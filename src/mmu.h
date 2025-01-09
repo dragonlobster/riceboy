@@ -4,8 +4,13 @@ public:
 
 	uint8_t get_value_from_address(uint16_t address);
 
+	void write_value_to_address(uint16_t address, uint8_t value);
+
 	// set boot completed to true
 	bool complete_boot();
+
+	// set cartridge loaded to true
+	bool complete_load_cartridge();
 
 private:
 
@@ -23,5 +28,8 @@ private:
 
 	// indicates of the boot rom has completed
 	bool is_boot_complete{ false };
+
+	// indicates if cartridge is loaded
+	bool is_cartridge_loaded{ false };
 
 };
