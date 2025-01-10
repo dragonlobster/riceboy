@@ -2,6 +2,7 @@
 //#include "DrawUtils.h"
 #include "HandleInput.h"
 #include "tinyfiledialogs.h"
+#include "Gameboy.h"
 
 
 int main() {
@@ -12,9 +13,13 @@ int main() {
 	//const char* ROM = tinyfd_openFileDialog("Open a Gameboy ROM", NULL, 1, lFilterPatterns, "*.gb", 0);
 	//if (!ROM) { exit(0); }
     
-    // TODO: load the BOOT ROM 
+	// initialize gameboy on heap
+	std::unique_ptr<Gameboy> riceboy = std::make_unique <Gameboy>();
 
-	// load the chosen ROM
+    // TODO: load the BOOT ROM 
+	riceboy->gb_cpu.load_boot_rom();
+
+	// TODO: load chosen cartridge
     
 	//sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH * DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }), "RiceBoy");
 
@@ -50,8 +55,12 @@ int main() {
 		const double delta_time = current_time - last_frame_time; // delta always calculates the difference between now within this frame and last frame
 		accumulator += delta_time; // add the delta time to the accumulator, we need to wait until it reachs ~1.67 milliseconds (59.7 fps, ~1.67ms / frame)
 
-		while (accumulator >= 1000.f / 59.7f) { // why while and not if? in the case that we missed out a whole frame for some reason, double the instructions will be processed (22 instructions, since twice loop until accumulator resets again) which is desirable in case we missed a set of instructions
-			// accumulator has reached 1.67 milliseconds or greater
+		while (accumulator >= 1000.f / 59.7f) { // why while and not if? in the case that we missed out a whole frame for some reason, double the instructions will be processed, which is desirable in case we missed a set of instructions
+
+			// TODO: Gameboy::clockspeed / 59.7275 should be the correct ipf
+			for (unsigned int i = 0; i < 70224; ++i) {
+				riceboy->gb_cpu.tick();
+			}
 
 			// 1pf concept?
 			//for (unsigned int i = 0; i < 11; ++i) {

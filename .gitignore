@@ -1,4 +1,5 @@
 build
+BOOT
 out
 .cache
 .idea

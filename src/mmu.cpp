@@ -29,7 +29,8 @@ uint8_t mmu::get_value_from_address(uint16_t address) {
 void mmu::write_value_to_address(uint16_t address, uint8_t value) {
 
 	if (address >= 0 && address <= 0x00ff && !this->is_boot_complete) {
-		// do nothing, can't write to boot ROM
+		// only write boot rom
+		this->memory_boot_rom[address] = value;
 	}
 
 	else if (address >= 0 && address <= 0x7fff && this->is_boot_complete && !is_cartridge_loaded) {
