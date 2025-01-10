@@ -52,6 +52,18 @@ public:
 
 	// load boot rom
 	void load_boot_rom();
+    
+    // registers
+    enum class registers {
+        A = 1,
+        B,
+        C,
+        D,
+        E,
+        H,
+        L, // 7,
+        NA // 8 means null
+    };
 
 private:
 
@@ -65,28 +77,28 @@ private:
 	// micro operations
 	// NOTE: d16 = address
 	void add_hl(); // add content from address HL to A
-	void add_a_r8(const char& r8); // add content from register r8 to A
-	void bit_b_r8(const char& r8, uint8_t b); // b is 0 or 1
+	void add_a_r8(const registers& r8); // add content from register r8 to A
+	void bit_b_r8(const registers& r8, uint8_t b); // b is 0 or 1
 	void call(bool check_z_flag);
 	void cp_a_imm8(); // compare immediate next byte with A no effect on A
 	void cp_a_hl(); // compare memory[hl] with A no effect on A
-	void inc_or_dec_r8(const char& r8, bool inc); // decrement register
-	void inc_or_dec_r16(const char& r1, const char& r2, bool inc, bool sp); // inc or dec r16 register, either SP (stack pointer) or 2 individual registers
+	void inc_or_dec_r8(const registers& r8, bool inc); // decrement register
+	void inc_or_dec_r16(const registers& r1, const registers& r2, bool inc, bool sp); // inc or dec r16 register, either SP (stack pointer) or 2 individual registers
 	void jp_imm16(bool check_z_flag); // absolute jump, check z flag
 	void jr_imm16(bool check_z_flag); // relative jump, check z flag
 	void ld_imm16_a(bool to_a); // to a means should i load imm16 to a, or a to imm16, covers ld_imm16_a and ld_a_imm16
-	void ld_r_r(const char& r_to, const char& r_from); // load value from 1 register to another register
-	void ld_r_imm8(const char& r);
-	void ld_rr_address(const char& r1, const char& r2, bool sp);
+	void ld_r_r(const registers& r_to, const registers& r_from); // load value from 1 register to another register
+	void ld_r_imm8(const registers& r);
+	void ld_rr_address(const registers& r1, const registers& r2, bool sp);
 	void ld_hl_a(bool increment); // hl+ and hl-
-	void pop_rr(const char& r1, const char& r2);
-	void push_rr(const char& r1, const char& r2);
+	void pop_rr(const registers& r1, const registers& r2);
+	void push_rr(const registers& r1, const registers& r2);
 	void ret(); // return
 	void rl_a(); // rotate left accumulator
-	void sla_r(const char& r); // rotate left accumulator
-	void rl_r(const char& r);
-	void sub_r(const char& r);
-	void xor_r(const char& r);
+	void sla_r(const registers& r); // rotate left accumulator
+	void rl_r(const registers& r);
+	void sub_r(const registers& r);
+	void xor_r(const registers& r);
 
 
 
@@ -104,6 +116,6 @@ private:
 	uint8_t _flags_to_byte() const; // const after function declaration makes it a compiler error to edit class members inside the function
 
 	// TODO: make enum
-	uint8_t* _get_register(const char& r8); // get the pointer to the register value based on char8
+	uint8_t* _get_register(const registers& r8); // get the pointer to the register value based on char8
 
 };
