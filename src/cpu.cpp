@@ -650,7 +650,8 @@ int cpu::handle_opcode(const uint8_t &opcode) {
         }
 
         case 0x20: {
-            jr_imm16(true); // JR e imm16
+            // TODO: jumped too much
+            //jr_imm16(true); // JR e imm16
             break;
         }
         /*
