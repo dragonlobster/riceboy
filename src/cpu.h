@@ -55,17 +55,20 @@ public:
     
     // registers
     enum class registers {
-        A = 1,
+        A,
         B,
         C,
         D,
         E,
         H,
-        L, // 7,
-        NA // 8 means null
+        L,
+        NA // NA means null (if register is SP
     };
 
+
 private:
+	// debugging only
+	std::vector<uint8_t> opcodes{};
 
 	// tick counter
 	uint8_t ticks{0};
@@ -90,7 +93,8 @@ private:
 	void ld_r_r(const registers& r_to, const registers& r_from); // load value from 1 register to another register
 	void ld_r_imm8(const registers& r);
 	void ld_rr_address(const registers& r1, const registers& r2, bool sp);
-	void ld_hl_a(bool increment); // hl+ and hl-
+	void ld_hl_a(bool increment); // hl+ and hl-, and hl
+    void ld_hl_r8(const registers& r); // hl+ and hl-, and hl
 	void pop_rr(const registers& r1, const registers& r2);
 	void push_rr(const registers& r1, const registers& r2);
 	void ret(); // return
