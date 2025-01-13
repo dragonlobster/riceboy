@@ -69,6 +69,7 @@ public:
 private:
 	// debugging only
 	std::vector<uint8_t> opcodes{};
+	std::vector<uint16_t> pcs{};
 
 	// tick counter
 	uint8_t ticks{0};
@@ -98,11 +99,14 @@ private:
 	void pop_rr(const registers& r1, const registers& r2);
 	void push_rr(const registers& r1, const registers& r2);
 	void ret(); // return
-	void rl_a(); // rotate left accumulator
+	void rla(); // rotate left accumulator
 	void sla_r(const registers& r); // rotate left accumulator
 	void rl_r(const registers& r);
 	void sub_r(const registers& r);
 	void xor_r(const registers& r);
+	void ld_c_a(); // also known as LDH (C), A
+	void ld_imm8_a(); // also known as LDH (n), A
+	void ld_rr_a(const registers& r1, const registers& r2); // load memory value from register pair address to A
 
 
 
