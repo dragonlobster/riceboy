@@ -91,7 +91,7 @@ class cpu {
                         bool sp); // inc or dec r16 register, either SP (stack
                                   // pointer) or 2 individual registers
     void jp_imm16(bool check_z_flag); // absolute jump, check z flag
-    void jr_imm16(bool check_z_flag); // relative jump, check z flag
+    void jr_s8(bool check_z_flag, bool nz); // relative jump, check z flag, nz means check if z flag is not 0
     void ld_imm16_a(bool to_a); // to a means should i load imm16 to a, or a to
                                 // imm16, covers ld_imm16_a and ld_a_imm16
     void ld_r_r(const registers &r_to,
@@ -109,8 +109,8 @@ class cpu {
     void rl_r(const registers &r);
     void sub_r(const registers &r);
     void xor_r(const registers &r);
-    void ld_c_a();    // also known as LDH (C), A
-    void ld_imm8_a(); // also known as LDH (n), A
+    void ld_c_a(bool to_a);    // also known as LDH (C), A, to_a reverses LD
+    void ld_imm8_a(bool to_a); // also known as LDH (n), A, to_a reverses LD
     void ld_rr_a(const registers &r1,
                  const registers
                      &r2); // load memory value from register pair address to A

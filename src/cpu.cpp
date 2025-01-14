@@ -106,7 +106,7 @@ void cpu::_write_memory(const uint16_t &address, const uint8_t &value) {
 
 // abstracted M-operations
 
-// TOOD: combine with add_a_r8 later on
+// TODO: combine with add_a_r8 later on
 void cpu::add_hl() {
     // TODO: if capture (this) goes out of scope it could cause crashes
     auto _add_hl = [=]() {
@@ -329,7 +329,7 @@ void cpu::jp_imm16(bool check_z_flag) {
     this->M_operations.push_back(get_lsb);
 }
 
-void cpu::jr_imm16(bool check_z_flag) {
+void cpu::jr_s8(const bool check_z_flag, const bool nz) {
     // TODO: check
     // get least and most significant byte via program_counter next
     auto get_value = [=]() {
@@ -353,7 +353,8 @@ void cpu::jr_imm16(bool check_z_flag) {
         this->PC = _combine_2_8bits(W, Z);
     };
 
-    if (!check_z_flag || !this->Zf) {
+    if (!check_z_flag || ((nz && !this->Zf) || (!nz && this->Zf))) {
+        // nz Z flag is 0, !nz Z flag is 1
         this->M_operations.push_back(set_pc);
     }
 
@@ -609,16 +610,21 @@ void cpu::xor_r(const registers &r) {
     this->Cf = false;
 }
 
-void cpu::ld_c_a() {
+void cpu::ld_c_a(const bool to_a) {
     auto m1 = [=]() {
-        uint16_t address = this->C | 0xff00;
-        this->_write_memory(address, this->A);
+        const uint16_t address = this->C | 0xff00;
+        if (to_a) {
+            this->A = this->_read_memory(address);
+        }
+        else {
+            this->_write_memory(address, this->A);
+        }
     };
 
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_imm8_a() {
+void cpu::ld_imm8_a(const bool to_a) {
     // read imm8
     auto m1 = [=]() {
         this->Z = _read_memory(this->PC);
@@ -626,8 +632,13 @@ void cpu::ld_imm8_a() {
     };
 
     auto m2 = [=]() {
-        uint16_t address = this->Z | 0xff00;
-        this->_write_memory(address, this->A);
+        const uint16_t address = this->Z | 0xff00;
+        if (to_a) {
+            this->A = _read_memory(address);
+        }
+        else {
+            this->_write_memory(address, this->A);
+        }
     };
 
     this->M_operations.push_back(m2);
@@ -706,7 +717,7 @@ int cpu::handle_opcode(const uint8_t &opcode) {
     }
 
     case 0x20: {
-        jr_imm16(true); // JR e imm16
+        jr_s8(true, true); // JR Z imm16
         break;
     }
 
@@ -721,12 +732,12 @@ int cpu::handle_opcode(const uint8_t &opcode) {
     }
 
     case 0xe2: {
-        ld_c_a(); // LD (C), A, or LDH (C) A
+        ld_c_a(false); // LD (C), A, or LDH (C) A
         break;
     }
 
     case 0x0c: {
-        inc_or_dec_r8(registers::C, true); // INC c
+        inc_or_dec_r8(registers::C, true); // INC C
         break;
     }
 
@@ -737,7 +748,7 @@ int cpu::handle_opcode(const uint8_t &opcode) {
 
     case 0xe0: {
         // LD (imm8) A
-        ld_imm8_a(); // LDH (n) A, or LD (imm8) A
+        ld_imm8_a(false); // LDH (n) A, or LD (imm8) A
         break;
     }
 
@@ -835,6 +846,60 @@ int cpu::handle_opcode(const uint8_t &opcode) {
     case 0x3d: {
         // DEC A
         inc_or_dec_r8(registers::A, false);
+        break;
+    }
+
+    case 0x28: {
+        // JR Z, s8
+        jr_s8(true, false);
+        break;
+    }
+
+    case 0x0d: {
+        // DEC C
+        inc_or_dec_r8(registers::C, false);
+        break;
+    }
+
+    case 0x2e: {
+        // LD L, imm8
+        ld_r_imm8(registers::L);
+        break;
+    }
+
+    case 0x18: {
+        // JR 8
+        jr_s8(false, false);
+        break;
+    }
+
+    case 0x67: {
+        // ld h, a
+        ld_r_r(registers::H, registers::A);
+        break;
+    }
+
+    case 0x57: {
+        // LD D A
+        ld_r_r(registers::D, registers::A);
+        break;
+    }
+
+    case 0x04: {
+        // INC B
+        inc_or_dec_r8(registers::B, true);
+        break;
+    }
+
+    case 0x1e: {
+        // LD E, imm8
+        ld_r_imm8(registers::E);
+        break;
+    }
+
+    case 0xf0: {
+        // LD A (imm8)
+        ld_imm8_a(true);
         break;
     }
 
