@@ -12,8 +12,11 @@ FetchContent_Declare(SFML
     SYSTEM)
 FetchContent_MakeAvailable(SFML)
 
-set(SOURCES src/main.cpp src/DrawUtils.cpp src/tinyfiledialogs.cpp src/Gameboy.cpp src/cpu.cpp src/mmu.cpp src/HandleInput.h src/tinyfiledialogs.h src/DrawUtils.h src/Gameboy.h src/cpu.h src/mmu.h)
+set(SOURCES src/main.cpp src/DrawUtils.cpp src/Gameboy.cpp src/cpu.cpp src/mmu.cpp src/HandleInput.h src/DrawUtils.h src/Gameboy.h src/cpu.h src/mmu.h)
+
+add_library(third_party INTERFACE)
+target_include_directories(third_party INTERFACE includes)
 
 add_executable(RiceBoy ${SOURCES})
 
-target_link_libraries(RiceBoy PRIVATE SFML::Graphics PRIVATE SFML::Audio)
+target_link_libraries(RiceBoy PRIVATE SFML::Graphics PRIVATE SFML::Audio PRIVATE third_party)
