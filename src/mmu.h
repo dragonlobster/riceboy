@@ -35,7 +35,7 @@ class mmu {
 
   private:
     // Interrupt enable flag - 0xFFFF
-    uint8_t interrupt_enable_flag;
+    uint8_t interrupt_enable_flag{};
 
     // zero page - ff80 - fffe, High RAM (127 bytes)
     uint8_t zero_page[(0xfffe - 0xff80) + 1]{};

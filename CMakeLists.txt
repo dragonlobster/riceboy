@@ -3,20 +3,16 @@ project(RiceBoy LANGUAGES CXX)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-include(FetchContent)
-FetchContent_Declare(SFML
-    GIT_REPOSITORY https://github.com/SFML/SFML.git
-    GIT_TAG 3.0.0
-    GIT_SHALLOW ON
-    EXCLUDE_FROM_ALL
-    SYSTEM)
-FetchContent_MakeAvailable(SFML)
+# gb components 
+add_subdirectory(src) 
+add_library(vendor INTERFACE)
+target_include_directories(vendor INTERFACE includes)
+target_link_libraries(gb_components PUBLIC vendor)
 
-set(SOURCES src/main.cpp src/DrawUtils.cpp src/Gameboy.cpp src/cpu.cpp src/mmu.cpp src/HandleInput.h src/DrawUtils.h src/Gameboy.h src/cpu.h src/mmu.h)
+# rice boy executable
+add_executable(RiceBoy src/main.cpp)
+target_link_libraries(RiceBoy PRIVATE gb_components)
 
-add_library(third_party INTERFACE)
-target_include_directories(third_party INTERFACE includes)
-
-add_executable(RiceBoy ${SOURCES})
-
-target_link_libraries(RiceBoy PRIVATE SFML::Graphics PRIVATE SFML::Audio PRIVATE third_party)
+# testing
+add_subdirectory(tests)
+target_link_libraries(GBTests PRIVATE gb_components)

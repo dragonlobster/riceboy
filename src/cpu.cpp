@@ -960,16 +960,16 @@ void cpu::tick() {
             const uint8_t opcode =
                 this->_read_memory(this->PC); // get current opcode
 
-            // TODO: debug only
+            /* DEBUG ONLY */
             if (opcodes.size() > 50) {
                 this->opcodes.erase(this->opcodes.begin());
             }
             if (pcs.size() > 50) {
                 this->pcs.erase(this->pcs.begin());
             }
-
             this->opcodes.push_back(opcode);
             this->pcs.push_back(this->PC);
+            /* DEBUG ONLY */
 
             this->PC++; // increment program counter
 
