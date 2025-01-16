@@ -224,7 +224,7 @@ void cpu::cp_a_imm8() {
 
         // sub_and_set_flags
         auto [result, z, n, h, c] = this->_subtraction_8bit(this->A, this->W);
-        //this->W = 0; // reset W (maybe not necessary)
+        // this->W = 0; // reset W (maybe not necessary)
 
         // TODO: M3/M1 - overlaps with the fetch of the next operation, should
         // occur 4 ticks after the last op, how to handle? set flags
@@ -338,6 +338,7 @@ void cpu::jr_s8(const bool check_z_flag, const bool nz) {
     };
 
     auto set_pc = [=]() {
+        /*
         uint8_t Z_sign = (this->Z >> 7) & 1;
         auto [msb, lsb] = _split_16bit(this->PC);
 
@@ -349,8 +350,12 @@ void cpu::jr_s8(const bool check_z_flag, const bool nz) {
         } else if (!c && Z_sign == 1) {
             adj = -1;
         }
-        W = msb + adj;
+        this->W = msb + adj;
         this->PC = _combine_2_8bits(W, Z);
+        */
+
+        int8_t e = static_cast<int8_t>(_read_memory(this->PC));
+        this->PC += e;
     };
 
     if (!check_z_flag || ((nz && !this->Zf) || (!nz && this->Zf))) {
@@ -615,8 +620,7 @@ void cpu::ld_c_a(const bool to_a) {
         const uint16_t address = this->C | 0xff00;
         if (to_a) {
             this->A = this->_read_memory(address);
-        }
-        else {
+        } else {
             this->_write_memory(address, this->A);
         }
     };
@@ -635,8 +639,7 @@ void cpu::ld_imm8_a(const bool to_a) {
         const uint16_t address = this->Z | 0xff00;
         if (to_a) {
             this->A = _read_memory(address);
-        }
-        else {
+        } else {
             this->_write_memory(address, this->A);
         }
     };
@@ -655,6 +658,27 @@ void cpu::ld_rr_a(const registers &r1, const registers &r2) {
     };
 
     this->M_operations.push_back(m1);
+}
+
+uint8_t cpu::identify_opcode(uint8_t opcode) {
+    this->PC++;            // increment program counter
+    handle_opcode(opcode); // handle the opcode
+    if (!this->M_operations.empty()) {
+        this->fetch_opcode = false; // going past fetch opcode,
+    }
+    return opcode;
+}
+
+void cpu::execute_M_operations() {
+    // execute any further instructions
+    if (!this->M_operations.empty()) {
+        std::function<void()> operation = this->M_operations.back();
+        this->M_operations.pop_back();
+        // TODO: check if this reference is valid
+        operation();
+    } else if (this->M_operations.empty()) {
+        this->fetch_opcode = true;
+    }
 }
 
 void cpu::load_boot_rom() {
@@ -802,7 +826,7 @@ int cpu::handle_opcode(const uint8_t &opcode) {
     }
 
     case 0x22: {
-        //LD HL+ A
+        // LD HL+ A
         ld_hl_a(true);
         break;
     }
@@ -954,11 +978,13 @@ void cpu::tick() {
     } else {
         this->ticks = 0; // reset ticks
 
-        switch (this->fetch_opcode) {
-        case true: {
+        if (this->fetch_opcode) {
+
             // fetch opcode, then execute what you can this M-cycle
             const uint8_t opcode =
                 this->_read_memory(this->PC); // get current opcode
+
+            identify_opcode(opcode);
 
             /* DEBUG ONLY */
             if (opcodes.size() > 50) {
@@ -968,32 +994,13 @@ void cpu::tick() {
                 this->pcs.erase(this->pcs.begin());
             }
             this->opcodes.push_back(opcode);
-            this->pcs.push_back(this->PC);
+            this->pcs.push_back(this->PC - 1);
             /* DEBUG ONLY */
-
-            this->PC++; // increment program counter
-
-            handle_opcode(opcode); // handle the opcode
-
-            if (!this->M_operations.empty()) {
-                this->fetch_opcode = false; // going past fetch opcode,
-                                            // executing more instructions
-            }
-            break;
         }
 
-        case false: {
+        else {
             // execute any further instructions
-            if (!this->M_operations.empty()) {
-                std::function<void()> operation = this->M_operations.back();
-                this->M_operations.pop_back();
-                // TODO: check if this reference is valid
-                operation();
-            } else if (this->M_operations.empty()) {
-                this->fetch_opcode = true;
-            }
-            break;
-        }
+            this->execute_M_operations();
         }
     }
 }

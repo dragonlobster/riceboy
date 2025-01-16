@@ -5,9 +5,9 @@
 #include <cstdint>
 class mmu {
   public:
-    uint8_t get_value_from_address(uint16_t address) const;
+    virtual uint8_t get_value_from_address(uint16_t address) const;
 
-    void write_value_to_address(uint16_t address, uint8_t value);
+    virtual void write_value_to_address(uint16_t address, uint8_t value);
 
     enum class section {
         restart_and_interrupt_vectors,

@@ -49,10 +49,18 @@ class cpu {
     int handle_opcode(const uint8_t &opcode);
     int handle_cb_opcode(const uint8_t &opcode);
 
+    void execute_M_operations(); // execute M operations and set state of fetch_opcode to true or false depending on whether all M operations have completed
+
+    uint8_t identify_opcode(uint8_t opcode); // get the next opcode and increment the PC
+
     void tick(); // single tick
 
     // load boot rom
     void load_boot_rom();
+
+    // read write memory
+    uint8_t _read_memory(const uint16_t &address);
+    void _write_memory(const uint16_t &address, const uint8_t &value);
 
     // registers
     enum class registers {
@@ -121,8 +129,6 @@ class cpu {
                      const uint8_t &r2); // get the register pairs value by
                                          // combining them into a 16 bit uint
     std::tuple<uint8_t, uint8_t> _split_16bit(const uint16_t &r16);
-    uint8_t _read_memory(const uint16_t &address);
-    void _write_memory(const uint16_t &address, const uint8_t &value);
 
     // all return result, zero, subtract, half-carry, carry
     std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(uint8_t x,

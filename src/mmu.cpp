@@ -148,7 +148,6 @@ uint8_t mmu::get_value_from_address(uint16_t address) const {
         return this->interrupt_enable_flag;
     }
 
-
     else {
         std::cout << "(read) memory not implemented: " //<< static_cast<unsigned int>(opcode)
                   << "hex: 0x" << std::hex << static_cast<unsigned int>(address)
@@ -235,7 +234,6 @@ void mmu::write_value_to_address(uint16_t address, uint8_t value) {
         mmu::section::interrupt_enable_flag) {
         this->interrupt_enable_flag = value;
     }
-
 
     else {
         std::cout << "(write) memory not implemented: " //<< static_cast<unsigned int>(opcode)
