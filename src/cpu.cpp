@@ -330,36 +330,21 @@ void cpu::jp_imm16(bool check_z_flag) {
 }
 
 void cpu::jr_s8(const bool check_z_flag, const bool nz) {
-    // TODO: check
-    // get least and most significant byte via program_counter next
+    // jump relative to signed 8 bit next in memory
     auto get_value = [=]() {
         this->Z = this->_read_memory(this->PC);
         this->PC++;
     };
 
     auto set_pc = [=]() {
-        /*
-        uint8_t Z_sign = (this->Z >> 7) & 1;
-        auto [msb, lsb] = _split_16bit(this->PC);
+        // 1001 0010
+        int8_t value = this->Z;
+        this->PC += value;
 
-        auto [result, z, n, h, c] = _addition_8bit(this->Z, lsb);
-        this->Z = result;
-        uint8_t adj{0};
-        if (c && Z_sign == 0) {
-            adj = 1;
-        } else if (!c && Z_sign == 1) {
-            adj = -1;
-        }
-        this->W = msb + adj;
-        this->PC = _combine_2_8bits(W, Z);
-        */
-
-        int8_t e = static_cast<int8_t>(_read_memory(this->PC));
-        this->PC += e;
     };
 
     if (!check_z_flag || ((nz && !this->Zf) || (!nz && this->Zf))) {
-        // nz Z flag is 0, !nz Z flag is 1
+        // nz jump if flag is 0, !nz jump if Z flag is 1
         this->M_operations.push_back(set_pc);
     }
 

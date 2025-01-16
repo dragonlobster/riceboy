@@ -27,24 +27,24 @@ cpu test_cpu = cpu(test_mmu);
 
 namespace sst {
 struct cpu_state {
-    uint16_t pc;
-    uint16_t sp;
-    uint8_t a;
-    uint8_t b;
-    uint8_t c;
-    uint8_t d;
-    uint8_t e;
-    uint8_t f;
-    uint8_t h;
-    uint8_t l;
-    int ime;
+    uint16_t pc{};
+    uint16_t sp{};
+    uint8_t a{};
+    uint8_t b{};
+    uint8_t c{};
+    uint8_t d{};
+    uint8_t e{};
+    uint8_t f{};
+    uint8_t h{};
+    uint8_t l{};
+    int ime{};
     //int ie; // final doesn't have ie, do i even test this?
     std::vector<std::array<int, 2>> ram;
 };
 
 struct cycles {
-    int address_pins;
-    int data_pins;
+    int address_pins{};
+    int data_pins{};
     std::string memory_request_pins;
 };
 
@@ -97,12 +97,12 @@ void test_setup(cpu& test_cpu, sst::cpu_state& initial) {
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {
-        znhc[i] = (initial.f << (7 - i)) & 1;
+        znhc[i] = (initial.f >> (7 - i)) & 1;
     }
-    test_cpu.Zf = znhc[0];
-    test_cpu.Nf = znhc[1];
-    test_cpu.Hf = znhc[2];
-    test_cpu.Cf = znhc[3];
+    test_cpu.Zf = znhc[0] == 1;
+    test_cpu.Nf = znhc[1] == 1;
+    test_cpu.Hf = znhc[2] == 1;
+    test_cpu.Cf = znhc[3] == 1;
 
     test_cpu.H = initial.h;
     test_cpu.L = initial.l;
@@ -124,7 +124,7 @@ void compare_final(cpu &test_cpu, sst::cpu_state &final) {
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {
-        znhc[i] = (final.f << (7 - i)) & 1;
+        znhc[i] = (final.f >> (7 - i)) & 1;
     }
     EXPECT_EQ(znhc[0], test_cpu.Zf);
     EXPECT_EQ(znhc[1], test_cpu.Nf);
@@ -144,7 +144,7 @@ TEST(CPUOpcodeTest, 0x31) {
     std::ifstream f("sm83/v1/31.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -163,7 +163,7 @@ TEST(CPUOpcodeTest, 0xaf) {
     std::ifstream f("sm83/v1/af.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -182,7 +182,7 @@ TEST(CPUOpcodeTest, 0x21) {
     std::ifstream f("sm83/v1/21.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -201,7 +201,7 @@ TEST(CPUOpcodeTest, 0x32) {
     std::ifstream f("sm83/v1/32.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -220,7 +220,7 @@ TEST(CPUOpcodeTest, 0x20) {
     std::ifstream f("sm83/v1/20.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -239,7 +239,7 @@ TEST(CPUOpcodeTest, 0x0e) {
     std::ifstream f("sm83/v1/0e.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
@@ -258,7 +258,7 @@ TEST(CPUOpcodeTest, 0x28) {
     std::ifstream f("sm83/v1/28.json");
     json data = json::parse(f);
 
-    for (json test_set : data) {
+    for (const json& test_set : data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
