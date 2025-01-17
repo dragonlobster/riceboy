@@ -14,5 +14,7 @@ add_executable(RiceBoy src/main.cpp)
 target_link_libraries(RiceBoy PRIVATE gb_components)
 
 # testing
+enable_testing()
 add_subdirectory(tests)
 target_link_libraries(GBTests PRIVATE gb_components)
+

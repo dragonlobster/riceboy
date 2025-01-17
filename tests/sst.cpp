@@ -4,8 +4,8 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include "opcodes.h" // import all opcodes
 using json = nlohmann::json;
-
 
 class sst_mmu : public mmu {
   public:
@@ -18,7 +18,6 @@ class sst_mmu : public mmu {
     void write_value_to_address(uint16_t address, uint8_t value) override {
         memory[address] = value;
     };
-
 };
 
 sst_mmu test_mmu{};
@@ -38,7 +37,7 @@ struct cpu_state {
     uint8_t h{};
     uint8_t l{};
     int ime{};
-    //int ie; // final doesn't have ie, do i even test this?
+    // int ie; // final doesn't have ie, do i even test this?
     std::vector<std::array<int, 2>> ram;
 };
 
@@ -73,7 +72,7 @@ void from_json(const json &j, cpu_state &cpu_state) {
     j.at("h").get_to(cpu_state.h);
     j.at("l").get_to(cpu_state.l);
     j.at("ime").get_to(cpu_state.ime);
-    //j.at("ie").get_to(cpu_state.ie);
+    // j.at("ie").get_to(cpu_state.ie);
     j.at("ram").get_to(cpu_state.ram);
 }
 
@@ -86,7 +85,7 @@ void from_json(const json &j, sst &sst) {
 
 } // namespace sst
 
-void test_setup(cpu& test_cpu, sst::cpu_state& initial) {
+void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
     test_cpu.PC = initial.pc;
     test_cpu.SP = initial.sp;
     test_cpu.A = initial.a;
@@ -137,19 +136,57 @@ void compare_final(cpu &test_cpu, sst::cpu_state &final) {
     for (const std::array<int, 2> &i : final.ram) {
         EXPECT_EQ(test_cpu._read_memory(i[0]), i[1]);
     }
-
 }
 
-TEST(CPUOpcodeTest, 0x31) {
-    std::ifstream f("sm83/v1/31.json");
-    json data = json::parse(f);
+class OpcodeTest : public testing::TestWithParam<uint8_t> {
+  public:
+    uint8_t value{};
+    json data{};
 
-    for (const json& test_set : data) {
+    void SetUp() override {
+        std::stringstream ss;
+        uint8_t value = GetParam();
+        ss << std::hex << std::setfill('0') << std::setw(2)
+           << static_cast<int>(value);
+        std::string filename = "sm83/v1/" + ss.str() + ".json";
+
+        std::cout << filename << '\n';
+        std::cout << std::filesystem::current_path() << '\n';
+
+        std::ifstream f(filename);
+
+        this->value = value;
+        this->data = json::parse(f);
+    }
+};
+
+class CBOpcodeTest : public OpcodeTest {
+  public:
+      void SetUp() override {
+        std::stringstream ss;
+        uint8_t value = GetParam();
+        ss << std::hex << std::setfill('0') << std::setw(2)
+           << static_cast<int>(value);
+        std::string filename = "sm83/v1/cb " + ss.str() + ".json";
+
+        std::cout << filename << '\n';
+        std::cout << std::filesystem::current_path() << '\n';
+
+        std::ifstream f(filename);
+
+        this->value = value;
+        this->data = json::parse(f);
+
+    }
+};
+
+TEST_P(OpcodeTest, opcode) {
+    for (const json &test_set : this->data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
         // fetch the opcode
-        test_cpu.identify_opcode(0x31);
+        test_cpu.identify_opcode(test_cpu._read_memory(test_cpu.PC));
         // execute the operations
         while (!test_cpu.M_operations.empty()) {
             test_cpu.execute_M_operations();
@@ -159,111 +196,13 @@ TEST(CPUOpcodeTest, 0x31) {
     }
 }
 
-TEST(CPUOpcodeTest, 0xaf) {
-    std::ifstream f("sm83/v1/af.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
+TEST_P(CBOpcodeTest, opcode_cb) {
+    for (const json &test_set : this->data) {
         sst::sst test = test_set.template get<sst::sst>();
         // initialize cpu values
         test_setup(test_cpu, test.initial);
         // fetch the opcode
-        test_cpu.identify_opcode(0xaf);
-        // execute the operations
-        while (!test_cpu.M_operations.empty()) {
-            test_cpu.execute_M_operations();
-        }
-        // see the final state
-        compare_final(test_cpu, test.final);
-    }
-}
-
-TEST(CPUOpcodeTest, 0x21) {
-    std::ifstream f("sm83/v1/21.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
-        sst::sst test = test_set.template get<sst::sst>();
-        // initialize cpu values
-        test_setup(test_cpu, test.initial);
-        // fetch the opcode
-        test_cpu.identify_opcode(0x21);
-        // execute the operations
-        while (!test_cpu.M_operations.empty()) {
-            test_cpu.execute_M_operations();
-        }
-        // see the final state
-        compare_final(test_cpu, test.final);
-    }
-}
-
-TEST(CPUOpcodeTest, 0x32) {
-    std::ifstream f("sm83/v1/32.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
-        sst::sst test = test_set.template get<sst::sst>();
-        // initialize cpu values
-        test_setup(test_cpu, test.initial);
-        // fetch the opcode
-        test_cpu.identify_opcode(0x32);
-        // execute the operations
-        while (!test_cpu.M_operations.empty()) {
-            test_cpu.execute_M_operations();
-        }
-        // see the final state
-        compare_final(test_cpu, test.final);
-    }
-}
-
-TEST(CPUOpcodeTest, 0x20) {
-    std::ifstream f("sm83/v1/20.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
-        sst::sst test = test_set.template get<sst::sst>();
-        // initialize cpu values
-        test_setup(test_cpu, test.initial);
-        // fetch the opcode
-        test_cpu.identify_opcode(0x20);
-        // execute the operations
-        while (!test_cpu.M_operations.empty()) {
-            test_cpu.execute_M_operations();
-        }
-        // see the final state
-        compare_final(test_cpu, test.final);
-    }
-}
-
-TEST(CPUOpcodeTest, 0x0e) {
-    std::ifstream f("sm83/v1/0e.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
-        sst::sst test = test_set.template get<sst::sst>();
-        // initialize cpu values
-        test_setup(test_cpu, test.initial);
-        // fetch the opcode
-        test_cpu.identify_opcode(0x0e);
-        // execute the operations
-        while (!test_cpu.M_operations.empty()) {
-            test_cpu.execute_M_operations();
-        }
-        // see the final state
-        compare_final(test_cpu, test.final);
-    }
-}
-
-TEST(CPUOpcodeTest, 0x28) {
-    std::ifstream f("sm83/v1/28.json");
-    json data = json::parse(f);
-
-    for (const json& test_set : data) {
-        sst::sst test = test_set.template get<sst::sst>();
-        // initialize cpu values
-        test_setup(test_cpu, test.initial);
-        // fetch the opcode
-        test_cpu.identify_opcode(0x28);
+        test_cpu.identify_opcode(test_cpu._read_memory(test_cpu.PC));
         // execute the operations
         while (!test_cpu.M_operations.empty()) {
             test_cpu.execute_M_operations();
@@ -274,3 +213,14 @@ TEST(CPUOpcodeTest, 0x28) {
 }
 
 
+std::string opcode_param_to_string(
+    const testing::TestParamInfo<OpcodeTest::ParamType> &info) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0') << std::setw(2)
+       << static_cast<int>(info.param);
+    return ss.str();
+}
+
+INSTANTIATE_TEST_SUITE_P(CPU, OpcodeTest, testing::ValuesIn(opcodes), opcode_param_to_string);
+
+INSTANTIATE_TEST_SUITE_P(CPU, CBOpcodeTest, testing::ValuesIn(cb_opcodes), opcode_param_to_string);

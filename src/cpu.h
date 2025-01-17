@@ -91,23 +91,23 @@ class cpu {
     void add_hl();                      // add content from address HL to A
     void add_a_r8(const registers &r8); // add content from register r8 to A
     void bit_b_r8(const registers &r8, uint8_t b); // b is 0 or 1
-    void call(bool check_z_flag);
+    void call(const bool &check_z_flag);
     void cp_a_imm8(); // compare immediate next byte with A no effect on A
     void cp_a_hl();   // compare memory[hl] with A no effect on A
-    void inc_or_dec_r8(const registers &r8, bool inc); // decrement register
-    void inc_or_dec_r16(const registers &r1, const registers &r2, bool inc,
-                        bool sp); // inc or dec r16 register, either SP (stack
+    void inc_or_dec_r8(const registers &r8, const bool &inc); // decrement register
+    void inc_or_dec_r16(const registers &r1, const registers &r2, const bool &inc,
+                        const bool &sp); // inc or dec r16 register, either SP (stack
                                   // pointer) or 2 individual registers
-    void jp_imm16(bool check_z_flag); // absolute jump, check z flag
-    void jr_s8(bool check_z_flag, bool nz); // relative jump, check z flag, nz means check if z flag is not 0
-    void ld_imm16_a(bool to_a); // to a means should i load imm16 to a, or a to
+    void jp_imm16(const bool &check_z_flag); // absolute jump, check z flag
+    void jr_s8(const bool &check_z_flag, const bool &nz); // relative jump, check z flag, nz means check if z flag is not 0
+    void ld_imm16_a(const bool &to_a); // to a means should i load imm16 to a, or a to
                                 // imm16, covers ld_imm16_a and ld_a_imm16
     void ld_r_r(const registers &r_to,
                 const registers
                     &r_from); // load value from 1 register to another register
     void ld_r_imm8(const registers &r);
-    void ld_rr_address(const registers &r1, const registers &r2, bool sp);
-    void ld_hl_a(bool increment);      // hl+ and hl-, and hl
+    void ld_rr_address(const registers &r1, const registers &r2, const bool &sp);
+    void ld_hl_a(const bool &increment);      // hl+ and hl-, and hl
     void ld_hl_r8(const registers &r); // hl+ and hl-, and hl
     void pop_rr(const registers &r1, const registers &r2);
     void push_rr(const registers &r1, const registers &r2);
@@ -117,8 +117,8 @@ class cpu {
     void rl_r(const registers &r);
     void sub_r(const registers &r);
     void xor_r(const registers &r);
-    void ld_c_a(bool to_a);    // also known as LDH (C), A, to_a reverses LD
-    void ld_imm8_a(bool to_a); // also known as LDH (n), A, to_a reverses LD
+    void ld_c_a(const bool &to_a);    // also known as LDH (C), A, to_a reverses LD
+    void ld_imm8_a(const bool &to_a); // also known as LDH (n), A, to_a reverses LD
     void ld_rr_a(const registers &r1,
                  const registers
                      &r2); // load memory value from register pair address to A

@@ -113,7 +113,6 @@ void cpu::add_hl() {
         const uint16_t hl = this->_combine_2_8bits(this->H, this->L);
         this->W =
             this->_read_memory(hl); // assign value of HL to temp register W
-        this->PC++;                 // increment PC
         // 1 M-cycle - add HL value to register A
         auto [result, z, n, h, c] = _addition_8bit(this->A, this->W);
 
@@ -128,8 +127,6 @@ void cpu::add_hl() {
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
-
-        this->PC++; // increment PC
     };
 
     // pushed backwards due to FIFO
@@ -168,7 +165,7 @@ void cpu::bit_b_r8(const registers &r8, uint8_t b) {
     this->M_operations.push_back(get_bit_of_r8);
 }
 
-void cpu::call(const bool check_z_flag) {
+void cpu::call(const bool &check_z_flag) {
     // get least and most significant byte via program_counter next
     // M2
     auto get_lsb = [=]() {
@@ -242,11 +239,9 @@ void cpu::cp_a_hl() {
     auto read_hl = [=]() {
         uint16_t hl = _combine_2_8bits(this->H, this->L);
         this->W = this->_read_memory(hl); // memory[hl] stored in W
-        this->PC++;
 
         // sub an set flags
         auto [result, z, n, h, c] = this->_subtraction_8bit(this->A, this->W);
-        this->W = 0; // reset W (maybe not necessary)
 
         // set flags
         this->Zf = z;
@@ -259,7 +254,7 @@ void cpu::cp_a_hl() {
     this->M_operations.push_back(read_hl);
 }
 
-void cpu::inc_or_dec_r8(const registers &r8, const bool inc) {
+void cpu::inc_or_dec_r8(const registers &r8, const bool &inc) {
     uint8_t *register_pointer = this->_get_register(r8);
 
     if (inc) {
@@ -278,8 +273,8 @@ void cpu::inc_or_dec_r8(const registers &r8, const bool inc) {
     }
 }
 
-void cpu::inc_or_dec_r16(const registers &r1, const registers &r2, bool inc,
-                         bool sp) {
+void cpu::inc_or_dec_r16(const registers &r1, const registers &r2, const bool &inc,
+                         const bool &sp) {
     auto _inc_or_dec_r16 = [=]() {
         if (sp && inc) {
             this->SP++;
@@ -306,7 +301,7 @@ void cpu::inc_or_dec_r16(const registers &r1, const registers &r2, bool inc,
     this->M_operations.push_back(_inc_or_dec_r16);
 }
 
-void cpu::jp_imm16(bool check_z_flag) {
+void cpu::jp_imm16(const bool &check_z_flag) {
     // get least and most significant byte via program_counter next
     auto get_lsb = [=]() {
         this->W = this->_read_memory(this->PC);
@@ -329,7 +324,7 @@ void cpu::jp_imm16(bool check_z_flag) {
     this->M_operations.push_back(get_lsb);
 }
 
-void cpu::jr_s8(const bool check_z_flag, const bool nz) {
+void cpu::jr_s8(const bool &check_z_flag, const bool &nz) {
     // jump relative to signed 8 bit next in memory
     auto get_value = [=]() {
         this->Z = this->_read_memory(this->PC);
@@ -351,7 +346,7 @@ void cpu::jr_s8(const bool check_z_flag, const bool nz) {
     this->M_operations.push_back(get_value);
 }
 
-void cpu::ld_imm16_a(bool to_a) {
+void cpu::ld_imm16_a(const bool &to_a) {
     auto m1 = [=]() {
         this->Z = this->_read_memory(PC); // lsb
         PC++;
@@ -364,7 +359,7 @@ void cpu::ld_imm16_a(bool to_a) {
 
     auto m3 = [=]() {
         uint16_t address = this->_combine_2_8bits(W, Z);
-        if (to_a) {
+        if (!to_a) {
             this->_write_memory(address, this->A); // write A to address
         } else {
             this->A =
@@ -394,7 +389,7 @@ void cpu::ld_r_imm8(const registers &r) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_rr_address(const registers &r1, const registers &r2, bool sp) {
+void cpu::ld_rr_address(const registers &r1, const registers &r2, const bool &sp) {
     auto m1 = [=]() {
         this->Z = this->_read_memory(PC); // lsb
         this->PC++;
@@ -420,7 +415,7 @@ void cpu::ld_rr_address(const registers &r1, const registers &r2, bool sp) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_hl_a(bool increment) {
+void cpu::ld_hl_a(const bool &increment) {
     auto m1 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
@@ -512,8 +507,9 @@ void cpu::rla() {
     auto m1 = [=]() {
         uint8_t msbit = (this->A >> 7) & 1;    // save the "carry" bit
         uint8_t carry_flag = this->Cf ? 1 : 0; // take current carry flag
-        this->A <<= 1;                         // left shift A by 1 bit
-        this->A = (this->A & 0) | carry_flag;  // put carry_flag into bit 0
+        this->A = this->A << 1;                         // left shift A by 1 bit
+
+        this->A = (this->A & 0xfe) | carry_flag;  // put carry_flag into bit 0
 
         // set flags
         this->Zf = false;
@@ -559,7 +555,7 @@ void cpu::rl_r(const registers &r) {
         uint8_t carry_flag = this->Cf ? 1 : 0;
         *rp <<= 1;
         // clear last bit first, then or it with the carry flag
-        *rp = (*rp & 0) | carry_flag;
+        *rp = (*rp & 0xfe) | carry_flag;
 
         // set flags
         this->Zf = *rp == 0;
@@ -600,7 +596,7 @@ void cpu::xor_r(const registers &r) {
     this->Cf = false;
 }
 
-void cpu::ld_c_a(const bool to_a) {
+void cpu::ld_c_a(const bool &to_a) {
     auto m1 = [=]() {
         const uint16_t address = this->C | 0xff00;
         if (to_a) {
@@ -613,7 +609,7 @@ void cpu::ld_c_a(const bool to_a) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_imm8_a(const bool to_a) {
+void cpu::ld_imm8_a(const bool &to_a) {
     // read imm8
     auto m1 = [=]() {
         this->Z = _read_memory(this->PC);
@@ -909,6 +905,63 @@ int cpu::handle_opcode(const uint8_t &opcode) {
     case 0xf0: {
         // LD A (imm8)
         ld_imm8_a(true);
+        break;
+    }
+    
+    case 0x1d: {
+        // DEC E
+        inc_or_dec_r8(registers::E, false);
+        break;
+    }
+
+    case 0x24: {
+        // INC H
+        inc_or_dec_r8(registers::H, true);
+        break;
+    }
+
+    case 0x7c: {
+        // LD A, H
+        ld_r_r(registers::A, registers::H);
+        break;
+    }
+
+    case 0x90: {
+        // SUB B
+        sub_r(registers::B);
+        break;
+    }
+
+    case 0x15: {
+        // DEC D
+        inc_or_dec_r8(registers::D, false);
+        break;
+    }
+
+    case 0x16: {
+        // LD D, imm8
+        ld_r_imm8(registers::D);
+        break;
+    }
+
+    case 0xbe: {
+        // CP A HL
+        cp_a_hl();
+        break;
+    }
+
+    case 0x7d: {
+        ld_r_r(registers::A, registers::L);
+        break;
+    }
+
+    case 0x78: {
+        ld_r_r(registers::A, registers::B);
+        break;
+    }
+
+    case 0x86: {
+        add_hl();
         break;
     }
 
