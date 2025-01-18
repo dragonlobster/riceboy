@@ -7,6 +7,8 @@ class mmu {
   public:
     virtual uint8_t get_value_from_address(uint16_t address) const;
 
+    uint8_t* get_pointer_from_address(uint16_t address);
+
     virtual void write_value_to_address(uint16_t address, uint8_t value);
 
     enum class section {

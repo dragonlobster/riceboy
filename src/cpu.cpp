@@ -273,8 +273,8 @@ void cpu::inc_or_dec_r8(const registers &r8, const bool &inc) {
     }
 }
 
-void cpu::inc_or_dec_r16(const registers &r1, const registers &r2, const bool &inc,
-                         const bool &sp) {
+void cpu::inc_or_dec_r16(const registers &r1, const registers &r2,
+                         const bool &inc, const bool &sp) {
     auto _inc_or_dec_r16 = [=]() {
         if (sp && inc) {
             this->SP++;
@@ -335,7 +335,6 @@ void cpu::jr_s8(const bool &check_z_flag, const bool &nz) {
         // 1001 0010
         int8_t value = this->Z;
         this->PC += value;
-
     };
 
     if (!check_z_flag || ((nz && !this->Zf) || (!nz && this->Zf))) {
@@ -389,7 +388,8 @@ void cpu::ld_r_imm8(const registers &r) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_rr_address(const registers &r1, const registers &r2, const bool &sp) {
+void cpu::ld_rr_address(const registers &r1, const registers &r2,
+                        const bool &sp) {
     auto m1 = [=]() {
         this->Z = this->_read_memory(PC); // lsb
         this->PC++;
@@ -507,9 +507,9 @@ void cpu::rla() {
     auto m1 = [=]() {
         uint8_t msbit = (this->A >> 7) & 1;    // save the "carry" bit
         uint8_t carry_flag = this->Cf ? 1 : 0; // take current carry flag
-        this->A = this->A << 1;                         // left shift A by 1 bit
+        this->A = this->A << 1;                // left shift A by 1 bit
 
-        this->A = (this->A & 0xfe) | carry_flag;  // put carry_flag into bit 0
+        this->A = (this->A & 0xfe) | carry_flag; // put carry_flag into bit 0
 
         // set flags
         this->Zf = false;
@@ -907,7 +907,7 @@ int cpu::handle_opcode(const uint8_t &opcode) {
         ld_imm8_a(true);
         break;
     }
-    
+
     case 0x1d: {
         // DEC E
         inc_or_dec_r8(registers::E, false);
@@ -1011,34 +1011,25 @@ int cpu::handle_cb_opcode(const uint8_t &cb_opcode) {
 
 void cpu::tick() {
     this->ticks++;
+
+    // inject ppu tick here
+    // TODO: if ppu tick resets, defer the tick reset to 0 until after CPU does its thing
+
     if (ticks < 4) {
         return;
-    } else {
-        this->ticks = 0; // reset ticks
+    }
 
-        if (this->fetch_opcode) {
+    this->ticks = 0; // reset ticks
 
-            // fetch opcode, then execute what you can this M-cycle
-            const uint8_t opcode =
-                this->_read_memory(this->PC); // get current opcode
+    if (this->fetch_opcode) {
+        // fetch opcode, then execute what you can this M-cycle
+        const uint8_t opcode =
+            this->_read_memory(this->PC); // get current opcode
+        identify_opcode(opcode);
 
-            identify_opcode(opcode);
-
-            /* DEBUG ONLY */
-            if (opcodes.size() > 50) {
-                this->opcodes.erase(this->opcodes.begin());
-            }
-            if (pcs.size() > 50) {
-                this->pcs.erase(this->pcs.begin());
-            }
-            this->opcodes.push_back(opcode);
-            this->pcs.push_back(this->PC - 1);
-            /* DEBUG ONLY */
-        }
-
-        else {
-            // execute any further instructions
-            this->execute_M_operations();
-        }
+    }
+    else {
+        // execute any further instructions
+        this->execute_M_operations();
     }
 }

@@ -13,7 +13,7 @@ class cpu {
 
   public:
     // pointer to mmu
-    cpu(mmu &);    // pass by reference
+    cpu(mmu &mmu);    // pass by reference
     mmu *gb_mmu{}; // the central mmu
 
     // main 8-bit registers

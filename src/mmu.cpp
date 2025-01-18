@@ -70,6 +70,28 @@ mmu::section mmu::locate_section(uint16_t address) {
     return mmu::section::unknown;
 }
 
+uint8_t* mmu::get_pointer_from_address(const uint16_t address){ // for PPU, will modify
+    if (locate_section(address) ==
+        mmu::section::character_ram) {
+        return &(this->character_ram[address - 0x8000]);
+    }
+
+    else if (locate_section(address) ==
+        mmu::section::bg_map_data_1) {
+        return &(this->bg_map_data_1[address - 0x9800]);
+    }
+
+    else if (locate_section(address) ==
+        mmu::section::bg_map_data_2) {
+        return &(this->bg_map_data_2[address - 0x9c00]);
+    }
+
+    std::cout << "(read) memory not implemented: " //<< static_cast<unsigned int>(opcode)
+              << "hex: 0x" << std::hex << static_cast<unsigned int>(address)
+              << std::endl;
+    return nullptr;
+}
+
 // TODO: make more elegant by segregating each address space
 uint8_t mmu::get_value_from_address(uint16_t address) const {
 
