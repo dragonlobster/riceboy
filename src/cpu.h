@@ -80,7 +80,7 @@ class cpu {
     std::vector<uint16_t> pcs{};
 
     // tick counter
-    uint8_t ticks{0};
+    uint16_t ticks{0};
 
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};

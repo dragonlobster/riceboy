@@ -2,11 +2,70 @@
 
 #include "mmu.h"
 #include <array>;
+#include <vector>
+#include <SFML/Graphics.hpp>
+
+class fetcher {
+  public:
+    mmu &gb_mmu;
+
+    const uint8_t *LY{};
+    const uint8_t *SCX{};
+    const uint8_t *SCY{};
+    const uint8_t *LCDC{};
+    const uint8_t *BGP{};
+
+    fetcher(mmu &gb_mmu_) : gb_mmu(gb_mmu_) {
+        this->LCDC = this->gb_mmu.get_pointer_from_address(0xff40);
+        this->LY = this->gb_mmu.get_pointer_from_address(0xff44);
+        this->SCY = this->gb_mmu.get_pointer_from_address(0xff42);
+        this->SCX = this->gb_mmu.get_pointer_from_address(0xff43);
+        this->BGP = this->gb_mmu.get_pointer_from_address(0xff47);
+    };
+
+    // fetcher states
+    uint16_t fetcher_ticks{0};
+    uint16_t tile_index{0}; // incremented after every push to FIFO
+    void tick();
+    enum class mode {
+        FetchTileNo = 0,
+        FetchTileDataLow = 1,
+        FetchTileDataHigh = 2,
+        PushToFIFO = 3
+    };
+    uint8_t tile_id{0};   // the current tile id read
+    mode current_mode{0}; // start at fetch tile no
+
+    // temporary pixel buffer before merging to fifo
+    // stores all 1 bit numbers at first, then 2bpp
+    // stored from lsb to msb, need to push out backwards to FIFO (first in
+    // first out)
+    std::array<uint8_t, 8> pixel_buffer{};
+
+    // background FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
+    std::vector<uint8_t> fifo{}; // 2 bits
+
+};
 
 class ppu {
   public:
-    ppu(mmu &mmu); // pass mmu by reference
-    mmu *gb_mmu{}; // the central mmu
+    mmu &gb_mmu; // the central mmu
+
+    ppu(mmu &gb_mmu_)
+        : gb_mmu(gb_mmu_) {
+        this->LCDC = this->gb_mmu.get_pointer_from_address(0xff40);
+        this->STAT = this->gb_mmu.get_pointer_from_address(0xff41);
+        this->SCY = this->gb_mmu.get_pointer_from_address(0xff42);
+        this->SCX = this->gb_mmu.get_pointer_from_address(0xff43);
+        this->LY = this->gb_mmu.get_pointer_from_address(0xff44);
+        this->LYC = this->gb_mmu.get_pointer_from_address(0xff45);
+        this->DMA = this->gb_mmu.get_pointer_from_address(0xff46);
+        this->BGP = this->gb_mmu.get_pointer_from_address(0xff47);
+        this->OBP0 = this->gb_mmu.get_pointer_from_address(0xff48);
+        this->OBP1 = this->gb_mmu.get_pointer_from_address(0xff49);
+        this->WX = this->gb_mmu.get_pointer_from_address(0xff4b);
+        this->WY = this->gb_mmu.get_pointer_from_address(0xff4a);
+    }; // pass mmu by reference
 
     // WY register: in memory 0xff4a
     // WX register: in memory 0xff4b (7 means left of screen)
@@ -39,36 +98,43 @@ class ppu {
     uint8_t *WY{};
 
     // 4 modes
-    enum class mode {
-        OAM_Scan = 2,
-        Drawing = 3,
-        HBlank = 0,
-        VBlank = 1
-    };
+    enum class mode { OAM_Scan = 2, Drawing = 3, HBlank = 0, VBlank = 1 };
 
-    mode current_mode{};
+    mode current_mode{2}; // start at OAM Scan
 
     // tick counter
-    uint8_t ticks{0};
+    uint16_t ppu_ticks{0}; // resets every LY
+
+    // fetcher
+
+    // initialize the fetcher
+    fetcher ppu_fetcher = fetcher(gb_mmu);
+
+    // # of pixels output to the current scanline
+    uint8_t dot_count{0};
 
     // main tick function
     void tick();
 
-    // pixel fetcher every 2 T-cycles
-    void pixel_fetcher_tick();
-
     // background map 0x9800 to 0x9bff, tile data: 0x8000 to 0x8fff
 
+    // OAM sprite metadata 0xfe00 - 0xfe9f
+    uint8_t oam_buffer_counter{0};
+    const uint16_t OAM_START_ADDRESS{0xfe00};
+    const uint16_t OAM_END_ADDRESS{0xfe9f};
 
     // TODO: maybe use std::array
-    // sprite buffer - stores 10 pixels (10 2-bits)
-    std::array<uint8_t, 10> sprite_buffer; // 2 bits
+    // store sprite metadata (4 bytes each), fits up to 10 pixels
+    std::vector<std::array<uint8_t, 4>> oam_buffer{};
 
-    // background FIFO, sprite FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
-    uint8_t background_fifo[8]{}; // 2 bits
-    uint8_t sprite_fifo[8]{}; // 2 bits
+    // LCD pixels to display
+    std::vector<sf::RectangleShape> lcd_dots{};
+
+    // palette
+    //std::array<std::array<uint16_t, 3>, 4> bg_lcd_palette 
+    uint16_t bg_lcd_palette[4][3] = {{0, 50, 31}, {0, 32, 22}, {0, 29, 19}, {0, 19, 12}};
 
     /* functions */
-    void add_to_sprite_buffer();
-
+    void add_to_sprite_buffer(
+        std::array<uint8_t, 4> oam_entry); // each sprite is 4 bytes
 };

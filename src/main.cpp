@@ -1,5 +1,5 @@
 #include <SFML/Graphics.hpp>
-//#include "DrawUtils.h"
+#include "DrawUtils.h"
 #include "Gameboy.h"
 #include "HandleInput.h"
 #include "vendor/tinyfiledialogs.h"
@@ -11,9 +11,13 @@ int main() {
     // const char* lFilterPatterns[1] = { "*.gb" };
     // const char* ROM = tinyfd_openFileDialog("Open a Gameboy ROM", NULL, 1,
     // lFilterPatterns, "*.gb", 0); if (!ROM) { exit(0); }
+    sf::RenderWindow window(sf::VideoMode({160 * DrawUtils::SCALE, 144 * DrawUtils::SCALE}), "RiceBoy");
+
+    // window.setFramerateLimit(60);
+    window.setVerticalSyncEnabled(true);
 
     // initialize gameboy on heap
-    std::unique_ptr<Gameboy> riceboy = std::make_unique<Gameboy>();
+    std::unique_ptr<Gameboy> riceboy = std::make_unique<Gameboy>(window);
 
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
@@ -23,10 +27,6 @@ int main() {
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
     // "RiceBoy");
-
-    sf::RenderWindow window(sf::VideoMode({160, 144}), "RiceBoy");
-    // window.setFramerateLimit(60);
-    window.setVerticalSyncEnabled(true);
 
     double accumulator{0};
     double last_frame_time{0};
@@ -72,7 +72,14 @@ int main() {
             // TODO: Gameboy::clockspeed / 59.7275 should be the correct ipf
             for (unsigned int i = 0; i < 70224; ++i) {
                 riceboy->gb_cpu.tick();
+                riceboy->gb_ppu.tick();
             }
+
+            window.clear(sf::Color::White);
+            for (const sf::RectangleShape &d : riceboy->gb_ppu.lcd_dots) {
+                window.draw(d);
+            }
+            window.display();
 
             // 1pf concept?
             // for (unsigned int i = 0; i < 11; ++i) {
@@ -85,7 +92,6 @@ int main() {
         }
 
         // clear/draw/display
-        window.clear();
 
         // TODO: draw
 

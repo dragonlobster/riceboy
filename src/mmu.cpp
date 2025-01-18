@@ -86,6 +86,16 @@ uint8_t* mmu::get_pointer_from_address(const uint16_t address){ // for PPU, will
         return &(this->bg_map_data_2[address - 0x9c00]);
     }
 
+    else if (locate_section(address) ==
+        mmu::section::hardware_registers) {
+        return &(this->hardware_registers[address - 0xff00]);
+    }
+
+    else if (locate_section(address) ==
+        mmu::section::oam_ram) {
+        return &(this->oam_ram[address - 0xfe00]);
+    }
+
     std::cout << "(read) memory not implemented: " //<< static_cast<unsigned int>(opcode)
               << "hex: 0x" << std::hex << static_cast<unsigned int>(address)
               << std::endl;
