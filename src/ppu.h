@@ -132,7 +132,7 @@ class ppu {
 
     // palette
     //std::array<std::array<uint16_t, 3>, 4> bg_lcd_palette 
-    uint16_t bg_lcd_palette[4][3] = {{0, 50, 31}, {0, 32, 22}, {0, 29, 19}, {0, 19, 12}};
+    uint16_t bg_lcd_palette[4][3] = {{58, 81, 34}, {93, 120, 46}, {145, 155, 58}, {181, 175, 66}};
 
     /* functions */
     void add_to_sprite_buffer(

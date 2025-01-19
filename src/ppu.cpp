@@ -43,19 +43,21 @@ void fetcher::tick() {
 
         // fetch tile no.
         // TODO: uncomment later
-        // uint16_t scx_offset = (tile_index + (*SCX / 8) & 0x1f) & 0x3ff;
-        // uint16_t scy_offset = (32 * (*LY + *SCY & 0xff) / 8) & 0x3ff;
-        // uint16_t address = bgmap_start + scx_offset + scy_offset;
+        uint16_t scx_offset = (tile_index + (*SCX / 8) & 0x1f) & 0x3ff;
+        uint16_t scy_offset = (32 * (*LY + *SCY & 0xff) / 8) & 0x3ff;
+        uint16_t address = bgmap_start + scx_offset + scy_offset;
 
         // TODO: tile_index never resets
-        uint16_t address = ((0x9800) + (*LY / 8) * 32) + tile_index;
+        // uint16_t address = ((0x9800) + (*LY / 8) * 32) + tile_index;
+
+        // TODO: here
 
         this->tile_id = this->gb_mmu.get_value_from_address(address);
         this->current_mode = fetcher::mode::FetchTileDataLow;
         break;
     }
     case fetcher::mode::FetchTileDataLow: {
-        uint16_t offset = 2 * ((*LY + *SCY) % 8);
+        uint16_t offset = 2 * (*LY + *SCY) % 8;
         uint8_t low_byte{};
 
         // 8000 method or 8800 method to read
@@ -79,7 +81,7 @@ void fetcher::tick() {
     }
 
     case fetcher::mode::FetchTileDataHigh: {
-        uint16_t offset = 2 * ((*LY + *SCY) % 8);
+        uint16_t offset = 2 * (*LY + *SCY) % 8;
         uint8_t high_byte{};
 
         // 8000 method or 8800 method to read
@@ -146,7 +148,7 @@ void ppu::tick() {
             this->ppu_fetcher.tile_index = 0;
 
             // set the ppu fetcher mode
-            //this->ppu_fetcher.current_mode = fetcher::mode::FetchTileNo;
+            // this->ppu_fetcher.current_mode = fetcher::mode::FetchTileNo;
 
             this->current_mode = mode::Drawing;
         }
@@ -172,7 +174,6 @@ void ppu::tick() {
             uint16_t g = bg_lcd_palette[0][1];
             uint16_t b = bg_lcd_palette[0][2];
 
-            // TODO: misunderstanding of fifo - fifo holds 1 bit at a time
             uint8_t dot = this->ppu_fetcher.fifo.back();
             this->ppu_fetcher.fifo.pop_back();
 
@@ -281,6 +282,7 @@ void ppu::tick() {
         }
 
         // TODO: draw without fifo first, remove after
+
 
         this->dot_count++;
         if (dot_count == 160) {
