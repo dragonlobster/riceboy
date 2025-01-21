@@ -23,7 +23,9 @@ class Gameboy {
     // TODO: mmu, cpu, ppu
     mmu gb_mmu{};
     cpu gb_cpu = cpu(gb_mmu);
-    ppu gb_ppu = ppu(gb_mmu);
+    ppu gb_ppu = ppu(gb_mmu, window);
+
+    void tick();
 
   private:
 };

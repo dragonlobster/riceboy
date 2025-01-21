@@ -17,3 +17,17 @@ sf::RectangleShape DrawUtils::add_pixel(sf::Vector2f position, std::uint8_t red,
                     static_cast<float>(DrawUtils::SCALE)});
     return pixel;
 }
+
+sf::Vertex DrawUtils::add_vertex(sf::Vector2f position, std::uint8_t red, std::uint8_t green, std::uint8_t blue) {
+
+    sf::Vertex vertex{};
+
+    float x = position.x * DrawUtils::SCALE;
+    float y = position.y * DrawUtils::SCALE;
+
+    vertex.position = {x, y};
+    vertex.color = {red, green, blue};
+
+    return vertex;
+
+}

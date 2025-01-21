@@ -1,5 +1,6 @@
 #include "ppu.h"
 #include "DrawUtils.h"
+#include <iostream>
 
 // determine if sprite should be added to sprite buffer
 // TODO: need to change this to get all 4 bytes of the OAM sprite metadata
@@ -57,13 +58,13 @@ void fetcher::tick() {
         break;
     }
     case fetcher::mode::FetchTileDataLow: {
-        uint16_t offset = 2 * (*LY + *SCY) % 8;
+        uint16_t offset = 2 * *LY + (*SCY % 8);
         uint8_t low_byte{};
 
         // 8000 method or 8800 method to read
         if (((*LCDC >> 4) & 1) == 1) {
             // 8000 method
-            uint16_t address = 0x8000 + tile_id * 16 + offset;
+            uint16_t address = 0x8000 + (tile_id * 16) + offset;
             low_byte = this->gb_mmu.get_value_from_address(address);
         } else {
             // 8800 method
@@ -81,13 +82,13 @@ void fetcher::tick() {
     }
 
     case fetcher::mode::FetchTileDataHigh: {
-        uint16_t offset = 2 * (*LY + *SCY) % 8;
+        uint16_t offset = 2 * *LY + (*SCY % 8);
         uint8_t high_byte{};
 
         // 8000 method or 8800 method to read
         if ((*LCDC >> 4 & 1) == 1) {
             // 8000 method
-            uint16_t address = 0x8000 + tile_id * 16 + offset + 1;
+            uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
             high_byte = this->gb_mmu.get_value_from_address(address);
         } else {
             // 8800 method
@@ -161,23 +162,29 @@ void ppu::tick() {
 
         if (!this->ppu_fetcher.fifo.empty()) {
             // draw
+            /*
             float f_dot_count = dot_count;
             float f_ly = *(this->LY);
             sf::Vector2f position = {f_dot_count, f_ly};
+            */
+            uint16_t f_dot_count = dot_count;
+            uint16_t f_ly = *(this->LY);
+            sf::Vector2u position = {f_dot_count, f_ly};
 
             uint8_t id_0 = *BGP & 0x03;      // id 0
             uint8_t id_1 = *BGP >> 2 & 0x03; // id 1
             uint8_t id_2 = *BGP >> 4 & 0x03; // id 2
             uint8_t id_3 = *BGP >> 6 & 0x03; // id 3
 
-            uint16_t r = bg_lcd_palette[0][0];
-            uint16_t g = bg_lcd_palette[0][1];
-            uint16_t b = bg_lcd_palette[0][2];
+            uint8_t r = bg_lcd_palette[0][0];
+            uint8_t g = bg_lcd_palette[0][1];
+            uint8_t b = bg_lcd_palette[0][2];
 
             uint8_t dot = this->ppu_fetcher.fifo.back();
             this->ppu_fetcher.fifo.pop_back();
 
             if (dot == id_0) {
+                std::cout << "";
                 if (id_0 == 0) {
                     r = bg_lcd_palette[0][0];
                     g = bg_lcd_palette[0][1];
@@ -201,6 +208,7 @@ void ppu::tick() {
             }
 
             else if (dot == id_1) {
+                std::cout << "";
                 if (id_1 == 0) {
                     r = bg_lcd_palette[0][0];
                     g = bg_lcd_palette[0][1];
@@ -224,6 +232,7 @@ void ppu::tick() {
             }
 
             else if (dot == id_2) {
+                std::cout << "";
                 if (id_2 == 0) {
                     r = bg_lcd_palette[0][0];
                     g = bg_lcd_palette[0][1];
@@ -247,6 +256,7 @@ void ppu::tick() {
             }
 
             else if (dot == id_3) {
+                std::cout << "";
                 if (id_3 == 0) {
                     r = bg_lcd_palette[0][0];
                     g = bg_lcd_palette[0][1];
@@ -269,22 +279,43 @@ void ppu::tick() {
                 }
             }
 
-            sf::RectangleShape lcd_dot =
-                DrawUtils::add_pixel(position, r, g, b);
+            //sf::Vertex lcd_dot =
+            //    DrawUtils::add_vertex(position, r, g, b);
 
-            this->lcd_dots.push_back(lcd_dot);
+            this->lcd_dots.push_back(dot);
+
+            // TODO: is there a better way to do this?
+            // fill up entire screen
+            uint16_t position_y_offset = 0;
+            for (uint16_t i = 0; i < DrawUtils::SCALE*DrawUtils::SCALE; ++i) {
+                uint16_t position_x = (i % DrawUtils::SCALE) + (position.x * DrawUtils::SCALE);
+                if (i % DrawUtils::SCALE == 0 && i != 0) {
+                    position_y_offset++;
+                }
+                uint16_t position_y = (position.y * DrawUtils::SCALE) + position_y_offset;
+
+                lcd_dots_image.setPixel({position_x, position_y}, {r, g, b});
+            }
+
+            /*
+            window.clear(sf::Color::White);
+            for (const sf::RectangleShape &d : lcd_dots) {
+                window.draw(d);
+            }
+            window.display();
+            */
 
             // TODO: optimize by only loading the palette when rom loads or
             // something
 
             // TODO: need to find a way to clear while drawing the
             // original pixels need a vector of dots to draw
+
+            this->dot_count++;
         }
 
         // TODO: draw without fifo first, remove after
 
-
-        this->dot_count++;
         if (dot_count == 160) {
             // finished
             this->current_mode = mode::HBlank;
@@ -313,8 +344,17 @@ void ppu::tick() {
 
     case mode::VBlank: {
         if (this->ppu_ticks == 456) {
+
+            // draw?
+            lcd_dots_texture.loadFromImage(lcd_dots_image);
+            sf::Sprite lcd_dots_sprite(lcd_dots_texture);
+
+            window.clear(sf::Color::White);
+            window.draw(lcd_dots_sprite);
+
             this->ppu_ticks = 0;
             ++*(this->LY);              // new blank scanline reached
+
             if (*(this->LY) == 153) {   // wait 10 more scanlines
                 (*(this->LY)) = 0;      // reset LY
                 this->lcd_dots.clear(); // reset LCD
@@ -325,3 +365,6 @@ void ppu::tick() {
     }
     }
 }
+
+//void ppu::tick() { std::cout << "hello"; }
+

@@ -51,8 +51,10 @@ class ppu {
   public:
     mmu &gb_mmu; // the central mmu
 
-    ppu(mmu &gb_mmu_)
-        : gb_mmu(gb_mmu_) {
+    sf::RenderWindow &window;
+
+    ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
+        : gb_mmu(gb_mmu_), window(window_) {
         this->LCDC = this->gb_mmu.get_pointer_from_address(0xff40);
         this->STAT = this->gb_mmu.get_pointer_from_address(0xff41);
         this->SCY = this->gb_mmu.get_pointer_from_address(0xff42);
@@ -65,6 +67,10 @@ class ppu {
         this->OBP1 = this->gb_mmu.get_pointer_from_address(0xff49);
         this->WX = this->gb_mmu.get_pointer_from_address(0xff4b);
         this->WY = this->gb_mmu.get_pointer_from_address(0xff4a);
+
+        sf::Image image({window.getSize().x, window.getSize().y},
+                        sf::Color::White);
+        this->lcd_dots_image = image;
     }; // pass mmu by reference
 
     // WY register: in memory 0xff4a
@@ -128,11 +134,17 @@ class ppu {
     std::vector<std::array<uint8_t, 4>> oam_buffer{};
 
     // LCD pixels to display
-    std::vector<sf::RectangleShape> lcd_dots{};
+    /* DEBUG ONLY */
+    std::vector<uint8_t> lcd_dots{}; // color only
+    /* DEBUG ONLY */
+
+    sf::Image lcd_dots_image{};
+    sf::Texture lcd_dots_texture;
+    //sf::Sprite lcd_dots_sprite;
 
     // palette
     //std::array<std::array<uint16_t, 3>, 4> bg_lcd_palette 
-    uint16_t bg_lcd_palette[4][3] = {{58, 81, 34}, {93, 120, 46}, {145, 155, 58}, {181, 175, 66}};
+    uint8_t bg_lcd_palette[4][3] = {{58, 81, 34}, {93, 120, 46}, {145, 155, 58}, {181, 175, 66}};
 
     /* functions */
     void add_to_sprite_buffer(
