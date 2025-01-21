@@ -101,6 +101,7 @@ uint8_t cpu::_read_memory(const uint16_t &address) {
 }
 
 void cpu::_write_memory(const uint16_t &address, const uint8_t &value) {
+
     this->gb_mmu->write_value_to_address(address, value);
 }
 
@@ -629,7 +630,7 @@ void cpu::ld_imm8_a(const bool &to_a) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_rr_a(const registers &r1, const registers &r2) {
+void cpu::ld_a_rr(const registers &r1, const registers &r2) {
     // read imm8
     auto m1 = [=]() {
         uint8_t *r1_p = _get_register(r1);
@@ -765,7 +766,7 @@ int cpu::handle_opcode(const uint8_t &opcode) {
 
     case 0x1a: {
         // LD A, (DE)
-        ld_rr_a(registers::D, registers::E);
+        ld_a_rr(registers::D, registers::E);
         break;
     }
 

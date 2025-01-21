@@ -119,7 +119,7 @@ class cpu {
     void xor_r(const registers &r);
     void ld_c_a(const bool &to_a);    // also known as LDH (C), A, to_a reverses LD
     void ld_imm8_a(const bool &to_a); // also known as LDH (n), A, to_a reverses LD
-    void ld_rr_a(const registers &r1,
+    void ld_a_rr(const registers &r1,
                  const registers
                      &r2); // load memory value from register pair address to A
 

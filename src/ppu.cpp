@@ -333,6 +333,15 @@ void ppu::tick() {
             this->dot_count = 0;
 
             if (*(this->LY) == 144) {
+
+				// draw?
+				lcd_dots_texture.loadFromImage(lcd_dots_image);
+				sf::Sprite lcd_dots_sprite(lcd_dots_texture);
+                
+				window.clear(sf::Color::White);
+				window.draw(lcd_dots_sprite);
+                window.display();
+
                 this->current_mode = mode::VBlank;
             } else {
                 this->current_mode = mode::OAM_Scan;
@@ -345,12 +354,7 @@ void ppu::tick() {
     case mode::VBlank: {
         if (this->ppu_ticks == 456) {
 
-            // draw?
-            lcd_dots_texture.loadFromImage(lcd_dots_image);
-            sf::Sprite lcd_dots_sprite(lcd_dots_texture);
 
-            window.clear(sf::Color::White);
-            window.draw(lcd_dots_sprite);
 
             this->ppu_ticks = 0;
             ++*(this->LY);              // new blank scanline reached

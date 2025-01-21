@@ -51,7 +51,6 @@ int main() {
             frame_time -= target_frame_time;
         }
 
-        window.display();
 
         // 70224
     }
