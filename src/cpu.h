@@ -58,6 +58,9 @@ class cpu {
     // load boot rom
     void load_boot_rom();
 
+    // load cartridge
+    void load_cartridge(std::string path);
+
     // read write memory
     uint8_t _read_memory(const uint16_t &address);
     void _write_memory(const uint16_t &address, const uint8_t &value);

@@ -23,6 +23,7 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // TODO: load chosen cartridge
+    riceboy->gb_cpu.load_cartridge("BOOT/test.gb");
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
@@ -50,8 +51,6 @@ int main() {
             std::cout << "hello" << frame_time << '\n';
             frame_time -= target_frame_time;
         }
-
-
         // 70224
     }
 

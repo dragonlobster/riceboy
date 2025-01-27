@@ -1,9 +1,9 @@
 #pragma once
 
 #include "mmu.h"
+#include <SFML/Graphics.hpp>
 #include <array>;
 #include <vector>
-#include <SFML/Graphics.hpp>
 
 class fetcher {
   public:
@@ -44,7 +44,6 @@ class fetcher {
 
     // background FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
     std::vector<uint8_t> fifo{}; // 2 bits
-
 };
 
 class ppu {
@@ -135,18 +134,28 @@ class ppu {
 
     // LCD pixels to display
     /* DEBUG ONLY */
+    //std::vector<uint8_t> lcd_dots{}; // color only
     std::vector<uint8_t> lcd_dots{}; // color only
     /* DEBUG ONLY */
 
     sf::Image lcd_dots_image{};
     sf::Texture lcd_dots_texture;
-    //sf::Sprite lcd_dots_sprite;
+    // sf::Sprite lcd_dots_sprite;
 
     // palette
-    //std::array<std::array<uint16_t, 3>, 4> bg_lcd_palette 
-    uint8_t bg_lcd_palette[4][3] = {{58, 81, 34}, {93, 120, 46}, {145, 155, 58}, {181, 175, 66}};
+    const std::array<uint8_t, 3> color_palette_white{181, 175, 66};
+    const std::array<uint8_t, 3> color_palette_light_gray{145, 155, 58};
+    const std::array<uint8_t, 3> color_palette_dark_gray{93, 120, 46};
+    const std::array<uint8_t, 3> color_palette_black{58, 81, 34};
+
+    // return dot color
+    sf::Color get_dot_color(uint8_t dot);
 
     /* functions */
     void add_to_sprite_buffer(
         std::array<uint8_t, 4> oam_entry); // each sprite is 4 bytes
+
+  private:
+    // color id
+    std::array<uint8_t, 3> _get_color(uint8_t id);
 };

@@ -23,6 +23,67 @@ void ppu::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     oam_buffer.push_back(oam_entry);
 }
 
+std::array<uint8_t, 3> ppu::_get_color(uint8_t id) {
+    switch (id) {
+    case 0:
+        return color_palette_white;
+        break;
+    case 1:
+        return color_palette_light_gray;
+        break;
+    case 2:
+        return color_palette_dark_gray;
+        break;
+    case 3:
+        return color_palette_black;
+        break;
+    default:
+        return color_palette_white;
+        break;
+    }
+}
+
+sf::Color ppu::get_dot_color(uint8_t dot) {
+    // TODO: maybe i only need to do this once per rom load
+    uint8_t id_0 = *BGP & 0x03;      // id 0 0x03 masks last 2 bits
+    uint8_t id_1 = *BGP >> 2 & 0x03; // id 1
+    uint8_t id_2 = *BGP >> 4 & 0x03; // id 2
+    uint8_t id_3 = *BGP >> 6 & 0x03; // id 3
+    // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
+
+    std::array<uint8_t, 3> color_0 = _get_color(id_0);
+    std::array<uint8_t, 3> color_1 = _get_color(id_1);
+    std::array<uint8_t, 3> color_2 = _get_color(id_2);
+    std::array<uint8_t, 3> color_3 = _get_color(id_3);
+
+    uint8_t r = color_palette_white[0];
+    uint8_t g = color_palette_white[1];
+    uint8_t b = color_palette_white[2];
+    switch (dot) {
+    case 0:
+        r = color_0[0];
+        g = color_0[1];
+        b = color_0[2];
+        break;
+    case 1:
+        r = color_1[0];
+        g = color_1[1];
+        b = color_1[2];
+        break;
+    case 2:
+        r = color_2[0];
+        g = color_2[1];
+        b = color_2[2];
+        break;
+    case 3:
+        r = color_3[0];
+        g = color_3[1];
+        b = color_3[2];
+        break;
+    }
+    return {r, g, b};
+}
+
 void fetcher::tick() {
     // TODO: modularize stuff here
     // fetcher
@@ -48,11 +109,13 @@ void fetcher::tick() {
         uint16_t scy_offset = (32 * (*LY + *SCY & 0xff) / 8) & 0x3ff;
         uint16_t address = bgmap_start + scx_offset + scy_offset;
 
-        // TODO: tile_index never resets
         // uint16_t address = ((0x9800) + (*LY / 8) * 32) + tile_index;
 
-        // TODO: here
+        // tile_id = 0;
+        //
+        //uint16_t address = (0x9800 + (*LY / 8) * 32) + tile_index;
 
+        // TODO: here
         this->tile_id = this->gb_mmu.get_value_from_address(address);
         this->current_mode = fetcher::mode::FetchTileDataLow;
         break;
@@ -113,9 +176,9 @@ void fetcher::tick() {
                 // later you can loop fifo forwards to draw the pixels to LCD
                 this->fifo.push_back(this->pixel_buffer[i]);
             }
-            this->tile_index++;
-            this->current_mode = fetcher::mode::FetchTileNo;
         }
+        this->tile_index++;
+        this->current_mode = fetcher::mode::FetchTileNo;
         break;
     }
     }
@@ -171,139 +234,34 @@ void ppu::tick() {
             uint16_t f_ly = *(this->LY);
             sf::Vector2u position = {f_dot_count, f_ly};
 
-            uint8_t id_0 = *BGP & 0x03;      // id 0
-            uint8_t id_1 = *BGP >> 2 & 0x03; // id 1
-            uint8_t id_2 = *BGP >> 4 & 0x03; // id 2
-            uint8_t id_3 = *BGP >> 6 & 0x03; // id 3
-
-            uint8_t r = bg_lcd_palette[0][0];
-            uint8_t g = bg_lcd_palette[0][1];
-            uint8_t b = bg_lcd_palette[0][2];
-
             uint8_t dot = this->ppu_fetcher.fifo.back();
             this->ppu_fetcher.fifo.pop_back();
 
-            if (dot == id_0) {
-                std::cout << "";
-                if (id_0 == 0) {
-                    r = bg_lcd_palette[0][0];
-                    g = bg_lcd_palette[0][1];
-                    b = bg_lcd_palette[0][2];
-                }
-                if (id_0 == 1) {
-                    r = bg_lcd_palette[1][0];
-                    g = bg_lcd_palette[1][1];
-                    b = bg_lcd_palette[1][2];
-                }
-                if (id_0 == 2) {
-                    r = bg_lcd_palette[2][0];
-                    g = bg_lcd_palette[2][1];
-                    b = bg_lcd_palette[2][2];
-                }
-                if (id_0 == 3) {
-                    r = bg_lcd_palette[3][0];
-                    g = bg_lcd_palette[3][1];
-                    b = bg_lcd_palette[3][2];
-                }
-            }
+            sf::Color rgb = get_dot_color(dot);
 
-            else if (dot == id_1) {
-                std::cout << "";
-                if (id_1 == 0) {
-                    r = bg_lcd_palette[0][0];
-                    g = bg_lcd_palette[0][1];
-                    b = bg_lcd_palette[0][2];
-                }
-                if (id_1 == 1) {
-                    r = bg_lcd_palette[1][0];
-                    g = bg_lcd_palette[1][1];
-                    b = bg_lcd_palette[1][2];
-                }
-                if (id_1 == 2) {
-                    r = bg_lcd_palette[2][0];
-                    g = bg_lcd_palette[2][1];
-                    b = bg_lcd_palette[2][2];
-                }
-                if (id_1 == 3) {
-                    r = bg_lcd_palette[3][0];
-                    g = bg_lcd_palette[3][1];
-                    b = bg_lcd_palette[3][2];
-                }
-            }
+            // sf::Vertex lcd_dot =
+            //     DrawUtils::add_vertex(position, r, g, b);
 
-            else if (dot == id_2) {
-                std::cout << "";
-                if (id_2 == 0) {
-                    r = bg_lcd_palette[0][0];
-                    g = bg_lcd_palette[0][1];
-                    b = bg_lcd_palette[0][2];
-                }
-                if (id_2 == 1) {
-                    r = bg_lcd_palette[1][0];
-                    g = bg_lcd_palette[1][1];
-                    b = bg_lcd_palette[1][2];
-                }
-                if (id_2 == 2) {
-                    r = bg_lcd_palette[2][0];
-                    g = bg_lcd_palette[2][1];
-                    b = bg_lcd_palette[2][2];
-                }
-                if (id_2 == 3) {
-                    r = bg_lcd_palette[3][0];
-                    g = bg_lcd_palette[3][1];
-                    b = bg_lcd_palette[3][2];
-                }
-            }
-
-            else if (dot == id_3) {
-                std::cout << "";
-                if (id_3 == 0) {
-                    r = bg_lcd_palette[0][0];
-                    g = bg_lcd_palette[0][1];
-                    b = bg_lcd_palette[0][2];
-                }
-                if (id_3 == 1) {
-                    r = bg_lcd_palette[1][0];
-                    g = bg_lcd_palette[1][1];
-                    b = bg_lcd_palette[1][2];
-                }
-                if (id_3 == 2) {
-                    r = bg_lcd_palette[2][0];
-                    g = bg_lcd_palette[2][1];
-                    b = bg_lcd_palette[2][2];
-                }
-                if (id_3 == 3) {
-                    r = bg_lcd_palette[3][0];
-                    g = bg_lcd_palette[3][1];
-                    b = bg_lcd_palette[3][2];
-                }
-            }
-
-            //sf::Vertex lcd_dot =
-            //    DrawUtils::add_vertex(position, r, g, b);
+            //sf::RectangleShape lcd_dot =
+            //    DrawUtils::add_pixel({f_dot_count, f_ly}, rgb.r, rgb.g, rgb.b);
 
             this->lcd_dots.push_back(dot);
+            //this->lcd_dots.push_back(lcd_dot);
 
             // TODO: is there a better way to do this?
             // fill up entire screen
             uint16_t position_y_offset = 0;
-            for (uint16_t i = 0; i < DrawUtils::SCALE*DrawUtils::SCALE; ++i) {
-                uint16_t position_x = (i % DrawUtils::SCALE) + (position.x * DrawUtils::SCALE);
+            for (uint16_t i = 0; i < DrawUtils::SCALE * DrawUtils::SCALE; ++i) {
+                uint16_t position_x =
+                    (i % DrawUtils::SCALE) + (position.x * DrawUtils::SCALE);
                 if (i % DrawUtils::SCALE == 0 && i != 0) {
                     position_y_offset++;
                 }
-                uint16_t position_y = (position.y * DrawUtils::SCALE) + position_y_offset;
+                uint16_t position_y =
+                    (position.y * DrawUtils::SCALE) + position_y_offset;
 
-                lcd_dots_image.setPixel({position_x, position_y}, {r, g, b});
+                lcd_dots_image.setPixel({position_x, position_y}, rgb);
             }
-
-            /*
-            window.clear(sf::Color::White);
-            for (const sf::RectangleShape &d : lcd_dots) {
-                window.draw(d);
-            }
-            window.display();
-            */
 
             // TODO: optimize by only loading the palette when rom loads or
             // something
@@ -334,13 +292,21 @@ void ppu::tick() {
 
             if (*(this->LY) == 144) {
 
-				// draw?
-				lcd_dots_texture.loadFromImage(lcd_dots_image);
-				sf::Sprite lcd_dots_sprite(lcd_dots_texture);
-                
-				window.clear(sf::Color::White);
-				window.draw(lcd_dots_sprite);
+                // draw?
+                lcd_dots_texture.loadFromImage(lcd_dots_image);
+                sf::Sprite lcd_dots_sprite(lcd_dots_texture);
+
+                window.clear(sf::Color::White);
+                window.draw(lcd_dots_sprite);
                 window.display();
+
+                /*
+				window.clear(sf::Color::White);
+				for (const sf::RectangleShape &d : lcd_dots) {
+					window.draw(d);
+				}
+				window.display();
+                */
 
                 this->current_mode = mode::VBlank;
             } else {
@@ -354,10 +320,8 @@ void ppu::tick() {
     case mode::VBlank: {
         if (this->ppu_ticks == 456) {
 
-
-
             this->ppu_ticks = 0;
-            ++*(this->LY);              // new blank scanline reached
+            ++*(this->LY); // new blank scanline reached
 
             if (*(this->LY) == 153) {   // wait 10 more scanlines
                 (*(this->LY)) = 0;      // reset LY
@@ -370,5 +334,4 @@ void ppu::tick() {
     }
 }
 
-//void ppu::tick() { std::cout << "hello"; }
-
+// void ppu::tick() { std::cout << "hello"; }

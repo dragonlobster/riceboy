@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "cpu.h"
 #include <fstream>
 #include <iostream>
 
@@ -686,6 +687,32 @@ void cpu::load_boot_rom() {
         // this->PC = 0; // initialize program counter
     }
     // this->gb_mmu->complete_boot();
+}
+
+void cpu::load_cartridge(std::string path) {
+    // TODO: right now i'm only loading the logo. fix this later.
+    std::ifstream file(
+        path,
+        std::ios::binary |
+            std::ios::ate); // read file from end, in binary format
+
+    if (file.is_open()) {
+        int size = file.tellg(); // check position of cursor (file size)
+
+        std::vector<char> buffer(
+            size); // prepare buffer with size = size of file
+
+        file.seekg(0, std::ios::beg); // move cursor to beginning of file
+        file.read(buffer.data(), size);
+
+        for (long i = 0x0100; i <= 0x014F; ++i) {
+            // 0104 - 0133 - logo
+            
+            // TODO: make sure rom doesnt take up more space than it should
+            this->_write_memory(i, buffer[i]);
+        }
+        // this->PC = 0; // initialize program counter
+    }
 }
 
 // cpu constructor
