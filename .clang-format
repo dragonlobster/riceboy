@@ -5,3 +5,9 @@ IndentWidth: 4
 UseTab: Never
 AllowShortBlocksOnASingleLine: Always
 AlignAfterOpenBracket: Align
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: true

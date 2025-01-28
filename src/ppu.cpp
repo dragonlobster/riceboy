@@ -104,16 +104,11 @@ void fetcher::tick() {
         }
 
         // fetch tile no.
-        // TODO: uncomment later
-        uint16_t scx_offset = (tile_index + (*SCX / 8) & 0x1f) & 0x3ff;
-        uint16_t scy_offset = (32 * (*LY + *SCY & 0xff) / 8) & 0x3ff;
-        uint16_t address = bgmap_start + scx_offset + scy_offset;
-
-        // uint16_t address = ((0x9800) + (*LY / 8) * 32) + tile_index;
-
-        // tile_id = 0;
-        //
-        //uint16_t address = (0x9800 + (*LY / 8) * 32) + tile_index;
+        // TODO: check scx offset
+        uint16_t scy_offset = 32 * (((*LY + *SCY) % 256) / 8);
+        uint16_t scx_offset = (*SCX % 256) / 8;
+        uint16_t address =
+            bgmap_start + ((scy_offset + scx_offset + tile_index) & 0x3ff);
 
         // TODO: here
         this->tile_id = this->gb_mmu.get_value_from_address(address);
@@ -121,18 +116,18 @@ void fetcher::tick() {
         break;
     }
     case fetcher::mode::FetchTileDataLow: {
-        uint16_t offset = 2 * *LY + (*SCY % 8);
+        uint16_t offset = 2 * ((*LY + *SCY) % 8);
         uint8_t low_byte{};
 
         // 8000 method or 8800 method to read
-        if (((*LCDC >> 4) & 1) == 1) {
-            // 8000 method
-            uint16_t address = 0x8000 + (tile_id * 16) + offset;
-            low_byte = this->gb_mmu.get_value_from_address(address);
-        } else {
+        if (((*LCDC >> 4) & 1) != 1) {
             // 8800 method
             uint16_t address =
                 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
+            low_byte = this->gb_mmu.get_value_from_address(address);
+        } else {
+            // 8000 method
+            uint16_t address = 0x8000 + (tile_id * 16) + offset;
             low_byte = this->gb_mmu.get_value_from_address(address);
         }
         for (unsigned int i = 0; i < 8; ++i) {
@@ -145,18 +140,18 @@ void fetcher::tick() {
     }
 
     case fetcher::mode::FetchTileDataHigh: {
-        uint16_t offset = 2 * *LY + (*SCY % 8);
+        uint16_t offset = 2 * ((*LY + *SCY) % 8);
         uint8_t high_byte{};
 
         // 8000 method or 8800 method to read
-        if ((*LCDC >> 4 & 1) == 1) {
-            // 8000 method
-            uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
-            high_byte = this->gb_mmu.get_value_from_address(address);
-        } else {
+        if ((*LCDC >> 4 & 1) != 1) {
             // 8800 method
             uint16_t address =
                 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset + 1;
+            high_byte = this->gb_mmu.get_value_from_address(address);
+        } else {
+            // 8000 method
+            uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
             high_byte = this->gb_mmu.get_value_from_address(address);
         }
         for (unsigned int i = 0; i < 8; ++i) {
@@ -171,7 +166,8 @@ void fetcher::tick() {
     }
     case fetcher::mode::PushToFIFO: {
         if (fifo.size() <= 8) {
-            for (int i = 7; i >= 0; --i) {
+            // for (int i = 7; i >= 0; --i) {
+            for (int i = 0; i < 8; ++i) {
                 // loop backwards 8 times (7-0) to push into fifo backwards
                 // later you can loop fifo forwards to draw the pixels to LCD
                 this->fifo.push_back(this->pixel_buffer[i]);
@@ -242,11 +238,11 @@ void ppu::tick() {
             // sf::Vertex lcd_dot =
             //     DrawUtils::add_vertex(position, r, g, b);
 
-            //sf::RectangleShape lcd_dot =
-            //    DrawUtils::add_pixel({f_dot_count, f_ly}, rgb.r, rgb.g, rgb.b);
+            // sf::RectangleShape lcd_dot =
+            //     DrawUtils::add_pixel({f_dot_count, f_ly}, rgb.r, rgb.g,
+            //     rgb.b);
 
             this->lcd_dots.push_back(dot);
-            //this->lcd_dots.push_back(lcd_dot);
 
             // TODO: is there a better way to do this?
             // fill up entire screen
@@ -300,14 +296,6 @@ void ppu::tick() {
                 window.draw(lcd_dots_sprite);
                 window.display();
 
-                /*
-				window.clear(sf::Color::White);
-				for (const sf::RectangleShape &d : lcd_dots) {
-					window.draw(d);
-				}
-				window.display();
-                */
-
                 this->current_mode = mode::VBlank;
             } else {
                 this->current_mode = mode::OAM_Scan;
@@ -333,5 +321,3 @@ void ppu::tick() {
     }
     }
 }
-
-// void ppu::tick() { std::cout << "hello"; }

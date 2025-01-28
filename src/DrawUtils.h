@@ -4,7 +4,7 @@
 
 class DrawUtils {
   public:
-    static const int SCALE{5};
+    static const int SCALE{2};
     static sf::RectangleShape add_pixel(sf::Vector2f position, std::uint8_t red,
                                         std::uint8_t green, std::uint8_t blue);
 
