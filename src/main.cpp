@@ -37,6 +37,11 @@ int main() {
 
     while (window.isOpen()) {
 
+        window.handleEvents(
+            // on close
+            [&](const sf::Event::Closed &) { window.close(); });
+
+
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
 
         double target_frame_time = 1.f / (((1 << 22) / 70224) * 1000);
