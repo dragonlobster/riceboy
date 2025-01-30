@@ -741,7 +741,7 @@ int cpu::handle_opcode_v2(const uint8_t opcode) {
             // beginning of switch case for z
         case 0: {
             switch (y) {
-                // beginning of swtich case for y
+                // beginning of switch case for y
             case 0: {
                 // NOP
                 break;
@@ -750,6 +750,32 @@ int cpu::handle_opcode_v2(const uint8_t opcode) {
                 // LD (imm16), SP
                 break;
             }
+            case 2: {
+                // STOP
+                break;
+            }
+            case 3: {
+                // JR d
+                jr_s8(false, false);
+                break;
+            }
+            case 4: {
+                jr_s8(true, true);
+                break;
+            }
+            case 5: {
+                jr_s8(true, false);
+                break;
+            }
+            case 6: {
+                // jr nc s8
+                break;
+            }
+            case 7: {
+                // jr c s8
+                break;
+            }
+                // case 4, 5, 6, 7
                 // end of switch case for y
             }
             break;
