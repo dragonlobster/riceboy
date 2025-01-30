@@ -113,7 +113,7 @@ class cpu {
                     r_from); // load value from 1 register to another register
     void ld_r_imm8(const registers r);
     void ld_rr_address(const registers r1, const registers r2, const bool sp);
-    void ld_hl_a(const bool increment);      // hl+ and hl-, and hl
+    void ld_hl_a(const bool increment, const bool to_a);      // hl+ and hl-, and hl
     void ld_hl_r8(const registers r); // hl+ and hl-, and hl
     void pop_rr(const registers r1, const registers r2);
     void push_rr(const registers r1, const registers r2);
@@ -127,7 +127,7 @@ class cpu {
     void ld_imm8_a(const bool to_a); // also known as LDH (n), A, to_a reverses LD
     void ld_a_rr(const registers r1,
                  const registers
-                     r2); // load memory value from register pair address to A
+                     r2, const bool to_a); // load memory value from register pair address to A
 
     // utility //
     uint16_t

@@ -414,7 +414,7 @@ void cpu::ld_rr_address(const registers r1, const registers r2, const bool sp) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_hl_a(const bool increment) {
+void cpu::ld_hl_a(const bool increment, const bool to_a) {
     auto m1 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
@@ -430,7 +430,28 @@ void cpu::ld_hl_a(const bool increment) {
         this->L = l;
     };
 
-    this->M_operations.push_back(m1);
+    auto m2 = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+
+        this->A = this->_read_memory(address);
+
+        if (increment) {
+            address++;
+        } else {
+            address--;
+        }
+        auto [h, l] = this->_split_16bit(address);
+        this->H = h;
+        this->L = l;
+    };
+
+
+    if (to_a) {
+        this->M_operations.push_back(m2);
+    }
+    else {
+        this->M_operations.push_back(m1);
+    }
 } // covers hl+ and hl-
 
 void cpu::ld_hl_r8(const registers r) {
@@ -628,7 +649,7 @@ void cpu::ld_imm8_a(const bool to_a) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ld_a_rr(const registers r1, const registers r2) {
+void cpu::ld_a_rr(const registers r1, const registers r2, const bool to_a) {
     // read imm8
     auto m1 = [=]() {
         uint8_t *r1_p = _get_register(r1);
@@ -637,7 +658,19 @@ void cpu::ld_a_rr(const registers r1, const registers r2) {
         this->A = _read_memory(address);
     };
 
-    this->M_operations.push_back(m1);
+    auto m2 = [=]() {
+        uint8_t *r1_p = _get_register(r1);
+        uint8_t *r2_p = _get_register(r2);
+        uint16_t address = this->_combine_2_8bits(*r1_p, *r2_p);
+        this->_write_memory(address, this->A);
+    };
+
+    if (to_a) {
+        this->M_operations.push_back(m1);
+    }
+    else {
+        this->M_operations.push_back(m2);
+    }
 }
 
 uint8_t cpu::identify_opcode(const uint8_t opcode) {
@@ -733,6 +766,10 @@ int cpu::handle_opcode_v2(const uint8_t opcode) {
     uint8_t p = y >> 1; // bit 5 - 4
     uint8_t q = y % 2; // bit 3
 
+    std::array<registers, 8> rp_table{registers::B, registers::C, registers::D, registers::E, registers::H, registers::L, registers::NA, registers::NA}; // sp is the last
+
+    registers r1 = rp_table[2 * p];
+    registers r2 = rp_table[(2 * p) + 1];
 
     switch (x) {
         // beginning of highest switch case (x)
@@ -741,7 +778,7 @@ int cpu::handle_opcode_v2(const uint8_t opcode) {
             // beginning of switch case for z
         case 0: {
             switch (y) {
-                // beginning of switch case for y
+            // beginning of switch case for y
             case 0: {
                 // NOP
                 break;
@@ -775,9 +812,99 @@ int cpu::handle_opcode_v2(const uint8_t opcode) {
                 // jr c s8
                 break;
             }
-                // case 4, 5, 6, 7
-                // end of switch case for y
+            // case 4, 5, 6, 7
+            // end of switch case for y
             }
+            break;
+        }
+        case 1: {
+            switch (q) {
+            case 0: {
+                if (r1 == registers::NA) {
+                    // sp case
+                    ld_rr_address(r1, r2, true);
+                } else { ld_rr_address(r1, r2, false); }
+                break;
+            }
+            case 1: {
+                // ADD HL, rp[p]
+                break;
+            }
+            }
+            break;
+        }
+        case 2: {
+            switch (q) {
+            case 0: {
+                switch (p) {
+                case 0: {
+                    ld_a_rr(registers::B, registers::C, false);
+                    break;
+                }
+                case 1: {
+                    ld_a_rr(registers::D, registers::E, false);
+                    break;
+                }
+                case 2: {
+                    ld_hl_a(true, false);
+                    break;
+                }
+                case 3: {
+                    ld_hl_a(false, false);
+                    break;
+                }
+                }
+                break;
+            }
+            case 1: {
+                switch (p) {
+                case 0: {
+                    ld_a_rr(registers::B, registers::C, true);
+                    break;
+                }
+                case 1: {
+                    ld_a_rr(registers::D, registers::E, true);
+                    break;
+                }
+                case 2: {
+                    ld_hl_a(true, true);
+                    break;
+                }
+                case 3: {
+                    ld_hl_a(false, true);
+                    break;
+                }
+                }
+                break;
+            }
+            }
+            break;
+        }
+        case 3: {
+            switch (q) {
+                case 0: {
+                    if (r1 == registers::NA) {
+                        inc_or_dec_r16(r1, r2, true, true);
+                    }
+                    else {
+                        inc_or_dec_r16(r1, r2, true, false);
+                    }
+                    break;
+                }
+            case 1: {
+                    if (r1 == registers::NA) {
+                        inc_or_dec_r16(r1, r2, false, true);
+                    }
+                    else {
+                        inc_or_dec_r16(r1, r2, false, false);
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+        case 4: {
+            // inc_or_dec r8 (hl)
             break;
         }
             // end of switch case for z
@@ -808,7 +935,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
         break;
 
     case 0x32:
-        ld_hl_a(false); // LD HL- A
+        ld_hl_a(false, false); // LD HL- A
         break;
 
     case 0xcb: {
@@ -863,7 +990,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
 
     case 0x1a: {
         // LD A, (DE)
-        ld_a_rr(registers::D, registers::E);
+        ld_a_rr(registers::D, registers::E, true);
         break;
     }
 
@@ -906,7 +1033,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
 
     case 0x22: {
         // LD HL+ A
-        ld_hl_a(true);
+        ld_hl_a(true, false);
         break;
     }
 
