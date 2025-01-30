@@ -1,6 +1,7 @@
 #include "cpu.h"
 #include <fstream>
 #include <iostream>
+#include <array>
 
 // TODO: abstract utility later
 std::tuple<uint8_t, bool, bool, bool, bool> cpu::_addition_8bit(uint8_t x,
@@ -107,7 +108,7 @@ void cpu::_write_memory(const uint16_t address, const uint8_t value) {
 // abstracted M-operations
 
 // TODO: combine with add_a_r8 later on
-void cpu::add_hl() {
+void cpu::add_a_hl() {
     // TODO: if capture (this) goes out of scope it could cause crashes
     auto _add_hl = [=]() {
         const uint16_t hl = this->_combine_2_8bits(this->H, this->L);
@@ -254,6 +255,38 @@ void cpu::cp_a_hl() {
     this->M_operations.push_back(read_hl);
 }
 
+void cpu::inc_or_dec_hl(const bool inc) {
+    uint16_t address = this->_combine_2_8bits(this->H, this->L);
+
+    auto m1 = [=]() {
+        this->Z = this->_read_memory(address);
+    };
+
+    auto m2_dec = [=]() {
+        auto [result, z, n, h, c] = this->_subtraction_8bit(this->Z, 1);
+        this->_write_memory(address, result);
+        this->Zf = z;
+        this->Nf = n;
+        this->Hf = h;
+    };
+
+    auto m2_inc = [=]() {
+        auto [result, z, n, h, c] = this->_addition_8bit(this->Z, 1);
+        this->_write_memory(address, result);
+        this->Zf = z;
+        this->Nf = n;
+        this->Hf = h;
+    };
+
+    if (inc) {
+        this->M_operations.push_back(m2_inc);
+    }
+    else {
+        this->M_operations.push_back(m2_dec);
+    }
+    this->M_operations.push_back(m1);
+}
+
 void cpu::inc_or_dec_r8(const registers r8, const bool inc) {
     uint8_t *register_pointer = this->_get_register(r8);
 
@@ -324,7 +357,7 @@ void cpu::jp_imm16(const bool check_z_flag) {
     this->M_operations.push_back(get_lsb);
 }
 
-void cpu::jr_s8(const bool check_z_flag, const bool nz) {
+void cpu::jr_s8(conditions condition) {
     // jump relative to signed 8 bit next in memory
     auto get_value = [=]() {
         this->Z = this->_read_memory(this->PC);
@@ -337,12 +370,52 @@ void cpu::jr_s8(const bool check_z_flag, const bool nz) {
         this->PC += value;
     };
 
-    if (!check_z_flag || ((nz && !this->Zf) || (!nz && this->Zf))) {
-        // nz jump if flag is 0, !nz jump if Z flag is 1
+    if (condition == conditions::NA) {
         this->M_operations.push_back(set_pc);
+    }
+    else if (condition == conditions::Z) {
+        if (this->Zf) {
+            this->M_operations.push_back(set_pc);
+        }
+    }
+    else if (condition == conditions::NZ) {
+        if (!this->Zf) {
+            this->M_operations.push_back(set_pc);
+        }
     }
 
     this->M_operations.push_back(get_value);
+}
+
+void cpu::ld_imm16_sp() {
+    auto m1 = [=]() {
+        this->Z = this->_read_memory(PC); // lsb
+        PC++;
+    };
+
+    auto m2 = [=]() {
+        this->W = this->_read_memory(PC); // msb
+        PC++;
+    };
+
+    auto m3 = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->W, this->Z);
+        auto [msb, lsb] = this->_split_16bit(this->SP);
+        this->_write_memory(address, lsb);
+    };
+
+    auto m4 = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->W, this->Z) + 1;
+        auto [msb, lsb] = this->_split_16bit(this->SP);
+        this->_write_memory(address, msb);
+    };
+
+
+    this->M_operations.push_back(m4);
+    this->M_operations.push_back(m3);
+
+    this->M_operations.push_back(m2);
+    this->M_operations.push_back(m1);
 }
 
 void cpu::ld_imm16_a(const bool to_a) {
@@ -375,6 +448,22 @@ void cpu::ld_r_r(const registers r_to, const registers r_from) {
     uint8_t *register_pointer_to = _get_register(r_to);
     uint8_t *register_pointer_from = _get_register(r_from);
     *register_pointer_to = *register_pointer_from;
+}
+
+void cpu::ld_hl_imm8() {
+    auto m1 = [=]() {
+        this->Z = this->_read_memory(this->PC);
+        this->PC++;
+    };
+
+    auto m2 = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+        this->_write_memory(address, this->Z);
+    };
+
+    this->M_operations.push_back(m2);
+    this->M_operations.push_back(m1);
+
 }
 
 void cpu::ld_r_imm8(const registers r) {
@@ -751,488 +840,6 @@ cpu::cpu(mmu &mmu) {
     this->gb_mmu = &mmu; // & refers to actual address to assign to the pointer
 }
 
-int cpu::handle_opcode_v2(const uint8_t opcode) {
-    /*
-    x = the opcode's 1st octal digit (i.e. bits 7-6)
-    y = the opcode's 2nd octal digit (i.e. bits 5-3)
-    z = the opcode's 3rd octal digit (i.e. bits 2-0)
-    p = y rightshifted one position (i.e. bits 5-4)
-    q = y modulo 2 (i.e. bit 3) 
-    */
-    uint8_t x = opcode >> 6 & 3; // bits 7 - 6
-    uint8_t y = opcode >> 3 & 7; // bits 3 - 5
-    uint8_t z = opcode & 7; // bits 2 - 0
-
-    uint8_t p = y >> 1; // bit 5 - 4
-    uint8_t q = y % 2; // bit 3
-
-    std::array<registers, 8> rp_table{registers::B, registers::C, registers::D, registers::E, registers::H, registers::L, registers::NA, registers::NA}; // sp is the last
-
-    registers r1 = rp_table[2 * p];
-    registers r2 = rp_table[(2 * p) + 1];
-
-    switch (x) {
-        // beginning of highest switch case (x)
-    case 0: { // x == 0
-        switch (z) {
-            // beginning of switch case for z
-        case 0: {
-            switch (y) {
-            // beginning of switch case for y
-            case 0: {
-                // NOP
-                break;
-            }
-            case 1: {
-                // LD (imm16), SP
-                break;
-            }
-            case 2: {
-                // STOP
-                break;
-            }
-            case 3: {
-                // JR d
-                jr_s8(false, false);
-                break;
-            }
-            case 4: {
-                jr_s8(true, true);
-                break;
-            }
-            case 5: {
-                jr_s8(true, false);
-                break;
-            }
-            case 6: {
-                // jr nc s8
-                break;
-            }
-            case 7: {
-                // jr c s8
-                break;
-            }
-            // case 4, 5, 6, 7
-            // end of switch case for y
-            }
-            break;
-        }
-        case 1: {
-            switch (q) {
-            case 0: {
-                if (r1 == registers::NA) {
-                    // sp case
-                    ld_rr_address(r1, r2, true);
-                } else { ld_rr_address(r1, r2, false); }
-                break;
-            }
-            case 1: {
-                // ADD HL, rp[p]
-                break;
-            }
-            }
-            break;
-        }
-        case 2: {
-            switch (q) {
-            case 0: {
-                switch (p) {
-                case 0: {
-                    ld_a_rr(registers::B, registers::C, false);
-                    break;
-                }
-                case 1: {
-                    ld_a_rr(registers::D, registers::E, false);
-                    break;
-                }
-                case 2: {
-                    ld_hl_a(true, false);
-                    break;
-                }
-                case 3: {
-                    ld_hl_a(false, false);
-                    break;
-                }
-                }
-                break;
-            }
-            case 1: {
-                switch (p) {
-                case 0: {
-                    ld_a_rr(registers::B, registers::C, true);
-                    break;
-                }
-                case 1: {
-                    ld_a_rr(registers::D, registers::E, true);
-                    break;
-                }
-                case 2: {
-                    ld_hl_a(true, true);
-                    break;
-                }
-                case 3: {
-                    ld_hl_a(false, true);
-                    break;
-                }
-                }
-                break;
-            }
-            }
-            break;
-        }
-        case 3: {
-            switch (q) {
-                case 0: {
-                    if (r1 == registers::NA) {
-                        inc_or_dec_r16(r1, r2, true, true);
-                    }
-                    else {
-                        inc_or_dec_r16(r1, r2, true, false);
-                    }
-                    break;
-                }
-            case 1: {
-                    if (r1 == registers::NA) {
-                        inc_or_dec_r16(r1, r2, false, true);
-                    }
-                    else {
-                        inc_or_dec_r16(r1, r2, false, false);
-                    }
-                    break;
-                }
-            }
-            break;
-        }
-        case 4: {
-            // inc_or_dec r8 (hl)
-            break;
-        }
-            // end of switch case for z
-        }
-        break;
-    }
-        // end of highest switch case (x)
-    }
-
-    return 1;
-
-}
-
-int cpu::handle_opcode(const uint8_t opcode) {
-    // big switch case for differnet instructions
-    switch (opcode) {
-    // TODO: implement
-    case 0x31:
-        ld_rr_address(registers::NA, registers::NA, true); // LD SP, r16
-        break;
-
-    case 0xaf:
-        xor_r(registers::A); // XOR A
-        break;
-
-    case 0x21:
-        ld_rr_address(registers::H, registers::L, false); // LD HL imm16
-        break;
-
-    case 0x32:
-        ld_hl_a(false, false); // LD HL- A
-        break;
-
-    case 0xcb: {
-        // extended set of instructions
-        const uint8_t cb_opcode = this->_read_memory(this->PC);
-        this->PC++; // increment the program counter
-        this->handle_cb_opcode(cb_opcode);
-        break;
-    }
-
-    case 0x20: {
-        jr_s8(true, true); // JR Z imm16
-        break;
-    }
-
-    case 0x0e: {
-        ld_r_imm8(registers::C); // LD C, imm8
-        break;
-    }
-
-    case 0x3e: {
-        ld_r_imm8(registers::A); // LD A, imm8
-        break;
-    }
-
-    case 0xe2: {
-        ld_c_a(false); // LD (C), A, or LDH (C) A
-        break;
-    }
-
-    case 0x0c: {
-        inc_or_dec_r8(registers::C, true); // INC C
-        break;
-    }
-
-    case 0x77: {
-        ld_hl_r8(registers::A); // LD HL A
-        break;
-    }
-
-    case 0xe0: {
-        // LD (imm8) A
-        ld_imm8_a(false); // LDH (n) A, or LD (imm8) A
-        break;
-    }
-
-    case 0x11: {
-        // LD DE, imm16
-        ld_rr_address(registers::D, registers::E, false);
-        break;
-    }
-
-    case 0x1a: {
-        // LD A, (DE)
-        ld_a_rr(registers::D, registers::E, true);
-        break;
-    }
-
-    case 0xcd: {
-        call(false); // CALL $0095
-        break;
-    }
-
-    case 0x4f: {
-        ld_r_r(registers::C, registers::A); // LD C, A
-        break;
-    }
-
-    case 0x06: {
-        ld_r_imm8(registers::B); // LD B, imm8
-        break;
-    }
-
-    case 0xc5: {
-        push_rr(registers::B, registers::C); // PUSH BC
-        break;
-    }
-
-    case 0x17: {
-        rla(); // RLA
-        break;
-    }
-
-    case 0xc1: {
-        // POP BC
-        pop_rr(registers::B, registers::C);
-        break;
-    }
-
-    case 0x05: {
-        // DEC B
-        inc_or_dec_r8(registers::B, false);
-        break;
-    }
-
-    case 0x22: {
-        // LD HL+ A
-        ld_hl_a(true, false);
-        break;
-    }
-
-    case 0x23: {
-        // INC HL
-        inc_or_dec_r16(registers::H, registers::L, true, false);
-        break;
-    }
-
-    case 0xc9: {
-        // RET
-        ret();
-        break;
-    }
-
-    case 0x13: {
-        // INC DE
-        inc_or_dec_r16(registers::D, registers::E, true, false);
-        break;
-    }
-
-    case 0x7b: {
-        // LD A, E
-        ld_r_r(registers::A, registers::E);
-        break;
-    }
-
-    case 0xfe: {
-        // CP A, imm8
-        cp_a_imm8();
-        break;
-    }
-
-    case 0xea: {
-        // LD imm16 A
-        ld_imm16_a(false);
-        break;
-    }
-
-    case 0x3d: {
-        // DEC A
-        inc_or_dec_r8(registers::A, false);
-        break;
-    }
-
-    case 0x28: {
-        // JR Z, s8
-        jr_s8(true, false);
-        break;
-    }
-
-    case 0x0d: {
-        // DEC C
-        inc_or_dec_r8(registers::C, false);
-        break;
-    }
-
-    case 0x2e: {
-        // LD L, imm8
-        ld_r_imm8(registers::L);
-        break;
-    }
-
-    case 0x18: {
-        // JR 8
-        jr_s8(false, false);
-        break;
-    }
-
-    case 0x67: {
-        // ld h, a
-        ld_r_r(registers::H, registers::A);
-        break;
-    }
-
-    case 0x57: {
-        // LD D A
-        ld_r_r(registers::D, registers::A);
-        break;
-    }
-
-    case 0x04: {
-        // INC B
-        inc_or_dec_r8(registers::B, true);
-        break;
-    }
-
-    case 0x1e: {
-        // LD E, imm8
-        ld_r_imm8(registers::E);
-        break;
-    }
-
-    case 0xf0: {
-        // LD A (imm8)
-        ld_imm8_a(true);
-        break;
-    }
-
-    case 0x1d: {
-        // DEC E
-        inc_or_dec_r8(registers::E, false);
-        break;
-    }
-
-    case 0x24: {
-        // INC H
-        inc_or_dec_r8(registers::H, true);
-        break;
-    }
-
-    case 0x7c: {
-        // LD A, H
-        ld_r_r(registers::A, registers::H);
-        break;
-    }
-
-    case 0x90: {
-        // SUB B
-        sub_r(registers::B);
-        break;
-    }
-
-    case 0x15: {
-        // DEC D
-        inc_or_dec_r8(registers::D, false);
-        break;
-    }
-
-    case 0x16: {
-        // LD D, imm8
-        ld_r_imm8(registers::D);
-        break;
-    }
-
-    case 0xbe: {
-        // CP A HL
-        cp_a_hl();
-        break;
-    }
-
-    case 0x7d: {
-        ld_r_r(registers::A, registers::L);
-        break;
-    }
-
-    case 0x78: {
-        ld_r_r(registers::A, registers::B);
-        break;
-    }
-
-    case 0x86: {
-        add_hl();
-        break;
-    }
-
-    default:
-        // print out the opcodes we didnt' implement
-        std::cout << "not implemented: " //<< static_cast<unsigned int>(opcode)
-                  << "hex: 0x" << std::hex << static_cast<unsigned int>(opcode)
-                  << std::endl;
-        // system("pause");
-        std::cin.get();
-        return 0;
-        break;
-    }
-
-    return 1;
-}
-
-int cpu::handle_cb_opcode(const uint8_t cb_opcode) {
-    switch (cb_opcode) {
-    case 0x7c:
-        bit_b_r8(registers::H, 7); // BIT 7 H
-        break;
-
-    case 0x11: {
-        rl_r(registers::C); // RL C
-        break;
-    }
-
-        /*
-        case 0x20:
-                sla_r(registers::B); //sla b, TODO: B not working
-                break;
-        */
-
-    default:
-        // print out the opcodes we didnt' implement
-        std::cout << "not implemented extended (cb): " << std::hex
-                  << static_cast<unsigned int>(cb_opcode) << std::endl;
-        // system("pause");
-        std::cin.get();
-        return 0;
-        break;
-    }
-
-    return 1;
-}
 
 void cpu::tick() {
     this->ticks++;

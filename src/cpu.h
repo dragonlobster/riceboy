@@ -49,9 +49,6 @@ class cpu {
     int handle_opcode(const uint8_t opcode);
     int handle_cb_opcode(const uint8_t opcode);
 
-    // more efficient way of handling the opcode
-    int handle_opcode_v2(const uint8_t opcode);
-
     void execute_M_operations(); // execute M operations and set state of fetch_opcode to true or false depending on whether all M operations have completed
 
     uint8_t identify_opcode(const uint8_t opcode); // get the next opcode and increment the PC
@@ -80,6 +77,14 @@ class cpu {
         NA // NA means null (if register is SP
     };
 
+    enum class conditions {
+        NA,
+        Z,
+        NZ,
+        C,
+        NC
+    };
+
   private:
     // debugging only
     std::vector<uint8_t> opcodes{};
@@ -94,24 +99,27 @@ class cpu {
     // TODO: convert all arguments to pass by reference and make them const
     // micro operations
     // NOTE: d16 = address
-    void add_hl();                      // add content from address HL to A
+    void add_a_hl();                      // add content from address HL to A
     void add_a_r8(const registers r8); // add content from register r8 to A
     void bit_b_r8(const registers r8, uint8_t b); // b is 0 or 1
     void call(const bool check_z_flag);
     void cp_a_imm8(); // compare immediate next byte with A no effect on A
     void cp_a_hl();   // compare memory[hl] with A no effect on A
     void inc_or_dec_r8(const registers r8, const bool inc); // decrement register
+    void inc_or_dec_hl(const bool inc); // decrement register
     void inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
                         const bool sp); // inc or dec r16 register, either SP (stack
                                   // pointer) or 2 individual registers
     void jp_imm16(const bool check_z_flag); // absolute jump, check z flag
-    void jr_s8(const bool check_z_flag, const bool nz); // relative jump, check z flag, nz means check if z flag is not 0
+    void jr_s8(conditions condition); // relative jump, check z flag, nz means check if z flag is not 0
     void ld_imm16_a(const bool to_a); // to a means should i load imm16 to a, or a to
+    void ld_imm16_sp(); // to a means should i load imm16 to a, or a to
                                 // imm16, covers ld_imm16_a and ld_a_imm16
     void ld_r_r(const registers r_to,
                 const registers
                     r_from); // load value from 1 register to another register
     void ld_r_imm8(const registers r);
+    void ld_hl_imm8();
     void ld_rr_address(const registers r1, const registers r2, const bool sp);
     void ld_hl_a(const bool increment, const bool to_a);      // hl+ and hl-, and hl
     void ld_hl_r8(const registers r); // hl+ and hl-, and hl
