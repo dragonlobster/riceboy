@@ -18,11 +18,11 @@ int cpu::handle_opcode(const uint8_t opcode) {
     std::array<registers, 8> rp_table{registers::B, registers::C, registers::D,
                                       registers::E, registers::H, registers::L,
                                       registers::NA,
-                                      registers::NA}; // sp is the last
+                                      registers::NA}; // sp or af is the last
 
     std::array<registers, 8> r_table{registers::B, registers::C, registers::D,
                                      registers::E, registers::H, registers::L,
-                                     registers::NA, registers::A};
+                                     registers::NA, registers::A}; // na means HL
 
     const registers rp_r1 = rp_table[2 * p];
     const registers rp_r2 = rp_table[(2 * p) + 1];
@@ -64,13 +64,14 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 6: {
                 // jr nc s8
+                jr_s8(conditions::NC);
                 break;
             }
             case 7: {
                 // jr c s8
+                jr_s8(conditions::C);
                 break;
             }
-            // case 4, 5, 6, 7
             // end of switch case for y
             }
             break;
@@ -78,14 +79,12 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 1: {
             switch (q) {
             case 0: {
-                if (rp_r1 == registers::NA) {
-                    // sp case
-                    ld_rr_address(rp_r1, rp_r2, true);
-                } else { ld_rr_address(rp_r1, rp_r2, false); }
+                ld_rr_address(rp_r1, rp_r2, rp_r1 == registers::NA);
                 break;
             }
             case 1: {
                 // ADD HL, rp[p]
+                add_hl_rr(rp_r1, rp_r2, rp_r1 == registers::NA);
                 break;
             }
             }
@@ -141,15 +140,11 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 3: {
             switch (q) {
             case 0: {
-                if (rp_r1 == registers::NA) {
-                    inc_or_dec_r16(rp_r1, rp_r2, true, true);
-                } else { inc_or_dec_r16(rp_r1, rp_r2, true, false); }
+                inc_or_dec_r16(rp_r1, rp_r2, true, rp_r1 == registers::NA);
                 break;
             }
             case 1: {
-                if (rp_r1 == registers::NA) {
-                    inc_or_dec_r16(rp_r1, rp_r2, false, true);
-                } else { inc_or_dec_r16(rp_r1, rp_r2, false, false); }
+                inc_or_dec_r16(rp_r1, rp_r2, false, rp_r1 == registers::NA);
                 break;
             }
             }
@@ -176,14 +171,16 @@ int cpu::handle_opcode(const uint8_t opcode) {
             break;
         }
         case 7: {
-            // TODO: R operations
+            // TODO: DAA
             switch (y) {
             case 0: {
                 // RLCA
+                rlca();
                 break;
             }
             case 1: {
                 // RRCA
+                rrca();
                 break;
             }
             case 2: {
@@ -192,6 +189,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 3: {
                 // RRA
+                rra();
                 break;
             }
             case 4: {
@@ -200,14 +198,17 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 5: {
                 // CPL
+                cpl();
                 break;
             }
             case 6: {
                 // SCF
+                scf();
                 break;
             }
             case 7: {
                 // CCF
+                ccf();
                 break;
             }
             }
@@ -219,13 +220,14 @@ int cpu::handle_opcode(const uint8_t opcode) {
     }
     case 1: {
         if (z == 6 && y == 6) {
-            // HALT
+            // TODO: HALT
         } else {
             if (r_table[y] == registers::NA) {
-                ld_hl_r8(r_table[z]);
+                ld_hl_r8(r_table[z], true);
             }
             else if (r_table[z] == registers::NA) {
                 // LD r8 hl
+                ld_hl_r8(r_table[y], false);
             }
             else {
                 ld_r_r(r_table[y], r_table[z]);
@@ -244,37 +246,35 @@ int cpu::handle_opcode(const uint8_t opcode) {
             break;
         }
         case 1: {
-            // ADC
+            // ADC A, r_table[z] (register)
+            adc_or_sbc(r_table[z], r_table[z] == registers::NA, true);
             break;
         }
         case 2: {
-            if (r_table[z] == registers::NA) {
-                // sub hl
-            } else { sub_r(r_table[z]); }
+            sub(r_table[z], r_table[z] == registers::NA);
             break;
         }
         case 3: {
-            //sbc
+            //sbc a, r_table[z]
+            adc_or_sbc(r_table[z], r_table[z] == registers::NA, false);
             break;
         }
         case 4: {
             // and
+            and_r(r_table[z], r_table[z] == registers::NA);
             break;
         }
         case 5: {
-            if (r_table[z] == registers::NA) {
-                // xor hl
-            } else { xor_r(r_table[z]); }
+            xor_r(r_table[z], r_table[z] == registers::NA);
             break;
         }
         case 6: {
             // or
+            or_r(r_table[z], r_table[z] == registers::NA);
             break;
         }
         case 7: {
-            if (r_table[z] == registers::NA) { cp_a_hl(); } else {
-                // cp r
-            }
+            cp_a_r(r_table[z], r_table[z] == registers::NA);
             break;
         }
         }
@@ -286,18 +286,22 @@ int cpu::handle_opcode(const uint8_t opcode) {
             switch (y) {
             case 0: {
                 // ret NZ
+                ret(conditions::NZ);
                 break;
             }
             case 1: {
                 // ret Z
+                ret(conditions::Z);
                 break;
             }
             case 2: {
                 // ret NC
+                ret(conditions::NC);
                 break;
             }
             case 3: {
                 // ret C
+                ret(conditions::C);
                 break;
             }
             case 4: {
@@ -307,6 +311,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 5: {
                 // add sp, s8
+                add_sp_s8();
                 break;
             }
             case 6: {
@@ -316,6 +321,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 7: {
                 // ld hl, sp+s8
+                ld_hl_sps8();
                 break;
             }
             }
@@ -324,28 +330,27 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 1: {
             switch (q) {
             case 0: {
-                // TODO: handle pop AF
-                if (rp_r1 == registers::NA) {
-                    // pop AF
-                } else { pop_rr(rp_r1, rp_r2); }
+                pop_rr(rp_r1, rp_r2, rp_r1 == registers::NA);
                 break;
             }
             case 1: {
                 switch (p) {
                 case 0: {
-                    ret();
+                    ret(conditions::NA);
                     break;
                 }
                 case 1: {
-                    // reti
+                    // TODO: reti
                     break;
                 }
                 case 2: {
                     // jp hl
+                    jp_hl();
                     break;
                 }
                 case 3: {
                     // ld sp, hl
+                    ld_sp_hl();
                     break;
                 }
                 }
@@ -358,18 +363,21 @@ int cpu::handle_opcode(const uint8_t opcode) {
             switch (y) {
             case 0: {
                 // jmp nz
+                jp_imm16(conditions::NZ);
                 break;
             }
             case 1: {
-                jp_imm16(true);
+                jp_imm16(conditions::Z);
                 break;
             }
             case 2: {
                 // jmp NC
+                jp_imm16(conditions::NC);
                 break;
             }
             case 3: {
                 // jmp C
+                jp_imm16(conditions::C);
                 break;
             }
             case 4: {
@@ -394,7 +402,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 3: {
             switch (y) {
             case 0: {
-                jp_imm16(false);
+                jp_imm16(conditions::NA);
                 break;
             }
             case 1: {
@@ -405,11 +413,11 @@ int cpu::handle_opcode(const uint8_t opcode) {
                 break;
             }
             case 6: {
-                // DI
+                // TODO: DI
                 break;
             }
             case 7: {
-                // EI
+                // TODO: EI
                 break;
             }
             }
@@ -420,18 +428,22 @@ int cpu::handle_opcode(const uint8_t opcode) {
             switch (y) {
             case 0: {
                 // call NZ
+                call(conditions::NZ);
                 break;
             }
             case 1: {
-                call(true);
+                // call Z
+                call(conditions::Z);
                 break;
             }
             case 2: {
                 // call nc
+                call(conditions::NC);
                 break;
             }
             case 3: {
                 // call c
+                call(conditions::C);
                 break;
             }
             }
@@ -440,17 +452,12 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 5: {
             switch (q) {
             case 0: {
-                if (rp_r1 == registers::NA) {
-                    // handle push AF
-                }
-                else {
-                    push_rr(rp_r1, rp_r2);
-                }
+                push_rr(rp_r1, rp_r2, rp_r1==registers::NA);
                 break;
             }
                 case 1: {
                 if (p == 0) {
-                    call(false);
+                    call(conditions::NA);
                 }
                 break;
             }
@@ -461,30 +468,37 @@ int cpu::handle_opcode(const uint8_t opcode) {
             switch (y) {
             case 0: {
                 // add a imm8
+                add_or_sub_a_imm8(true);
                 break;
             }
             case 1: {
                 // adc a imm8
+                adc_or_sbc_imm8(true);
                 break;
             }
             case 2: {
                 // sub imm8
+                add_or_sub_a_imm8(false);
                 break;
             }
             case 3: {
                 // sbc a, imm8
+                add_or_sub_a_imm8(false);
                 break;
             }
             case 4: {
                 // and a, imm8
+                and_xor_or_imm8(bitops::AND);
                 break;
             }
             case 5: {
                 // xor imm8
+                and_xor_or_imm8(bitops::XOR);
                 break;
             }
             case 6: {
                 // or imm8
+                and_xor_or_imm8(bitops::OR);
                 break;
             }
             case 7: {

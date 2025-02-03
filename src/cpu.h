@@ -85,6 +85,12 @@ class cpu {
         NC
     };
 
+    enum class bitops {
+        AND,
+        XOR,
+        OR
+    };
+
   private:
     // debugging only
     std::vector<uint8_t> opcodes{};
@@ -100,17 +106,20 @@ class cpu {
     // micro operations
     // NOTE: d16 = address
     void add_a_hl();                      // add content from address HL to A
+    void add_hl_rr(const registers r1, const registers r2, const bool sp);                      // add content from address HL to A
     void add_a_r8(const registers r8); // add content from register r8 to A
+    void add_sp_s8();
     void bit_b_r8(const registers r8, uint8_t b); // b is 0 or 1
-    void call(const bool check_z_flag);
+    void call(const conditions condition);
     void cp_a_imm8(); // compare immediate next byte with A no effect on A
-    void cp_a_hl();   // compare memory[hl] with A no effect on A
+    void cp_a_r(const registers r, const bool hl);   // compare memory[hl] with A no effect on A
     void inc_or_dec_r8(const registers r8, const bool inc); // decrement register
     void inc_or_dec_hl(const bool inc); // decrement register
     void inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
                         const bool sp); // inc or dec r16 register, either SP (stack
                                   // pointer) or 2 individual registers
-    void jp_imm16(const bool check_z_flag); // absolute jump, check z flag
+    void jp_imm16(const conditions condition); // absolute jump, check z flag
+    void jp_hl();
     void jr_s8(conditions condition); // relative jump, check z flag, nz means check if z flag is not 0
     void ld_imm16_a(const bool to_a); // to a means should i load imm16 to a, or a to
     void ld_imm16_sp(); // to a means should i load imm16 to a, or a to
@@ -122,20 +131,38 @@ class cpu {
     void ld_hl_imm8();
     void ld_rr_address(const registers r1, const registers r2, const bool sp);
     void ld_hl_a(const bool increment, const bool to_a);      // hl+ and hl-, and hl
-    void ld_hl_r8(const registers r); // hl+ and hl-, and hl
-    void pop_rr(const registers r1, const registers r2);
-    void push_rr(const registers r1, const registers r2);
-    void ret();                     // return
+    void ld_hl_r8(const registers r, const bool to_hl); // hl+ and hl-, and hl
+    void ld_hl_sps8();
+    void ld_sp_hl();
+    void pop_rr(const registers r1, const registers r2, const bool af);
+    void push_rr(const registers r1, const registers r2, const bool af);
+    void ret(conditions condition);                     // return
     void rla();                     // rotate left accumulator
+    void rlca();                     // rotate left accumulator
+    void rra();                     // rotate right accumulator
+    void rrca();                     // rotate right accumulator
     void sla_r(const registers r); // rotate left accumulator
     void rl_r(const registers r);
-    void sub_r(const registers r);
-    void xor_r(const registers r);
+    void sub(const registers r, const bool hl);
+    void xor_r(const registers r, const bool hl);
     void ld_c_a(const bool to_a);    // also known as LDH (C), A, to_a reverses LD
     void ld_imm8_a(const bool to_a); // also known as LDH (n), A, to_a reverses LD
     void ld_a_rr(const registers r1,
                  const registers
                      r2, const bool to_a); // load memory value from register pair address to A
+    void cpl();
+    void scf();
+    void ccf();
+    void adc_or_sbc(const registers r1, const bool hl, const bool add);
+    void and_r(const registers r, const bool hl);
+    void or_r(const registers r, const bool hl);
+
+    void add_or_sub_a_imm8(const bool add);
+    void adc_or_sbc_imm8(const bool add);
+
+    void and_xor_or_imm8(bitops op);
+
+    void rst(const uint8_t opcode);
 
     // utility //
     uint16_t
@@ -145,16 +172,19 @@ class cpu {
     std::tuple<uint8_t, uint8_t> _split_16bit(const uint16_t r16);
 
     // all return result, zero, subtract, half-carry, carry
-    std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(uint8_t x,
-                                                               uint8_t y);
-    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(uint8_t x,
-                                                                  uint8_t y);
+    template <typename... Args>
+    std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(Args... args);
+
     std::tuple<uint16_t, bool, bool, bool, bool> _addition_16bit(uint16_t x,
-                                                                 uint16_t y);
+                                                               uint16_t y);
+    template <typename... Args>
+    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(Args... args);
 
     uint8_t _flags_to_byte()
         const; // const after function declaration makes it a compiler error to
                // edit class members inside the function
+
+    std::tuple<bool, bool, bool, bool> _byte_to_flags(uint8_t byte);
 
     // TODO: make enum
     uint8_t *_get_register(
