@@ -47,7 +47,7 @@ int main() {
         double target_frame_time = 1.f / (((1 << 22) / 70224) * 1000);
         // double target_frame_time = 60;
 
-        // 70224 ipf
+        // 70224 ipf - clock speed 4194304Hz
         while (frame_time >= target_frame_time) {
             for (unsigned int i = 0; i < 70224; ++i) {
                 riceboy->tick();

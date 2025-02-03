@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include <array>
 
 int cpu::handle_opcode(const uint8_t opcode) {
     /*
@@ -10,19 +11,18 @@ int cpu::handle_opcode(const uint8_t opcode) {
     */
     uint8_t x = opcode >> 6 & 3; // bits 7 - 6
     uint8_t y = opcode >> 3 & 7; // bits 3 - 5
-    uint8_t z = opcode & 7; // bits 2 - 0
+    uint8_t z = opcode & 7;      // bits 2 - 0
 
     uint8_t p = y >> 1; // bit 5 - 4
-    uint8_t q = y % 2; // bit 3
+    uint8_t q = y % 2;  // bit 3
 
-    std::array<registers, 8> rp_table{registers::B, registers::C, registers::D,
-                                      registers::E, registers::H, registers::L,
-                                      registers::NA,
-                                      registers::NA}; // sp or af is the last
+    std::array<registers, 8> rp_table{
+        registers::B, registers::C,  registers::D, registers::E, registers::H,
+        registers::L, registers::NA, registers::NA}; // sp or af is the last
 
-    std::array<registers, 8> r_table{registers::B, registers::C, registers::D,
-                                     registers::E, registers::H, registers::L,
-                                     registers::NA, registers::A}; // na means HL
+    std::array<registers, 8> r_table{
+        registers::B, registers::C, registers::D,  registers::E,
+        registers::H, registers::L, registers::NA, registers::A}; // na means HL
 
     const registers rp_r1 = rp_table[2 * p];
     const registers rp_r2 = rp_table[(2 * p) + 1];
@@ -72,7 +72,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
                 jr_s8(conditions::C);
                 break;
             }
-            // end of switch case for y
+                // end of switch case for y
             }
             break;
         }
@@ -152,20 +152,26 @@ int cpu::handle_opcode(const uint8_t opcode) {
         }
         case 4: {
             // inc hl, or others
-            if (r_table[y] == registers::NA) { inc_or_dec_hl(true); } else {
+            if (r_table[y] == registers::NA) {
+                inc_or_dec_hl(true);
+            } else {
                 inc_or_dec_r8(r_table[y], true);
             }
             break;
         }
         case 5: {
             // inc hl, or others
-            if (r_table[y] == registers::NA) { inc_or_dec_hl(false); } else {
+            if (r_table[y] == registers::NA) {
+                inc_or_dec_hl(false);
+            } else {
                 inc_or_dec_r8(r_table[y], false);
             }
             break;
         }
         case 6: {
-            if (r_table[y] == registers::NA) { ld_hl_imm8(); } else {
+            if (r_table[y] == registers::NA) {
+                ld_hl_imm8();
+            } else {
                 ld_r_imm8(r_table[y]);
             }
             break;
@@ -194,6 +200,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 4: {
                 // DAA
+                daa();
                 break;
             }
             case 5: {
@@ -214,7 +221,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             break;
         }
-        // end of switch case for z
+            // end of switch case for z
         }
         break;
     }
@@ -224,12 +231,10 @@ int cpu::handle_opcode(const uint8_t opcode) {
         } else {
             if (r_table[y] == registers::NA) {
                 ld_hl_r8(r_table[z], true);
-            }
-            else if (r_table[z] == registers::NA) {
+            } else if (r_table[z] == registers::NA) {
                 // LD r8 hl
                 ld_hl_r8(r_table[y], false);
-            }
-            else {
+            } else {
                 ld_r_r(r_table[y], r_table[z]);
             }
         }
@@ -242,7 +247,9 @@ int cpu::handle_opcode(const uint8_t opcode) {
             if (r_table[z] == registers::NA) {
                 // add a, hl
                 add_a_hl();
-            } else { add_a_r8(r_table[z]); }
+            } else {
+                add_a_r8(r_table[z]);
+            }
             break;
         }
         case 1: {
@@ -255,7 +262,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             break;
         }
         case 3: {
-            //sbc a, r_table[z]
+            // sbc a, r_table[z]
             adc_or_sbc(r_table[z], r_table[z] == registers::NA, false);
             break;
         }
@@ -321,7 +328,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 7: {
                 // ld hl, sp+s8
-                ld_hl_sps8();
+                ld_hl_sp_s8();
                 break;
             }
             }
@@ -452,10 +459,10 @@ int cpu::handle_opcode(const uint8_t opcode) {
         case 5: {
             switch (q) {
             case 0: {
-                push_rr(rp_r1, rp_r2, rp_r1==registers::NA);
+                push_rr(rp_r1, rp_r2, rp_r1 == registers::NA);
                 break;
             }
-                case 1: {
+            case 1: {
                 if (p == 0) {
                     call(conditions::NA);
                 }
@@ -483,7 +490,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
             }
             case 3: {
                 // sbc a, imm8
-                add_or_sub_a_imm8(false);
+                adc_or_sbc_imm8(false);
                 break;
             }
             case 4: {
@@ -510,6 +517,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
         }
         case 7: {
             // rst y*8
+            rst(opcode);
             break;
         }
         }
@@ -519,8 +527,8 @@ int cpu::handle_opcode(const uint8_t opcode) {
     default: {
         // print out the opcodes we didnt' implement
         std::cout << "not implemented: " //<< static_cast<unsigned int>(opcode)
-            << "hex: 0x" << std::hex << static_cast<unsigned int>(opcode)
-            << std::endl;
+                  << "hex: 0x" << std::hex << static_cast<unsigned int>(opcode)
+                  << std::endl;
         // system("pause");
         std::cin.get();
         return 0;
@@ -529,7 +537,6 @@ int cpu::handle_opcode(const uint8_t opcode) {
     }
 
     return 1;
-
 }
 
 int cpu::handle_cb_opcode(const uint8_t cb_opcode) {

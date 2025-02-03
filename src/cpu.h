@@ -132,7 +132,7 @@ class cpu {
     void ld_rr_address(const registers r1, const registers r2, const bool sp);
     void ld_hl_a(const bool increment, const bool to_a);      // hl+ and hl-, and hl
     void ld_hl_r8(const registers r, const bool to_hl); // hl+ and hl-, and hl
-    void ld_hl_sps8();
+    void ld_hl_sp_s8();
     void ld_sp_hl();
     void pop_rr(const registers r1, const registers r2, const bool af);
     void push_rr(const registers r1, const registers r2, const bool af);
@@ -164,6 +164,8 @@ class cpu {
 
     void rst(const uint8_t opcode);
 
+    void daa();
+
     // utility //
     uint16_t
     _combine_2_8bits(const uint8_t r1,
@@ -175,10 +177,9 @@ class cpu {
     template <typename... Args>
     std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(Args... args);
 
-    std::tuple<uint16_t, bool, bool, bool, bool> _addition_16bit(uint16_t x,
-                                                               uint16_t y);
-    template <typename... Args>
-    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(Args... args);
+    std::tuple<uint16_t, bool, bool, bool, bool>
+    _addition_16bit(uint16_t x, uint16_t y, bool sp_s8);
+    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf);
 
     uint8_t _flags_to_byte()
         const; // const after function declaration makes it a compiler error to

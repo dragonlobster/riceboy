@@ -1,7 +1,7 @@
 #include "cpu.h"
+#include <array>
 #include <fstream>
 #include <iostream>
-#include <array>
 
 // TODO: abstract utility later
 template <typename... Args>
@@ -11,41 +11,47 @@ std::tuple<uint8_t, bool, bool, bool, bool> cpu::_addition_8bit(Args... args) {
     result += (... + args);
     // Check if the result is zero
     bool zero = result == 0;
-    bool half_carry = ((args & 0xf) + ...) > 0xf;
+    bool half_carry = ((args & 0xf) + ...) > 0xf; // see if 4 bit sum fits in 4 bits
     bool full_carry = (static_cast<uint16_t>(args) + ...) > 0xff;
     return {result, zero, false, half_carry, full_carry};
 }
 
-std::tuple<uint16_t, bool, bool, bool, bool> cpu::_addition_16bit(uint16_t x,
-                                                                uint16_t y) {
+std::tuple<uint16_t, bool, bool, bool, bool>
+cpu::_addition_16bit(uint16_t x, uint16_t y, bool sp_s8 = false) {
+    uint16_t Hf_sum = 0xfff;
+    if (sp_s8) {
+        Hf_sum = 0xf;
+    }
+    bool full_carry{};
     // return result, zero, sub, half_carry, full_carry
     uint16_t result = x + y;
     bool zero = result == 0;
-    bool half_carry =
-        (x & 0xff) + (y & 0xff) > 0xff; // see if 8 bit sum fits in 8 bits
-    bool full_carry = static_cast<uint32_t>(x) + static_cast<uint32_t>(y) >
-                      0xffff; // see if added numbers > 16 bits
+    bool half_carry = (x & Hf_sum) + (y & Hf_sum) >
+                      Hf_sum;
+    if (!sp_s8) {
+        full_carry = static_cast<uint32_t>(x) + static_cast<uint32_t>(y) >
+                          0xffff; // see if added numbers > 16 bits
+    } else {
+        full_carry = (x & 0xff) + (y & 0xff) > 0xff; 
+    }
     return {result, zero, false, half_carry, full_carry};
 }
 
-template <typename... Args>
 std::tuple<uint8_t, bool, bool, bool, bool>
-cpu::_subtraction_8bit(Args... args) {
+cpu::_subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf = 0) {
     // return result, zero, sub, half_carry, full_carry
-    uint8_t result = 0;
-    result += (... - args);
+    uint8_t result = x - y - Cf;
     bool zero = result == 0;
-    bool half_carry =
-        (static_cast<int8_t>(args & 0xf) - ...) < 0;
-    bool full_carry = (static_cast<int>(args) - ...) < 0;
+    bool half_carry = (x & 0xf) < (y & 0xf) + Cf;
+    bool full_carry = (static_cast<int>(x) - static_cast<int>(y) - static_cast<int>(Cf)) < 0;
     return {result, zero, true, half_carry, full_carry};
 }
 
 uint8_t cpu::_flags_to_byte() const {
-    uint8_t Z = this->Zf ? 1 : 0;
-    uint8_t N = this->Nf ? 1 : 0;
-    uint8_t H = this->Hf ? 1 : 0;
-    uint8_t C = this->Cf ? 1 : 0;
+    uint8_t Z = this->Zf;
+    uint8_t N = this->Nf;
+    uint8_t H = this->Hf;
+    uint8_t C = this->Cf;
     return (Z << 7) | (N << 6) | (H << 5) | (C << 4);
 }
 
@@ -158,8 +164,6 @@ void cpu::add_a_r8(const registers r8) {
     this->Nf = n;
     this->Hf = h;
     this->Cf = c;
-    // increment program counter once
-    this->PC++;
 }
 
 void cpu::add_or_sub_a_imm8(const bool add) {
@@ -187,8 +191,7 @@ void cpu::add_or_sub_a_imm8(const bool add) {
 
     if (add) {
         this->M_operations.push_back(m1_add);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m1_sub);
     }
 }
@@ -197,7 +200,8 @@ void cpu::adc_or_sbc_imm8(const bool add) {
     auto m1_adc = [=]() {
         uint8_t imm8 = this->_read_memory(this->PC);
         this->PC++;
-        auto [result, z, n, h, c] = this->_addition_8bit(this->A, imm8, this->Cf);
+        auto [result, z, n, h, c] =
+            this->_addition_8bit(this->A, imm8, this->Cf);
         this->A = result;
         this->Zf = z;
         this->Nf = n;
@@ -208,7 +212,8 @@ void cpu::adc_or_sbc_imm8(const bool add) {
     auto m1_sbc = [=]() {
         uint8_t imm8 = this->_read_memory(this->PC);
         this->PC++;
-        auto [result, z, n, h, c] = this->_subtraction_8bit(this->A, imm8, this->Cf);
+        auto [result, z, n, h, c] =
+            this->_subtraction_8bit(this->A, imm8, this->Cf);
         this->A = result;
         this->Zf = z;
         this->Nf = n;
@@ -218,8 +223,7 @@ void cpu::adc_or_sbc_imm8(const bool add) {
 
     if (add) {
         this->M_operations.push_back(m1_adc);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m1_sbc);
     }
 }
@@ -227,6 +231,7 @@ void cpu::adc_or_sbc_imm8(const bool add) {
 void cpu::and_xor_or_imm8(bitops op) {
     auto m1_and = [=]() {
         uint8_t imm8 = this->_read_memory(this->PC);
+        this->PC++;
         this->A = this->A & imm8;
         this->Zf = this->A == 0;
         this->Nf = false;
@@ -236,6 +241,7 @@ void cpu::and_xor_or_imm8(bitops op) {
 
     auto m1_or = [=]() {
         uint8_t imm8 = this->_read_memory(this->PC);
+        this->PC++;
         this->A = this->A | imm8;
         this->Zf = this->A == 0;
         this->Nf = false;
@@ -245,6 +251,7 @@ void cpu::and_xor_or_imm8(bitops op) {
 
     auto m1_xor = [=]() {
         uint8_t imm8 = this->_read_memory(this->PC);
+        this->PC++;
         this->A = this->A ^ imm8;
         this->Zf = this->A == 0;
         this->Nf = false;
@@ -254,55 +261,16 @@ void cpu::and_xor_or_imm8(bitops op) {
 
     if (op == bitops::AND) {
         this->M_operations.push_back(m1_and);
-    }
-    else if (op == bitops::OR) {
+    } else if (op == bitops::OR) {
         this->M_operations.push_back(m1_or);
-    }
-    else if (op == bitops::XOR) {
+    } else if (op == bitops::XOR) {
         this->M_operations.push_back(m1_xor);
     }
 }
 
 void cpu::rst(const uint8_t opcode) {
-    uint16_t address{};
 
-    switch (opcode) {
-    case 0xC7:
-        address = 0x00;
-        break;
-
-    case 0xCF:
-        address = 0x08;
-        break;
-
-    case 0xD7:
-        address = 0x10;
-        break;
-
-    case 0xDF:
-        address = 0x18;
-        break;
-
-    case 0xE7:
-        address = 0x20;
-        break;
-
-    case 0xEF:
-        address = 0x28;
-        break;
-
-    case 0xF7:
-        address = 0x30;
-        break;
-
-    case 0xFF:
-        address = 0x38;
-        break;
-    }
-
-    auto m1 = [=]() {
-        this->SP--;
-    };
+    auto m1 = [=]() { this->SP--; };
 
     auto m2 = [=]() {
         auto [p, c] = _split_16bit(this->PC);
@@ -312,11 +280,32 @@ void cpu::rst(const uint8_t opcode) {
     };
 
     auto m3 = [=]() {
-        this->_write_memory(this->SP, );
+        uint16_t address{};
+        switch (opcode) {
+        case 0xC7: address = 0x00; break;
+
+        case 0xCF: address = 0x08; break;
+
+        case 0xD7: address = 0x10; break;
+
+        case 0xDF: address = 0x18; break;
+
+        case 0xE7: address = 0x20; break;
+
+        case 0xEF: address = 0x28; break;
+
+        case 0xF7: address = 0x30; break;
+
+        case 0xFF: address = 0x38; break;
+        }
+        this->_write_memory(this->SP, this->Z);
+        this->PC = address;
     };
 
+    this->M_operations.push_back(m3);
+    this->M_operations.push_back(m2);
+    this->M_operations.push_back(m1);
 }
-
 
 void cpu::add_hl_rr(const registers r1, const registers r2, const bool sp) {
     auto m1_nonsp = [=]() {
@@ -332,7 +321,6 @@ void cpu::add_hl_rr(const registers r1, const registers r2, const bool sp) {
         this->H = msb;
         this->L = lsb;
 
-        this->Zf = z;
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
@@ -347,7 +335,6 @@ void cpu::add_hl_rr(const registers r1, const registers r2, const bool sp) {
         this->H = msb;
         this->L = lsb;
 
-        this->Zf = z;
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
@@ -355,8 +342,7 @@ void cpu::add_hl_rr(const registers r1, const registers r2, const bool sp) {
 
     if (!sp) {
         this->M_operations.push_back(m1_nonsp);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m1_sp);
     }
 }
@@ -489,14 +475,14 @@ void cpu::cp_a_r(const registers r, const bool hl) {
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
-    }
-    else {
+    } else {
         auto read_hl = [=]() {
             uint16_t hl = _combine_2_8bits(this->H, this->L);
             this->W = this->_read_memory(hl); // memory[hl] stored in W
 
             // sub an set flags
-            auto [result, z, n, h, c] = this->_subtraction_8bit(this->A, this->W);
+            auto [result, z, n, h, c] =
+                this->_subtraction_8bit(this->A, this->W);
 
             // set flags
             this->Zf = z;
@@ -513,9 +499,7 @@ void cpu::cp_a_r(const registers r, const bool hl) {
 void cpu::inc_or_dec_hl(const bool inc) {
     uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
-    auto m1 = [=]() {
-        this->Z = this->_read_memory(address);
-    };
+    auto m1 = [=]() { this->Z = this->_read_memory(address); };
 
     auto m2_dec = [=]() {
         auto [result, z, n, h, c] = this->_subtraction_8bit(this->Z, 1);
@@ -535,8 +519,7 @@ void cpu::inc_or_dec_hl(const bool inc) {
 
     if (inc) {
         this->M_operations.push_back(m2_inc);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m2_dec);
     }
     this->M_operations.push_back(m1);
@@ -589,9 +572,7 @@ void cpu::inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
     this->M_operations.push_back(_inc_or_dec_r16);
 }
 
-void cpu::jp_hl() {
-    this->PC = this->_combine_2_8bits(this->H, this->L);
-}
+void cpu::jp_hl() { this->PC = this->_combine_2_8bits(this->H, this->L); }
 
 void cpu::jp_imm16(const conditions condition) {
     // get least and most significant byte via program_counter next
@@ -610,7 +591,7 @@ void cpu::jp_imm16(const conditions condition) {
     };
 
     switch (condition) {
-    case conditions:: NA: {
+    case conditions::NA: {
         this->M_operations.push_back(set_pc);
         break;
     }
@@ -659,13 +640,11 @@ void cpu::jr_s8(conditions condition) {
 
     if (condition == conditions::NA) {
         this->M_operations.push_back(set_pc);
-    }
-    else if (condition == conditions::Z) {
+    } else if (condition == conditions::Z) {
         if (this->Zf) {
             this->M_operations.push_back(set_pc);
         }
-    }
-    else if (condition == conditions::NZ) {
+    } else if (condition == conditions::NZ) {
         if (!this->Zf) {
             this->M_operations.push_back(set_pc);
         }
@@ -708,7 +687,6 @@ void cpu::ld_imm16_sp() {
         auto [msb, lsb] = this->_split_16bit(this->SP);
         this->_write_memory(address, msb);
     };
-
 
     this->M_operations.push_back(m4);
     this->M_operations.push_back(m3);
@@ -765,9 +743,7 @@ void cpu::ld_hl_imm8() {
 }
 
 void cpu::ld_sp_hl() {
-    auto m1 = [=]() {
-        this->SP = this->_combine_2_8bits(this->H, this->L);
-    };
+    auto m1 = [=]() { this->SP = this->_combine_2_8bits(this->H, this->L); };
     this->M_operations.push_back(m1);
 }
 
@@ -839,11 +815,9 @@ void cpu::ld_hl_a(const bool increment, const bool to_a) {
         this->L = l;
     };
 
-
     if (to_a) {
         this->M_operations.push_back(m2);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m1);
     }
 } // covers hl+ and hl-
@@ -864,13 +838,12 @@ void cpu::ld_hl_r8(const registers r, const bool to_hl) {
 
     if (to_hl) {
         this->M_operations.push_back(m1_to_hl);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m2);
     }
 }
 
-void cpu::ld_hl_sps8() {
+void cpu::ld_hl_sp_s8() {
     auto m1 = [=]() {
         this->Z = this->_read_memory(this->PC);
         this->PC++;
@@ -878,11 +851,11 @@ void cpu::ld_hl_sps8() {
 
     auto m2 = [=]() {
         int8_t s8 = this->Z;
-        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8);
+        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8, true);
         auto [msb, lsb] = _split_16bit(result);
         this->H = msb;
         this->L = lsb;
-        this->Zf = z;
+        this->Zf = false;
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
@@ -961,8 +934,7 @@ void cpu::push_rr(const registers r1, const registers r2, const bool af) {
     if (af) {
         this->M_operations.push_back(m3_af);
         this->M_operations.push_back(m2_af);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m3);
         this->M_operations.push_back(m2);
     }
@@ -971,7 +943,7 @@ void cpu::push_rr(const registers r1, const registers r2, const bool af) {
 
 void cpu::ret(conditions condition) {
 
-    auto fill = [=](){};
+    auto fill = [=]() {};
 
     auto m1 = [=]() {
         this->Z = _read_memory(this->SP);
@@ -1033,9 +1005,9 @@ void cpu::ret(conditions condition) {
 
 void cpu::rla() {
     auto m1 = [=]() {
-        uint8_t msbit = (this->A >> 7) & 1;    // save the "carry" bit
-        uint8_t carry_flag = this->Cf ? 1 : 0; // take current carry flag
-        this->A = this->A << 1;                // left shift A by 1 bit
+        uint8_t msbit = (this->A >> 7) & 1;      // save the "carry" bit
+        uint8_t carry_flag = this->Cf;           // take current carry flag
+        this->A = this->A << 1;                  // left shift A by 1 bit
         this->A = (this->A & 0xfe) | carry_flag; // put carry_flag into bit 0
         // set flags
         this->Zf = false;
@@ -1049,25 +1021,25 @@ void cpu::rla() {
 
 void cpu::rlca() {
     auto m1 = [=]() {
-        uint8_t msbit = (this->A >> 7) & 1;    // save the "carry" bit
-        this->A = this->A << 1;                // left shift A by 1 bit
+        uint8_t msbit = (this->A >> 7) & 1; // save the "carry" bit
+        this->A = this->A << 1;             // left shift A by 1 bit
         this->A = (this->A & 0xfe) | msbit; // put carry_flag into bit 0
         // set flags
         this->Zf = false;
         this->Nf = false;
         this->Hf = false;
         this->Cf = msbit == 1;
-
     };
     this->M_operations.push_back(m1);
 }
 
 void cpu::rra() {
     auto m1 = [=]() {
-        uint8_t lsbit = this->A & 1;    // save the "carry" bit
-        uint8_t carry_flag = this->Cf ? 1 : 0; // take current carry flag
+        uint8_t lsbit = this->A & 1;           // save the "carry" bit
+        uint8_t carry_flag = this->Cf; // take current carry flag
         this->A = this->A >> 1;                // left shift A by 1 bit
-        this->A = (this->A & 0x7f) | (carry_flag << 7); // put carry_flag into bit 0
+        this->A =
+            (this->A & 0x7f) | (carry_flag << 7); // put carry_flag into bit 0
         // set flags
         this->Zf = false;
         this->Nf = false;
@@ -1079,15 +1051,14 @@ void cpu::rra() {
 
 void cpu::rrca() {
     auto m1 = [=]() {
-        uint8_t lsbit = this->A & 1;    // save the "carry" bit
-        this->A = this->A >> 1;                // left shift A by 1 bit
+        uint8_t lsbit = this->A & 1;               // save the "carry" bit
+        this->A = this->A >> 1;                    // left shift A by 1 bit
         this->A = (this->A & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
         // set flags
         this->Zf = false;
         this->Nf = false;
         this->Hf = false;
         this->Cf = lsbit == 1;
-
     };
     this->M_operations.push_back(m1);
 }
@@ -1115,27 +1086,28 @@ void cpu::adc_or_sbc(const registers r1, const bool hl, const bool add) {
         uint8_t *r1p = _get_register(r1);
         uint8_t result{};
         if (add) {
-            auto [result, z, n, h, c] = _addition_8bit(this->A, *r1p, this->Cf ? 1 : 0);
+            auto [result, z, n, h, c] =
+                _addition_8bit(this->A, *r1p, this->Cf);
+            this->A = result;
+            this->Zf = z;
+            this->Nf = n;
+            this->Hf = h;
+            this->Cf = c;
+        } else {
+            auto [result, z, n, h, c] =
+                _subtraction_8bit(this->A, *r1p, this->Cf);
             this->A = result;
             this->Zf = z;
             this->Nf = n;
             this->Hf = h;
             this->Cf = c;
         }
-        else {
-            auto [result, z, n, h, c] = _subtraction_8bit(this->A, *r1p, this->Cf ? 1 : 0);
-            this->A = result;
-            this->Zf = z;
-            this->Nf = n;
-            this->Hf = h;
-            this->Cf = c;
-        }
-    }
-    else {
+    } else {
         auto m1_adc = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
-            auto [result, z, n, h, c] = _addition_8bit(this->A, this->Z, this->Cf ? 1 : 0);
+            auto [result, z, n, h, c] =
+                _addition_8bit(this->A, this->Z, this->Cf);
             this->A = result;
             this->Zf = z;
             this->Nf = n;
@@ -1145,7 +1117,8 @@ void cpu::adc_or_sbc(const registers r1, const bool hl, const bool add) {
         auto m1_sbc = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
-            auto [result, z, n, h, c] = _subtraction_8bit(this->A, this->Z, this->Cf ? 1 : 0);
+            auto [result, z, n, h, c] =
+                _subtraction_8bit(this->A, this->Z, this->Cf);
             this->A = result;
             this->Zf = z;
             this->Nf = n;
@@ -1154,8 +1127,7 @@ void cpu::adc_or_sbc(const registers r1, const bool hl, const bool add) {
         };
         if (add) {
             this->M_operations.push_back(m1_adc);
-        }
-        else {
+        } else {
             this->M_operations.push_back(m1_sbc);
         }
     }
@@ -1170,7 +1142,7 @@ void cpu::add_sp_s8() {
 
     auto m2 = [=]() {
         int8_t s8 = this->Z;
-        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8);
+        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8, true);
         this->SP = result;
         this->Zf = z;
         this->Nf = n;
@@ -1184,7 +1156,6 @@ void cpu::add_sp_s8() {
     this->M_operations.push_back(m1);
 }
 
-
 void cpu::and_r(const registers r, const bool hl) {
     if (!hl) {
         uint8_t *r1p = _get_register(r);
@@ -1194,8 +1165,7 @@ void cpu::and_r(const registers r, const bool hl) {
         this->Nf = false;
         this->Hf = true;
         this->Cf = false;
-    }
-    else {
+    } else {
         auto m1 = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
@@ -1217,7 +1187,7 @@ void cpu::sla_r(const registers r) {
         // uint8_t* rp = &this->B;
 
         uint8_t msbit = (*rp >> 7) & 1;        // save the "carry" bit
-        uint8_t carry_flag = this->Cf ? 1 : 0; // take current carry flag
+        uint8_t carry_flag = this->Cf; // take current carry flag
         *rp <<= 1;                             // left shift A by 1 bit
         // bit 0 is reset to 0
 
@@ -1236,7 +1206,7 @@ void cpu::rl_r(const registers r) {
     auto m1 = [=]() {
         auto rp = this->_get_register(r);
         uint8_t msbit = (*rp >> 7) & 1;
-        uint8_t carry_flag = this->Cf ? 1 : 0;
+        uint8_t carry_flag = this->Cf;
         *rp <<= 1;
         // clear last bit first, then or it with the carry flag
         *rp = (*rp & 0xfe) | carry_flag;
@@ -1267,13 +1237,12 @@ void cpu::sub(const registers r, const bool hl) {
         this->Nf = n;
         this->Hf = h;
         this->Cf = c;
-    }
-    else {
+    } else {
         auto m1 = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
-            auto [result, z, n, h, c] = this->_subtraction_8bit(
-                this->A, this->Z);
+            auto [result, z, n, h, c] =
+                this->_subtraction_8bit(this->A, this->Z);
             this->A = result;
 
             // set flags
@@ -1296,8 +1265,7 @@ void cpu::xor_r(const registers r, const bool hl) {
         this->Nf = false;
         this->Hf = false;
         this->Cf = false;
-    }
-    else {
+    } else {
         auto m1 = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
@@ -1323,8 +1291,7 @@ void cpu::or_r(const registers r, const bool hl) {
         this->Nf = false;
         this->Hf = false;
         this->Cf = false;
-    }
-    else {
+    } else {
         auto m1 = [=]() {
             uint16_t address = _combine_2_8bits(this->H, this->L);
             this->Z = _read_memory(address);
@@ -1391,10 +1358,33 @@ void cpu::ld_a_rr(const registers r1, const registers r2, const bool to_a) {
 
     if (to_a) {
         this->M_operations.push_back(m1);
-    }
-    else {
+    } else {
         this->M_operations.push_back(m2);
     }
+}
+
+void cpu::daa() {
+    // note: assumes a is a uint8_t and wraps from 0xff to 0
+    if (!this->Nf) { // after an addition, adjust if (half-)carry occurred or if
+                     // result is out of bounds
+        if (this->Cf || this->A > 0x99) {
+            this->A += 0x60;
+            this->Cf = true;
+        }
+        if (this->Hf || (this->A & 0x0f) > 0x09) {
+            this->A += 0x6;
+        }
+    } else { // after a subtraction, only adjust if (half-)carry occurred
+        if (this->Cf) {
+            this->A -= 0x60;
+        }
+        if (this->Hf) {
+            this->A -= 0x6;
+        }
+    }
+    // these flags are always updated
+    this->Zf = (this->A == 0); // the usual z flag
+    this->Hf = false;          // h flag is always cleared
 }
 
 uint8_t cpu::identify_opcode(const uint8_t opcode) {
@@ -1474,7 +1464,6 @@ cpu::cpu(mmu &mmu) {
     // pass by reference
     this->gb_mmu = &mmu; // & refers to actual address to assign to the pointer
 }
-
 
 void cpu::tick() {
     this->ticks++;
