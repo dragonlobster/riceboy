@@ -190,8 +190,13 @@ uint8_t mmu::get_value_from_address(uint16_t address) const {
 
 void mmu::write_value_to_address(uint16_t address, uint8_t value) {
 
+    // trap DIV 
+    if (address == 0xff04) {
+        this->hardware_registers[address - 0xff00] = 0;
+    }
+
     // TODO: restrict access
-    if (locate_section(address) ==
+    else if (locate_section(address) ==
         mmu::section::restart_and_interrupt_vectors) {
         this->restart_and_interrupt_vectors[address] = value;
     }

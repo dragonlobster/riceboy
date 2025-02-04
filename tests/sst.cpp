@@ -93,6 +93,7 @@ void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
     test_cpu.C = initial.c;
     test_cpu.D = initial.d;
     test_cpu.E = initial.e;
+    test_cpu.ime = initial.ime;
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {
@@ -120,6 +121,7 @@ void compare_final(cpu &test_cpu, sst::cpu_state &final) {
     EXPECT_EQ(test_cpu.C, final.c);
     EXPECT_EQ(test_cpu.D, final.d);
     EXPECT_EQ(test_cpu.E, final.e);
+    EXPECT_EQ(test_cpu.ime, final.ime);
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {

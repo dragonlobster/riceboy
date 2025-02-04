@@ -25,21 +25,11 @@ void ppu::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
 
 std::array<uint8_t, 3> ppu::_get_color(uint8_t id) {
     switch (id) {
-    case 0:
-        return color_palette_white;
-        break;
-    case 1:
-        return color_palette_light_gray;
-        break;
-    case 2:
-        return color_palette_dark_gray;
-        break;
-    case 3:
-        return color_palette_black;
-        break;
-    default:
-        return color_palette_white;
-        break;
+    case 0 : return color_palette_white; break;
+    case 1 : return color_palette_light_gray; break;
+    case 2 : return color_palette_dark_gray; break;
+    case 3 : return color_palette_black; break;
+    default: return color_palette_white; break;
     }
 }
 
@@ -183,9 +173,19 @@ void fetcher::tick() {
 // 1 tick = 1 T-Cycle
 void ppu::tick() {
     this->ppu_ticks++;
+    
+    // set stat to mode
+    *STAT = (*STAT & 0xfc) | static_cast<uint8_t>(current_mode);
+    last_mode = current_mode;
 
     switch (this->current_mode) {
     case mode::OAM_Scan: {
+
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (*STAT >> 5 & 1)) {
+            *IF = *IF | 2;
+        }
+
         if (this->ppu_ticks % 2 == 0 &&
             oam_buffer_counter < 40) { // 40 oam entries
             // oam scan 1 entry (4 bytes) every 2 ticks
@@ -199,6 +199,7 @@ void ppu::tick() {
             oam_buffer_counter++; // each oam entry is 4 bytes
         } else if (this->ppu_ticks == 80 && oam_buffer_counter == 40) {
             // TODO: start the fetcher based on LY
+
 
             // prepare for drawing
             // clear fifo
@@ -271,6 +272,7 @@ void ppu::tick() {
         // TODO: draw without fifo first, remove after
 
         if (dot_count == 160) {
+
             // finished
             this->current_mode = mode::HBlank;
         }
@@ -278,6 +280,12 @@ void ppu::tick() {
     }
 
     case mode::HBlank: {
+
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (*STAT >> 3 & 1)) {
+            *IF = *IF | 2;
+        }
+
         // wait 456 t-cycles
         if (this->ppu_ticks == 456) {
             this->ppu_ticks = 0;
@@ -296,6 +304,10 @@ void ppu::tick() {
                 window.draw(lcd_dots_sprite);
                 window.display();
 
+                // v-blank IF interrupt
+                *IF = *IF | 1;
+                // end v-blank if interrupt
+
                 this->current_mode = mode::VBlank;
             } else {
                 this->current_mode = mode::OAM_Scan;
@@ -306,10 +318,29 @@ void ppu::tick() {
     }
 
     case mode::VBlank: {
+
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (*STAT >> 4 & 1)) {
+            *IF = *IF | 2;
+        }
+
         if (this->ppu_ticks == 456) {
 
             this->ppu_ticks = 0;
             ++*(this->LY); // new blank scanline reached
+
+            // stat interrupt check
+            // TODO: check stat interrupt
+            if (*LY == *LYC) {
+                if ((*STAT >> 6) & 1) {
+                    if (((*STAT >> 2) & 1) == 0) {
+                        *IF = *IF | 2;
+                        *STAT = *STAT | 4;
+                    }
+                }
+            } else {
+                *STAT = *STAT & ~4;
+            }
 
             if (*(this->LY) == 153) {   // wait 10 more scanlines
                 (*(this->LY)) = 0;      // reset LY

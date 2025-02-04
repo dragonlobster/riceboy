@@ -17,28 +17,40 @@ std::tuple<uint8_t, bool, bool, bool, bool> cpu::_addition_8bit(Args... args) {
 }
 
 std::tuple<uint16_t, bool, bool, bool, bool>
-cpu::_addition_16bit(uint16_t x, uint16_t y, bool sp_s8 = false) {
+cpu::_addition_16bit(uint16_t x, uint16_t y, bool s8) {
+
     uint16_t Hf_sum = 0xfff;
-    if (sp_s8) {
+    if (s8) {
         Hf_sum = 0xf;
     }
+
     bool full_carry{};
-    // return result, zero, sub, half_carry, full_carry
-    uint16_t result = x + y;
-    bool zero = result == 0;
-    bool half_carry = (x & Hf_sum) + (y & Hf_sum) >
-                      Hf_sum;
-    if (!sp_s8) {
-        full_carry = static_cast<uint32_t>(x) + static_cast<uint32_t>(y) >
-                          0xffff; // see if added numbers > 16 bits
+    bool half_carry{};
+
+    uint16_t result{};
+    if (s8) {
+        int8_t imm8 = static_cast<int8_t>(y);
+        result = x + imm8;
     } else {
-        full_carry = (x & 0xff) + (y & 0xff) > 0xff; 
+        result = x + y;
     }
+
+    bool zero = result == 0;
+
+    half_carry = (x & Hf_sum) + (y & Hf_sum) > Hf_sum;
+
+    if (!s8) {
+        full_carry = static_cast<uint32_t>(x) + static_cast<uint32_t>(y) >
+                     0xffff; // see if added numbers > 16 bits
+    } else {
+        full_carry = (x & 0xff) + (y & 0xff) > 0xff;
+    }
+
     return {result, zero, false, half_carry, full_carry};
 }
 
 std::tuple<uint8_t, bool, bool, bool, bool>
-cpu::_subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf = 0) {
+cpu::_subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf) {
     // return result, zero, sub, half_carry, full_carry
     uint8_t result = x - y - Cf;
     bool zero = result == 0;
@@ -116,6 +128,10 @@ uint8_t *cpu::_get_register(const registers r8) {
 
 uint8_t cpu::_read_memory(const uint16_t address) {
     return this->gb_mmu->get_value_from_address(address);
+}
+
+uint8_t* cpu::_read_pointer(const uint16_t address) {
+    return this->gb_mmu->get_pointer_from_address(address);
 }
 
 void cpu::_write_memory(const uint16_t address, const uint8_t value) {
@@ -850,8 +866,7 @@ void cpu::ld_hl_sp_s8() {
     };
 
     auto m2 = [=]() {
-        int8_t s8 = this->Z;
-        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8, true);
+        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, this->Z, true);
         auto [msb, lsb] = _split_16bit(result);
         this->H = msb;
         this->L = lsb;
@@ -861,8 +876,8 @@ void cpu::ld_hl_sp_s8() {
         this->Cf = c;
     };
 
-    this->M_operations.push_back(m1);
     this->M_operations.push_back(m2);
+    this->M_operations.push_back(m1);
 }
 
 void cpu::pop_rr(const registers r1, const registers r2, const bool af) {
@@ -941,9 +956,14 @@ void cpu::push_rr(const registers r1, const registers r2, const bool af) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ret(conditions condition) {
+void cpu::ret(conditions condition, bool ime) {
 
-    auto fill = [=]() {};
+    auto fill = [=](){};
+    auto set_ime = [=]() {
+        if (ime) {
+            this->ime = true;
+        }
+    };
 
     auto m1 = [=]() {
         this->Z = _read_memory(this->SP);
@@ -962,6 +982,9 @@ void cpu::ret(conditions condition) {
         this->M_operations.push_back(m3);
         this->M_operations.push_back(m2);
         this->M_operations.push_back(m1);
+        if (ime) {
+            this->M_operations.push_back(set_ime);
+        }
         break;
     }
     case conditions::Z: {
@@ -1141,8 +1164,7 @@ void cpu::add_sp_s8() {
     };
 
     auto m2 = [=]() {
-        int8_t s8 = this->Z;
-        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, s8, true);
+        auto [result, z, n, h, c] = this->_addition_16bit(this->SP, this->Z, true);
         this->SP = result;
         this->Zf = z;
         this->Nf = n;
@@ -1364,9 +1386,7 @@ void cpu::ld_a_rr(const registers r1, const registers r2, const bool to_a) {
 }
 
 void cpu::daa() {
-    // note: assumes a is a uint8_t and wraps from 0xff to 0
-    if (!this->Nf) { // after an addition, adjust if (half-)carry occurred or if
-                     // result is out of bounds
+    if (!this->Nf) { 
         if (this->Cf || this->A > 0x99) {
             this->A += 0x60;
             this->Cf = true;
@@ -1374,7 +1394,7 @@ void cpu::daa() {
         if (this->Hf || (this->A & 0x0f) > 0x09) {
             this->A += 0x6;
         }
-    } else { // after a subtraction, only adjust if (half-)carry occurred
+    } else {
         if (this->Cf) {
             this->A -= 0x60;
         }
@@ -1382,14 +1402,26 @@ void cpu::daa() {
             this->A -= 0x6;
         }
     }
-    // these flags are always updated
-    this->Zf = (this->A == 0); // the usual z flag
-    this->Hf = false;          // h flag is always cleared
+    this->Zf = (this->A == 0);
+    this->Hf = false;
+}
+
+void cpu::ei_or_di(const bool ei) {
+    if (ei) {
+        this->ei_delay = true;
+
+    } else {
+        this->ime = false;
+    }
 }
 
 uint8_t cpu::identify_opcode(const uint8_t opcode) {
     this->PC++;            // increment program counter
     handle_opcode(opcode); // handle the opcode
+    if (ei_delay && opcode != 0xfb) { // don't do it during ei (0xfb
+        this->ime = true;
+        this->ei_delay = false;
+    }
     if (!this->M_operations.empty()) {
         this->fetch_opcode = false; // going past fetch opcode,
     }
@@ -1468,24 +1500,171 @@ cpu::cpu(mmu &mmu) {
 void cpu::tick() {
     this->ticks++;
 
-    // inject ppu tick here
-    // TODO: if ppu tick resets, defer the tick reset to 0 until after CPU does
-    // its thing
-
     if (ticks < 4) {
         return;
     }
 
     this->ticks = 0; // reset ticks
 
-    if (this->fetch_opcode) {
-        // fetch opcode, then execute what you can this M-cycle
-        const uint8_t opcode =
-            this->_read_memory(this->PC); // get current opcode
-        identify_opcode(opcode);
+    if (!this->halt) {
 
-    } else {
-        // execute any further instructions
-        this->execute_M_operations();
+        if (this->fetch_opcode && this->M_operations.empty()) {
+            // fetch opcode, then execute what you can this M-cycle
+            const uint8_t opcode =
+                this->_read_memory(this->PC); // get current opcode
+            identify_opcode(opcode);
+
+        } else {
+            // execute any further instructions
+            this->execute_M_operations();
+        }
+
     }
+}
+
+void cpu::interrupt_tick() { 
+    this->interrupt_ticks++;
+
+    if (interrupt_ticks < 4) {
+        return;
+    }
+    this->interrupt_ticks = 0;
+    // operates in M-cycles
+
+    if (M_operations.empty()) {
+        this->handle_interrupts();
+    }
+}
+
+void cpu::timer_tick() { 
+
+    timer_ticks++;
+
+    if (timer_ticks < 4) {
+        return;
+    }
+
+    timer_ticks = 0;
+    // operates in M- cycles
+    
+    this->div_ticks++;
+
+    if (div_ticks == 64) {
+        uint8_t *div = _read_pointer(0xff04);
+        ++*div; // increment div every 64 M-cycles
+        div_ticks = 0;
+    }
+
+    // if timer is off return
+    // TAC
+    if (!((_read_memory(0xff07) >> 7) & 1)) {
+        return;
+    }
+
+    // case 0: 4096
+    // clock speed: 4194304
+    tima_ticks++; // increment every M-cycle
+
+    uint32_t frequency = 4096;
+    uint8_t tac_freq_bit = _read_memory(0xff07) & 3;
+
+    switch (tac_freq_bit) {
+    case 1: frequency = 262144; break;
+    case 2: frequency = 65536; break;
+    case 3: frequency = 16384; break;
+    }
+
+    while (tima_ticks >= (4194304 / frequency)) {
+
+        // increment TIMA
+        uint8_t *tima = _read_pointer(0xff05);
+        ++*tima;
+        // check for TIMA overflow
+        if (*tima == 0) {
+            // set timer interrupt
+            uint8_t *_if  = _read_pointer(0xff0f);
+            *_if = *_if | 4;
+
+            // reset timer modulo
+            uint8_t tma = _read_memory(0xff06);
+            *tima = tma;
+        }
+
+        tima_ticks -= (4194304 / frequency);
+    }
+}
+
+void cpu::handle_interrupts() {
+
+    // takes 5 M-Cycles
+    uint8_t _ie = this->_read_memory(0xffff);
+    uint8_t _if = this->_read_memory(0xff0f);
+
+    if ((_ie & _if) && this->halt) {
+        this->halt = false;
+    }
+
+    if (!this->ime || !_ie || !_if) { // no interrupts
+        return;
+    }
+
+    auto m1 = [=]() {}; // NOP
+    auto m2 = [=]() {}; // NOP
+
+    uint8_t ie_joypad = (_ie >> 4) & 1;
+    uint8_t ie_serial = (_ie >> 3) & 1;
+    uint8_t ie_timer = (_ie >> 2) & 1;
+    uint8_t ie_lcd = (_ie >> 1) & 1;
+    uint8_t ie_vblank = _ie & 1;
+
+    uint8_t if_joypad = (_if >> 4) & 1;
+    uint8_t if_serial = (_if >> 3) & 1;
+    uint8_t if_timer = (_if >> 2) & 1;
+    uint8_t if_lcd = (_if >> 1) & 1;
+    uint8_t if_vblank = _if & 1;
+
+    auto m3 = [=]() {
+        if ((ie_joypad && if_joypad) || (ie_serial && if_serial) || (ie_timer && if_timer) || (ie_lcd && if_lcd) || (ie_vblank && if_vblank)) {
+            this->SP--;
+            this->_write_memory(this->SP, this->PC >> 8);
+            this->SP--;
+            this->_write_memory(this->SP, this->PC & 0xff);
+        }
+    };
+
+    auto m4 = [=]() {
+        if (ie_vblank && if_vblank) {
+            // vblank interrupt
+            this->PC = 0x40;
+            this->_write_memory(0xff0f, _if & 0xfe); // mask 1111 1110
+        }
+        else if (ie_lcd && if_lcd) {
+            // vblank interrupt
+            this->PC = 0x48;
+            this->_write_memory(0xff0f, _if & 0xfd); // mask 1111 1101
+        }
+        else if (ie_timer && if_timer) {
+            // vblank interrupt
+            this->PC = 0x50;
+            this->_write_memory(0xff0f, _if & 0xfb); // mask 1111 1011
+        }
+        else if (ie_serial && if_serial) {
+            // vblank interrupt
+            this->PC = 0x58;
+            this->_write_memory(0xff0f, _if & 0xf7); // mask 1111 0111
+        }
+        else if (ie_joypad && if_joypad) {
+            // vblank interrupt
+            this->PC = 0x60;
+            this->_write_memory(0xff0f, _if & 0xef); // mask 1110 1111
+        }
+    };
+
+    auto m5 = [=]() { this->ime = false; };
+
+    this->M_operations.push_back(m5);
+    this->M_operations.push_back(m4);
+    this->M_operations.push_back(m3);
+    this->M_operations.push_back(m2);
+    this->M_operations.push_back(m1);
 }

@@ -67,6 +67,11 @@ class ppu {
         this->WX = this->gb_mmu.get_pointer_from_address(0xff4b);
         this->WY = this->gb_mmu.get_pointer_from_address(0xff4a);
 
+        this->IF = this->gb_mmu.get_pointer_from_address(0xff0f);
+
+        // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
+        *(this->STAT) = 0x80;
+
         sf::Image image({window.getSize().x, window.getSize().y},
                         sf::Color::White);
         this->lcd_dots_image = image;
@@ -102,8 +107,11 @@ class ppu {
     uint8_t *WX{};
     uint8_t *WY{};
 
+    uint8_t *IF{};
+
     // 4 modes
     enum class mode { OAM_Scan = 2, Drawing = 3, HBlank = 0, VBlank = 1 };
+    mode last_mode;
 
     mode current_mode{2}; // start at OAM Scan
 

@@ -46,7 +46,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
                 break;
             }
             case 2: {
-                // STOP
+                // TODO: STOP
                 break;
             }
             case 3: {
@@ -177,7 +177,6 @@ int cpu::handle_opcode(const uint8_t opcode) {
             break;
         }
         case 7: {
-            // TODO: DAA
             switch (y) {
             case 0: {
                 // RLCA
@@ -227,7 +226,8 @@ int cpu::handle_opcode(const uint8_t opcode) {
     }
     case 1: {
         if (z == 6 && y == 6) {
-            // TODO: HALT
+            // HALT
+            this->halt = true;
         } else {
             if (r_table[y] == registers::NA) {
                 ld_hl_r8(r_table[z], true);
@@ -347,7 +347,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
                     break;
                 }
                 case 1: {
-                    // TODO: reti
+                    ret(conditions::NA, true);
                     break;
                 }
                 case 2: {
@@ -420,11 +420,11 @@ int cpu::handle_opcode(const uint8_t opcode) {
                 break;
             }
             case 6: {
-                // TODO: DI
+                ei_or_di(false);
                 break;
             }
             case 7: {
-                // TODO: EI
+                ei_or_di(true);
                 break;
             }
             }

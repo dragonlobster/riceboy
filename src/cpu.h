@@ -42,6 +42,13 @@ class cpu {
     uint8_t W{};
     uint8_t Z{};
 
+    // interrupts, ime is either 0 or 1
+    bool ei_delay{false};
+    bool ime{false};
+
+    // HALT flag
+    bool halt{false};
+
     std::vector<std::function<void()>> M_operations{};
 
     // execute instructions
@@ -53,7 +60,11 @@ class cpu {
 
     uint8_t identify_opcode(const uint8_t opcode); // get the next opcode and increment the PC
 
-    void tick(); // single tick
+    void tick(); // single cpu tick
+    void interrupt_tick(); // interrupt tick
+    void timer_tick(); // timer tick
+
+    void handle_interrupts(); // handle interrupts
 
     // load boot rom
     void load_boot_rom();
@@ -63,6 +74,7 @@ class cpu {
 
     // read write memory
     uint8_t _read_memory(const uint16_t address);
+    uint8_t* _read_pointer(const uint16_t address);
     void _write_memory(const uint16_t address, const uint8_t value);
 
     // registers
@@ -98,6 +110,10 @@ class cpu {
 
     // tick counter
     uint16_t ticks{0};
+    uint16_t interrupt_ticks{0};
+    uint16_t timer_ticks{0};
+    uint16_t tima_ticks{0};
+    uint16_t div_ticks{0};
 
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};
@@ -136,7 +152,7 @@ class cpu {
     void ld_sp_hl();
     void pop_rr(const registers r1, const registers r2, const bool af);
     void push_rr(const registers r1, const registers r2, const bool af);
-    void ret(conditions condition);                     // return
+    void ret(conditions condition, bool ime = false);                     // return
     void rla();                     // rotate left accumulator
     void rlca();                     // rotate left accumulator
     void rra();                     // rotate right accumulator
@@ -166,6 +182,9 @@ class cpu {
 
     void daa();
 
+    // interrupts
+    void ei_or_di(const bool ei);
+
     // utility //
     uint16_t
     _combine_2_8bits(const uint8_t r1,
@@ -178,8 +197,8 @@ class cpu {
     std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(Args... args);
 
     std::tuple<uint16_t, bool, bool, bool, bool>
-    _addition_16bit(uint16_t x, uint16_t y, bool sp_s8);
-    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf);
+    _addition_16bit(uint16_t x, uint16_t y,  bool s8 = false);
+    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf = 0);
 
     uint8_t _flags_to_byte()
         const; // const after function declaration makes it a compiler error to
