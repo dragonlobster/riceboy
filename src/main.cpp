@@ -23,7 +23,7 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // TODO: load chosen cartridge
-    riceboy->gb_cpu.load_cartridge("BOOT/test.gb");
+    riceboy->gb_cpu.prepare_rom("BOOT/04-op r,imm.gb");
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),

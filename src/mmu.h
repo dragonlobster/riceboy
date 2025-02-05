@@ -35,6 +35,8 @@ class mmu {
 
     //section locate_section(uint16_t address);
 
+    bool boot_rom_complete{false};
+
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
@@ -44,6 +46,8 @@ class mmu {
 
     // hardware registers - ff00 - ff7f
     uint8_t hardware_registers[(0xff7f - 0xff00) + 1]{};
+    
+    // fea0
 
     // ununsable memory - 0xfea0 - 0xfeff
     uint8_t unusable_memory[(0xfeff - 0xfea0) + 1]{};

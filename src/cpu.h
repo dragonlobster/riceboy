@@ -7,6 +7,7 @@
 #include <iostream>
 #include <tuple>
 #include <vector>
+#include <array>
 
 class cpu {
     // TODO: make private
@@ -54,7 +55,9 @@ class cpu {
     // execute instructions
     // int is status (0 = success, 1 = error)
     int handle_opcode(const uint8_t opcode);
-    int handle_cb_opcode(const uint8_t opcode);
+    int handle_cb_opcode(const uint8_t cb_opcode);
+
+    int handle_cb_opcode_v2(const uint8_t cb_opcode);
 
     void execute_M_operations(); // execute M operations and set state of fetch_opcode to true or false depending on whether all M operations have completed
 
@@ -68,9 +71,12 @@ class cpu {
 
     // load boot rom
     void load_boot_rom();
+    bool boot_rom_complete{false};
 
-    // load cartridge
-    void load_cartridge(std::string path);
+    // load
+    void prepare_rom(std::string path);
+    void load_rom();
+    std::string rom;
 
     // read write memory
     uint8_t _read_memory(const uint16_t address);
@@ -150,15 +156,18 @@ class cpu {
     void ld_hl_r8(const registers r, const bool to_hl); // hl+ and hl-, and hl
     void ld_hl_sp_s8();
     void ld_sp_hl();
-    void pop_rr(const registers r1, const registers r2, const bool af);
-    void push_rr(const registers r1, const registers r2, const bool af);
+    void pop_rr(const registers r1, const registers r2, const bool af = false);
+    void push_rr(const registers r1, const registers r2, const bool af = false);
     void ret(conditions condition, bool ime = false);                     // return
-    void rla();                     // rotate left accumulator
-    void rlca();                     // rotate left accumulator
-    void rra();                     // rotate right accumulator
-    void rrca();                     // rotate right accumulator
-    void sla_r(const registers r); // rotate left accumulator
-    void rl_r(const registers r);
+    void rl_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate left accumulator
+    void rlc_r(const registers r, const bool hl = false, const bool z_flag = false);
+    void rr_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate right accumulator
+    void rrc_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate right accumulator
+    void sla_r(const registers r, const bool hl = false); // rotate left accumulator
+    void sra_r(const registers r, const bool hl = false); // rotate right accumulator
+    void swap_r(const registers r, const bool hl = false);
+    void srl_r(const registers r, const bool hl = false);
+    // TODO: combine srl and rr, try to find other combos
     void sub(const registers r, const bool hl);
     void xor_r(const registers r, const bool hl);
     void ld_c_a(const bool to_a);    // also known as LDH (C), A, to_a reverses LD
@@ -179,6 +188,10 @@ class cpu {
     void and_xor_or_imm8(bitops op);
 
     void rst(const uint8_t opcode);
+
+    void res_or_set(const uint8_t bit, const registers r, const bool set, const bool hl = false);
+
+    void bit(const uint8_t bit, const registers r, const bool hl = false);
 
     void daa();
 
@@ -210,4 +223,14 @@ class cpu {
     uint8_t *_get_register(
         const registers
             r8); // get the pointer to the register value based on char8
+
+
+    // opcode lookup tables
+    std::array<registers, 8> rp_table{
+        registers::B, registers::C,  registers::D, registers::E, registers::H,
+        registers::L, registers::NA, registers::NA}; // sp or af is the last
+
+    std::array<registers, 8> r_table{
+        registers::B, registers::C, registers::D,  registers::E,
+        registers::H, registers::L, registers::NA, registers::A}; // na means HL
 };

@@ -1026,64 +1026,387 @@ void cpu::ret(conditions condition, bool ime) {
     }
 }
 
-void cpu::rla() {
+void cpu::sla_r(const registers r, const bool hl) {
     auto m1 = [=]() {
-        uint8_t msbit = (this->A >> 7) & 1;      // save the "carry" bit
+        uint8_t *rp =
+            this->_get_register(r); // r falls out of scope for some reason
+        // uint8_t* rp = &this->B;
+
+        uint8_t msbit = (*rp >> 7) & 1;        // save the "carry" bit
+        *rp <<= 1;                             // left shift A by 1 bit
+        // bit 0 is reset to 0
+
+        this->Zf = *rp == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = msbit == 1;
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t msbit = (this->Z >> 7) & 1;        // save the "carry" bit
+        this->Z <<= 1;                             // left shift A by 1 bit
+        // bit 0 is reset to 0
+
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = msbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
+void cpu::rl_r(const registers r, const bool hl, const bool z_flag) {
+    auto m1 = [=]() {
+        uint8_t *rp = _get_register(r);
+        uint8_t msbit = (*rp >> 7) & 1;      // save the "carry" bit
         uint8_t carry_flag = this->Cf;           // take current carry flag
-        this->A = this->A << 1;                  // left shift A by 1 bit
-        this->A = (this->A & 0xfe) | carry_flag; // put carry_flag into bit 0
+        *rp = *rp << 1;                  // left shift A by 1 bit
+        *rp = (*rp & 0xfe) | carry_flag; // put carry_flag into bit 0
         // set flags
-        this->Zf = false;
+        if (!z_flag) {
+            this->Zf = false;
+        } else {
+            this->Zf = *rp == 0;
+        }
         this->Nf = false;
         this->Hf = false;
 
         this->Cf = msbit == 1;
     };
-    this->M_operations.push_back(m1);
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t msbit = (this->Z >> 7) & 1;      // save the "carry" bit
+        uint8_t carry_flag = this->Cf;           // take current carry flag
+        this->Z = this->Z << 1;                  // left shift A by 1 bit
+        this->Z = (this->Z & 0xfe) | carry_flag; // put carry_flag into bit 0
+        // set flags
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+
+        this->Cf = msbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
 }
 
-void cpu::rlca() {
+void cpu::rlc_r(const registers r, const bool hl, const bool z_flag) {
     auto m1 = [=]() {
-        uint8_t msbit = (this->A >> 7) & 1; // save the "carry" bit
-        this->A = this->A << 1;             // left shift A by 1 bit
-        this->A = (this->A & 0xfe) | msbit; // put carry_flag into bit 0
+        uint8_t *rp = _get_register(r);
+        uint8_t msbit = (*rp >> 7) & 1; // save the "carry" bit
+        *rp = *rp << 1;
+        *rp = (*rp & 0xfe) | msbit; // put carry_flag into bit 0
         // set flags
-        this->Zf = false;
+        if (!z_flag) {
+            this->Zf = false;
+        } else {
+            this->Zf = *rp == 0;
+        }
         this->Nf = false;
         this->Hf = false;
         this->Cf = msbit == 1;
     };
-    this->M_operations.push_back(m1);
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
+        this->Z = this->Z << 1;
+        this->Z = (this->Z & 0xfe) | msbit; // put carry_flag into bit 0
+        // set flags
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = msbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
 }
 
-void cpu::rra() {
+void cpu::rr_r(const registers r, const bool hl, const bool z_flag) {
     auto m1 = [=]() {
-        uint8_t lsbit = this->A & 1;           // save the "carry" bit
+        uint8_t *rp = _get_register(r);
+        uint8_t lsbit = *rp & 1;           // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
-        this->A = this->A >> 1;                // left shift A by 1 bit
-        this->A =
-            (this->A & 0x7f) | (carry_flag << 7); // put carry_flag into bit 0
+        *rp = *rp >> 1;                // left shift A by 1 bit
+        *rp =
+            (*rp & 0x7f) | (carry_flag << 7); // put carry_flag into bit 0
         // set flags
-        this->Zf = false;
+        if (!z_flag) {
+            this->Zf = false;
+        } else {
+            this->Zf = *rp == 0;
+        }
         this->Nf = false;
         this->Hf = false;
         this->Cf = lsbit == 1;
     };
-    this->M_operations.push_back(m1);
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t lsbit = this->Z & 1;   // save the "carry" bit
+        uint8_t carry_flag = this->Cf; // take current carry flag
+        this->Z = this->Z >> 1;        // left shift A by 1 bit
+        this->Z = (this->Z & 0x7f) | (carry_flag << 7); // put carry_flag into
+                                                        // bit 0 set flags
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
 }
 
-void cpu::rrca() {
+void cpu::rrc_r(const registers r, const bool hl, const bool z_flag) {
     auto m1 = [=]() {
-        uint8_t lsbit = this->A & 1;               // save the "carry" bit
-        this->A = this->A >> 1;                    // left shift A by 1 bit
-        this->A = (this->A & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
+        uint8_t *rp = _get_register(r);
+        uint8_t lsbit = *rp & 1;               // save the "carry" bit
+        *rp = *rp >> 1;                    // left shift A by 1 bit
+        *rp = (*rp & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
         // set flags
-        this->Zf = false;
+        if (!z_flag) {
+            this->Zf = false;
+        } else {
+            this->Zf = *rp == 0;
+        }
         this->Nf = false;
         this->Hf = false;
         this->Cf = lsbit == 1;
     };
-    this->M_operations.push_back(m1);
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t lsbit = this->Z & 1; // save the "carry" bit
+        this->Z = this->Z >> 1;
+        this->Z = (this->Z & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
+        // set flags
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
+void cpu::sra_r(const registers r, const bool hl) {
+    auto m1 = [=]() {
+        uint8_t *rp =
+            this->_get_register(r); // r falls out of scope for some reason
+        // uint8_t* rp = &this->B;
+
+        uint8_t msbit_retain = *rp & 0x80;
+
+        uint8_t lsbit = *rp & 1;
+        *rp = (*rp >> 1) | msbit_retain;
+
+        this->Zf = *rp == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t msbit_retain = this->Z & 0x80;
+        uint8_t lsbit = this->Z & 1;
+        this->Z = (this->Z >> 1) | msbit_retain;
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
+void cpu::swap_r(const registers r, const bool hl) {
+    auto m1 = [=]() {
+        uint8_t *rp =
+            this->_get_register(r); // r falls out of scope for some reason
+        // uint8_t* rp = &this->B;
+
+        uint8_t lsb = *rp & 0x0f; 
+        *rp >>= 4;
+        *rp = *rp | (lsb << 4);
+
+        // 0010 1011 == 1011 0010
+
+        this->Zf = *rp == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = false;
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t lsb = this->Z & 0x0f; 
+        this->Z >>= 4;
+        this->Z = this->Z | (lsb << 4);
+
+        // 0010 1011 == 1011 0010
+
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = false;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
+void cpu::srl_r(const registers r, const bool hl) {
+    auto m1 = [=]() {
+        uint8_t *rp = _get_register(r);
+        uint8_t lsbit = *rp & 1;           // save the "carry" bit
+        uint8_t carry_flag = this->Cf; // take current carry flag
+        *rp = *rp >> 1;                // left shift A by 1 bit
+        // bit 7 reset to 0
+
+        // set flags
+        this->Zf = *rp == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        uint8_t lsbit = this->Z & 1;   // save the "carry" bit
+        uint8_t carry_flag = this->Cf; // take current carry flag
+        this->Z = this->Z >> 1;        // left shift A by 1 bit
+        // bit 7 reset to 0
+
+        this->Zf = this->Z == 0;
+        this->Nf = false;
+        this->Hf = false;
+        this->Cf = lsbit == 1;
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
 }
 
 void cpu::cpl() {
@@ -1202,51 +1525,6 @@ void cpu::and_r(const registers r, const bool hl) {
     }
 }
 
-void cpu::sla_r(const registers r) {
-    auto m1 = [=]() {
-        uint8_t *rp =
-            this->_get_register(r); // r falls out of scope for some reason
-        // uint8_t* rp = &this->B;
-
-        uint8_t msbit = (*rp >> 7) & 1;        // save the "carry" bit
-        uint8_t carry_flag = this->Cf; // take current carry flag
-        *rp <<= 1;                             // left shift A by 1 bit
-        // bit 0 is reset to 0
-
-        // set carry flag to msbit
-        if (msbit == 0) {
-            this->Cf = false;
-        } else if (msbit == 1) {
-            this->Cf = true;
-        }
-    };
-
-    this->M_operations.push_back(m1);
-}
-
-void cpu::rl_r(const registers r) {
-    auto m1 = [=]() {
-        auto rp = this->_get_register(r);
-        uint8_t msbit = (*rp >> 7) & 1;
-        uint8_t carry_flag = this->Cf;
-        *rp <<= 1;
-        // clear last bit first, then or it with the carry flag
-        *rp = (*rp & 0xfe) | carry_flag;
-
-        // set flags
-        this->Zf = *rp == 0;
-        this->Nf = false;
-        this->Hf = false;
-
-        if (msbit == 0) {
-            this->Cf = false;
-        } else if (msbit == 1) {
-            this->Cf = true;
-        }
-    };
-
-    this->M_operations.push_back(m1);
-}
 
 void cpu::sub(const registers r, const bool hl) {
     if (!hl) {
@@ -1385,6 +1663,88 @@ void cpu::ld_a_rr(const registers r1, const registers r2, const bool to_a) {
     }
 }
 
+void cpu::res_or_set(const uint8_t bit, const registers r, const bool set, const bool hl) {
+
+    auto m1 = [=]() { 
+        uint8_t *rp = _get_register(r);
+        
+        // res
+        // 1111 1110
+        // 0 = 1, 1 = 2, 2 = 4, 3 = 8, 4 = 16, 5 = 32, 6 = 64, 7 = 128
+        // 0000 0001, 0000 0010, 0000 0011, 0000 0100, 0000 0101, 00000 
+        if (!set) {
+            uint8_t mask = ~(1 << bit);
+            *rp = *rp & mask;
+        } else {
+            // 0100 1010 , set 2 
+            uint8_t mask = 1 << bit;
+            *rp = *rp | mask;
+        }
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        // res
+        // 1111 1110
+        // 0 = 1, 1 = 2, 2 = 4, 3 = 8, 4 = 16, 5 = 32, 6 = 64, 7 = 128
+        // 0000 0001, 0000 0010, 0000 0011, 0000 0100, 0000 0101, 00000 
+        if (!set) {
+            uint8_t mask = ~(1 << bit);
+            this->Z = this->Z & mask;
+        } else {
+            // 0100 1010 , set 2 
+            uint8_t mask = 1 << bit;
+            this->Z = this->Z | mask;
+        }
+    };
+
+    auto m3_hl = [=]() { 
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        _write_memory(address, this->Z);
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m3_hl);
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
+void cpu::bit(const uint8_t bit, const registers r, const bool hl) {
+
+    auto m1 = [=]() { 
+        uint8_t *rp = _get_register(r);
+        
+        this->Zf = !((*rp >> bit) & 1);
+        this->Nf = false;
+        this->Hf = true;
+    };
+
+    auto m1_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _read_memory(address);
+    };
+
+    auto m2_hl = [=]() {
+        this->Zf = !((this->Z >> bit) & 1);
+        this->Nf = false;
+        this->Hf = true;
+    };
+
+    if (!hl) {
+        this->M_operations.push_back(m1);
+    } else {
+        this->M_operations.push_back(m2_hl);
+        this->M_operations.push_back(m1_hl);
+    }
+}
+
 void cpu::daa() {
     if (!this->Nf) { 
         if (this->Cf || this->A > 0x99) {
@@ -1465,7 +1825,8 @@ void cpu::load_boot_rom() {
     // this->gb_mmu->complete_boot();
 }
 
-void cpu::load_cartridge(std::string path) {
+void cpu::prepare_rom(std::string path) {
+    this->rom = path;
     // TODO: right now i'm only loading the logo. fix this later.
     std::ifstream file(
         path,
@@ -1491,6 +1852,30 @@ void cpu::load_cartridge(std::string path) {
     }
 }
 
+void cpu::load_rom() {
+    // TODO: right now i'm only loading the logo. fix this later.
+    std::ifstream file(
+        this->rom,
+        std::ios::binary |
+            std::ios::ate); // read file from end, in binary format
+
+    if (file.is_open()) {
+        int size = file.tellg(); // check position of cursor (file size)
+
+        std::vector<char> buffer(
+            size); // prepare buffer with size = size of file
+
+        file.seekg(0, std::ios::beg); // move cursor to beginning of file
+        file.read(buffer.data(), size);
+
+        for (long i = 0; i < size; ++i) {
+            // TODO: make sure rom doesnt take up more space than it should
+            this->_write_memory(i, buffer[i]);
+        }
+        // this->PC = 0; // initialize program counter
+    }
+}
+
 // cpu constructor
 cpu::cpu(mmu &mmu) {
     // pass by reference
@@ -1505,6 +1890,17 @@ void cpu::tick() {
     }
 
     this->ticks = 0; // reset ticks
+
+    // check if boot rom is completed
+    if (!boot_rom_complete && _read_memory(0xff50)) {
+        // boot rom has completed
+        this->boot_rom_complete = true;
+        // load the actual game rom
+        load_rom();
+
+        // complete boot rom in mmu so that writes to certain addresses are blocked
+        this->gb_mmu->boot_rom_complete = true;
+    }
 
     if (!this->halt) {
 
