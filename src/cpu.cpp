@@ -2,6 +2,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <cassert>
 
 // TODO: abstract utility later
 template <typename... Args>
@@ -956,14 +957,10 @@ void cpu::push_rr(const registers r1, const registers r2, const bool af) {
     this->M_operations.push_back(m1);
 }
 
-void cpu::ret(conditions condition, bool ime) {
+void cpu::ret(conditions condition, bool ime_condition) {
 
-    auto fill = [=](){};
-    auto set_ime = [=]() {
-        if (ime) {
-            this->ime = true;
-        }
-    };
+    auto fill = [=]() {};
+    auto set_ime = [=]() { this->ime = true; };
 
     auto m1 = [=]() {
         this->Z = _read_memory(this->SP);
@@ -982,7 +979,7 @@ void cpu::ret(conditions condition, bool ime) {
         this->M_operations.push_back(m3);
         this->M_operations.push_back(m2);
         this->M_operations.push_back(m1);
-        if (ime) {
+        if (ime_condition) {
             this->M_operations.push_back(set_ime);
         }
         break;
@@ -1489,8 +1486,8 @@ void cpu::add_sp_s8() {
     auto m2 = [=]() {
         auto [result, z, n, h, c] = this->_addition_16bit(this->SP, this->Z, true);
         this->SP = result;
-        this->Zf = z;
-        this->Nf = n;
+        this->Zf = false;
+        this->Nf = false;
         this->Hf = h;
         this->Cf = c;
     };
@@ -1791,6 +1788,7 @@ uint8_t cpu::identify_opcode(const uint8_t opcode) {
 void cpu::execute_M_operations() {
     // execute any further instructions
     if (!this->M_operations.empty()) {
+        this->fetch_opcode = false;
         std::function<void()> operation = this->M_operations.back();
         this->M_operations.pop_back();
         // TODO: check if this reference is valid
@@ -1904,7 +1902,7 @@ void cpu::tick() {
 
     if (!this->halt) {
 
-        if (this->fetch_opcode && this->M_operations.empty()) {
+        if (this->fetch_opcode) {
             // fetch opcode, then execute what you can this M-cycle
             const uint8_t opcode =
                 this->_read_memory(this->PC); // get current opcode
@@ -1941,7 +1939,7 @@ void cpu::timer_tick() {
     }
 
     timer_ticks = 0;
-    // operates in M- cycles
+    // operates in M cycles
     
     this->div_ticks++;
 
@@ -1953,7 +1951,7 @@ void cpu::timer_tick() {
 
     // if timer is off return
     // TAC
-    if (!((_read_memory(0xff07) >> 7) & 1)) {
+    if (!((_read_memory(0xff07) >> 2) & 1)) {
         return;
     }
 
@@ -1975,7 +1973,7 @@ void cpu::timer_tick() {
         // increment TIMA
         uint8_t *tima = _read_pointer(0xff05);
         ++*tima;
-        // check for TIMA overflow
+        // check for TIMA overflow after 1 M-cycle
         if (*tima == 0) {
             // set timer interrupt
             uint8_t *_if  = _read_pointer(0xff0f);
@@ -1996,6 +1994,12 @@ void cpu::handle_interrupts() {
     uint8_t _ie = this->_read_memory(0xffff);
     uint8_t _if = this->_read_memory(0xff0f);
 
+    if (_ie >= 4) {
+        printf("Interrupt Check - IE_timer: %02X, IF_timer: %02X, IME: %d\n",
+               (_ie >> 2) & 1, (_if >> 2) & 1,
+               this->ime);
+    }
+
     if ((_ie & _if) && this->halt) {
         this->halt = false;
     }
@@ -2003,9 +2007,6 @@ void cpu::handle_interrupts() {
     if (!this->ime || !_ie || !_if) { // no interrupts
         return;
     }
-
-    auto m1 = [=]() {}; // NOP
-    auto m2 = [=]() {}; // NOP
 
     uint8_t ie_joypad = (_ie >> 4) & 1;
     uint8_t ie_serial = (_ie >> 3) & 1;
@@ -2019,16 +2020,33 @@ void cpu::handle_interrupts() {
     uint8_t if_lcd = (_if >> 1) & 1;
     uint8_t if_vblank = _if & 1;
 
+    if (!(ie_joypad && if_joypad) && !(ie_serial && if_serial) &&
+        !(ie_timer && if_timer) && !(ie_lcd && if_lcd) &&
+        !(ie_vblank && if_vblank)) {
+        return;
+    }
+
+    auto m1 = [=]() {}; // NOP
+    auto m2 = [=]() {}; // NOP
+
     auto m3 = [=]() {
-        if ((ie_joypad && if_joypad) || (ie_serial && if_serial) || (ie_timer && if_timer) || (ie_lcd && if_lcd) || (ie_vblank && if_vblank)) {
-            this->SP--;
-            this->_write_memory(this->SP, this->PC >> 8);
-            this->SP--;
-            this->_write_memory(this->SP, this->PC & 0xff);
-        }
+        assert(((ie_joypad && if_joypad) || (ie_serial && if_serial) ||
+               (ie_timer && if_timer) || (ie_lcd && if_lcd) ||
+                (ie_vblank && if_vblank)) &&
+               "IF and IE same bits are not set");
+        this->SP--;
+        this->_write_memory(this->SP, this->PC >> 8);
+        this->SP--;
+        this->_write_memory(this->SP, this->PC & 0xff);
     };
 
     auto m4 = [=]() {
+        assert(((ie_joypad && if_joypad) || (ie_serial && if_serial) ||
+               (ie_timer && if_timer) || (ie_lcd && if_lcd) ||
+                (ie_vblank && if_vblank)) &&
+               "IF and IE same bits are not set");
+
+        // reset IF
         if (ie_vblank && if_vblank) {
             // vblank interrupt
             this->PC = 0x40;
@@ -2056,7 +2074,14 @@ void cpu::handle_interrupts() {
         }
     };
 
-    auto m5 = [=]() { this->ime = false; };
+    auto m5 = [=]() {
+        this->ime = false;
+
+        uint8_t _ie_2 = this->_read_memory(0xffff);
+        uint8_t _if_2 = this->_read_memory(0xff0f);
+        printf("Interrupt Check - IE: %02X, IF: %02X, IME: %d\n", _ie_2, _if_2,
+               this->ime);
+    };
 
     this->M_operations.push_back(m5);
     this->M_operations.push_back(m4);

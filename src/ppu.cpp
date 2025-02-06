@@ -158,8 +158,6 @@ void fetcher::tick() {
         if (fifo.size() <= 8) {
             // for (int i = 7; i >= 0; --i) {
             for (int i = 0; i < 8; ++i) {
-                // loop backwards 8 times (7-0) to push into fifo backwards
-                // later you can loop fifo forwards to draw the pixels to LCD
                 this->fifo.push_back(this->pixel_buffer[i]);
             }
         }
@@ -197,19 +195,20 @@ void ppu::tick() {
                     OAM_START_ADDRESS + 4 * oam_buffer_counter + i);
             }
             oam_buffer_counter++; // each oam entry is 4 bytes
-        } else if (this->ppu_ticks == 80 && oam_buffer_counter == 40) {
+        } else if (this->ppu_ticks == 80) {
             // TODO: start the fetcher based on LY
-
+            assert(oam_buffer_counter == 40 && "OAM counter is not 40!");
 
             // prepare for drawing
             // clear fifo
             this->ppu_fetcher.fifo.clear();
 
             // reset tile index
-            this->ppu_fetcher.tile_index = 0;
+            //this->ppu_fetcher.tile_index = 0;
+            this->ppu_fetcher.tile_index = *SCX / 8;
 
-            // set the ppu fetcher mode
-            // this->ppu_fetcher.current_mode = fetcher::mode::FetchTileNo;
+            // reset the ppu fetcher mode
+            this->ppu_fetcher.current_mode = fetcher::mode::FetchTileNo;
 
             this->current_mode = mode::Drawing;
         }
@@ -227,9 +226,8 @@ void ppu::tick() {
             float f_ly = *(this->LY);
             sf::Vector2f position = {f_dot_count, f_ly};
             */
-            uint16_t f_dot_count = dot_count;
-            uint16_t f_ly = *(this->LY);
-            sf::Vector2u position = {f_dot_count, f_ly};
+
+            sf::Vector2u position = {dot_count, *(this->LY)};
 
             uint8_t dot = this->ppu_fetcher.fifo.back();
             this->ppu_fetcher.fifo.pop_back();

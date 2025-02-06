@@ -158,7 +158,7 @@ class cpu {
     void ld_sp_hl();
     void pop_rr(const registers r1, const registers r2, const bool af = false);
     void push_rr(const registers r1, const registers r2, const bool af = false);
-    void ret(conditions condition, bool ime = false);                     // return
+    void ret(conditions condition, bool ime_condition = false);                     // return
     void rl_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate left accumulator
     void rlc_r(const registers r, const bool hl = false, const bool z_flag = false);
     void rr_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate right accumulator
