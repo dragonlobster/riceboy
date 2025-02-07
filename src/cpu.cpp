@@ -1628,6 +1628,7 @@ void cpu::ld_imm8_a(const bool to_a) {
         const uint16_t address = this->Z | 0xff00;
         if (to_a) {
             this->A = _read_memory(address);
+            std::cout << "";
         } else {
             this->_write_memory(address, this->A);
         }
@@ -1943,10 +1944,10 @@ void cpu::timer_tick() {
     
     this->div_ticks++;
 
-    if (div_ticks == 64) {
+    while (div_ticks >= 64) {
         uint8_t *div = _read_pointer(0xff04);
         ++*div; // increment div every 64 M-cycles
-        div_ticks = 0;
+        div_ticks -= 64;
     }
 
     // if timer is off return
@@ -1957,7 +1958,7 @@ void cpu::timer_tick() {
 
     // case 0: 4096
     // clock speed: 4194304
-    tima_ticks++; // increment every M-cycle
+    tima_ticks += 4; // increment every M-cycle
 
     uint32_t frequency = 4096;
     uint8_t tac_freq_bit = _read_memory(0xff07) & 3;
@@ -1985,6 +1986,7 @@ void cpu::timer_tick() {
         }
 
         tima_ticks -= (4194304 / frequency);
+        //tima_ticks = 0;
     }
 }
 

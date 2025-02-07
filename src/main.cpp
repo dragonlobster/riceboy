@@ -23,8 +23,10 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // TODO: load chosen cartridge
+    std::string rom = "BOOT/instr_timing.gb";
+    //std::string rom = "BOOT/cpu_instrs.gb";
     //std::string rom = "BOOT/individual_cpu/01-special.gb";
-    std::string rom = "BOOT/individual_cpu/02-interrupts.gb"; // FAILED
+    //std::string rom = "BOOT/individual_cpu/02-interrupts.gb"; // FAILED
     //std::string rom = "BOOT/individual_cpu/03-op sp,hl.gb"; // n and zero flag always cleared
     //std::string rom = "BOOT/individual_cpu/04-op r,imm.gb";
     //std::string rom = "BOOT/individual_cpu/05-op rp.gb";
