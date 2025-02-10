@@ -1898,7 +1898,7 @@ void cpu::tick() {
         load_rom();
 
         // complete boot rom in mmu so that writes to certain addresses are blocked
-        this->gb_mmu->boot_rom_complete = true;
+        this->gb_mmu->load_rom_complete();
     }
 
     if (!this->halt) {
@@ -1996,12 +1996,6 @@ void cpu::handle_interrupts() {
     uint8_t _ie = this->_read_memory(0xffff);
     uint8_t _if = this->_read_memory(0xff0f);
 
-    if (_ie >= 4) {
-        printf("Interrupt Check - IE_timer: %02X, IF_timer: %02X, IME: %d\n",
-               (_ie >> 2) & 1, (_if >> 2) & 1,
-               this->ime);
-    }
-
     if ((_ie & _if) && this->halt) {
         this->halt = false;
     }
@@ -2078,11 +2072,8 @@ void cpu::handle_interrupts() {
 
     auto m5 = [=]() {
         this->ime = false;
-
         uint8_t _ie_2 = this->_read_memory(0xffff);
         uint8_t _if_2 = this->_read_memory(0xff0f);
-        printf("Interrupt Check - IE: %02X, IF: %02X, IME: %d\n", _ie_2, _if_2,
-               this->ime);
     };
 
     this->M_operations.push_back(m5);

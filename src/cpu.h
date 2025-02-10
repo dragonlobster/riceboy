@@ -57,8 +57,6 @@ class cpu {
     int handle_opcode(const uint8_t opcode);
     int handle_cb_opcode(const uint8_t cb_opcode);
 
-    int handle_cb_opcode_v2(const uint8_t cb_opcode);
-
     void execute_M_operations(); // execute M operations and set state of fetch_opcode to true or false depending on whether all M operations have completed
 
     uint8_t identify_opcode(const uint8_t opcode); // get the next opcode and increment the PC
