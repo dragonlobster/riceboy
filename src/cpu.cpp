@@ -136,7 +136,6 @@ uint8_t* cpu::_read_pointer(const uint16_t address) {
 }
 
 void cpu::_write_memory(const uint16_t address, const uint8_t value) {
-
     this->gb_mmu->write_value_to_address(address, value);
 }
 
@@ -1841,9 +1840,8 @@ void cpu::prepare_rom(std::string path) {
         file.seekg(0, std::ios::beg); // move cursor to beginning of file
         file.read(buffer.data(), size);
 
-        for (long i = 0x0100; i <= 0x014F; ++i) {
+        for (long i = 0x0100; i < 0x0150; ++i) {
             // 0104 - 0133 - logo
-
             // TODO: make sure rom doesnt take up more space than it should
             this->_write_memory(i, buffer[i]);
         }
@@ -1852,7 +1850,6 @@ void cpu::prepare_rom(std::string path) {
 }
 
 void cpu::load_rom() {
-    // TODO: right now i'm only loading the logo. fix this later.
     std::ifstream file(
         this->rom,
         std::ios::binary |
@@ -1866,6 +1863,10 @@ void cpu::load_rom() {
 
         file.seekg(0, std::ios::beg); // move cursor to beginning of file
         file.read(buffer.data(), size);
+
+        uint8_t type = buffer[0x147]; // cartridge type
+        // assert that type is a cartridge type
+        this->gb_mmu->_cartridge_type = static_cast<mmu::cartridge_type>(type);
 
         for (long i = 0; i < size; ++i) {
             // TODO: make sure rom doesnt take up more space than it should
@@ -1898,7 +1899,7 @@ void cpu::tick() {
         load_rom();
 
         // complete boot rom in mmu so that writes to certain addresses are blocked
-        this->gb_mmu->load_rom_complete();
+        this->gb_mmu->load_rom_complete = true;
     }
 
     if (!this->halt) {

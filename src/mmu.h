@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
@@ -10,6 +11,8 @@ class mmu {
     uint8_t *get_pointer_from_address(uint16_t address);
 
     virtual void write_value_to_address(uint16_t address, uint8_t value);
+
+    std::vector<uint8_t> rom{}; // only need to load if its not rom_only (ram can't hold the entire rom)
 
     enum class section : uint16_t {
         restart_and_interrupt_vectors = 0,       // 0x00ff
@@ -64,7 +67,8 @@ class mmu {
 
     static mmu::section locate_section(const uint16_t address);
 
-    void load_rom_complete();
+    bool load_rom_complete{false};
+    cartridge_type _cartridge_type{};
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -116,11 +120,6 @@ class mmu {
 
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
-
-    // load rom complete
-    bool _load_rom_complete{false};
-
-    cartridge_type _cartridge_type{};
 
     uint8_t rom_bank_number{1}; // Current ROM bank (1-based)
     uint8_t ram_bank_number{0}; // Current RAM bank

@@ -2,18 +2,6 @@
 #include <array>
 #include <iostream>
 
-void mmu::load_rom_complete() {
-
-    this->_load_rom_complete = true;
-
-    uint8_t __cartridge_type =
-        this->get_value_from_address(0x147); // cartridge type
-
-    // TODO: assert __cartridge_type is within enum class cartridge_type
-
-    this->_cartridge_type = static_cast<mmu::cartridge_type>(__cartridge_type);
-}
-
 mmu::section mmu::locate_section(const uint16_t address) {
     if (address <= 0x00ff) {
         return mmu::section::restart_and_interrupt_vectors;
@@ -76,22 +64,15 @@ uint8_t mmu::get_value_from_address(uint16_t address) const {
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
     if (this->_cartridge_type == mmu::cartridge_type::mbc1) {
-        // ROM Bank 0 (always accessible) (includes cartridge header and restart_interrupt vectors
-        if (address >= 0x0150 && address <= 0x3fff) {
-            return this->cartridge_rom_bank_0[address - 0x0150];
+        // ROM Bank 0 (always accessible) (includes cartridge header and
+        if (address <= 0x3fff) {
+            // TODO: handle zero bank number based on mode flag
+            return this->rom[address];
         }
-        else if (address >= 0x0100 && address <= 0x014f) {
-            return this->cartridge_header_area[address - 0x0100];
-        }
-        else if (address <= 0x00ff) {
-            return this->restart_and_interrupt_vectors[address];
-        }
-
         // Switchable ROM Bank - $4000 - $7FFF
         else if (address >= 0x4000 && address <= 0x7fff) {
-            uint16_t bank_offset = (this->rom_bank_number - 1) * 0x4000;
-            uint16_t bank_address = ((address - 0x4000) + bank_offset) % ((0x7fff - 0x4000));
-            return this->cartridge_rom_switchable_banks[bank_address];
+            uint16_t bank_offset = this->rom_bank_number * 0x4000;
+            return this->rom[bank_offset + (address - 0x4000)];
         }
 
         // Cartridge RAM - $A000 - $BFFF
@@ -101,10 +82,9 @@ uint8_t mmu::get_value_from_address(uint16_t address) const {
                 // If RAM Banking Mode: use selected RAM bank
                 uint8_t ram_bank =
                     this->rom_banking_mode ? 0 : this->ram_bank_number;
-                return this
-                    ->cartridge_ram[(address - 0xa000) + (ram_bank * 0x2000)];
+                return this->rom[(address) + (ram_bank * 0x2000)];
             }
-            return 0xff; // Return 0xFF if RAM is disabled
+            return 0xff; // Return 0xff (undefined) if RAM is disabled
         }
     }
 
@@ -162,13 +142,19 @@ uint8_t mmu::get_value_from_address(uint16_t address) const {
 
 void mmu::write_value_to_address(uint16_t address, uint8_t value) {
 
+    if (!this->load_rom_complete &&
+        (this->_cartridge_type == mmu::cartridge_type::mbc1)) { // TODO: not rom_only
+        this->rom.push_back(value);
+        return;
+    }
+
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
     if (this->_cartridge_type == mmu::cartridge_type::mbc1) {
         // RAM Enable/Disable - $0000 - $1FFF
-        if (address >= 0x0000 && address <= 0x1fff) {
+        if (address <= 0x1fff) {
             // Enable RAM if value is 0x0A, disable otherwise
-            this->ram_enabled = (value & 0x0f) == 0x0a;
+            this->ram_enabled = (value & 0x0f) == 0x0a; // 0000 1010
             return;
         }
 
@@ -216,8 +202,7 @@ void mmu::write_value_to_address(uint16_t address, uint8_t value) {
                 // If RAM Banking Mode: use selected RAM bank
                 uint8_t ram_bank =
                     this->rom_banking_mode ? 0 : this->ram_bank_number;
-                this->cartridge_ram[(address - 0xa000) + (ram_bank * 0x2000)] =
-                    value;
+                this->rom[(address) + (ram_bank * 0x2000)] = value;
             }
             return;
         }
@@ -265,13 +250,13 @@ void mmu::write_value_to_address(uint16_t address, uint8_t value) {
         break;
 
     case mmu::section::echo_ram:
-        if (!_load_rom_complete) {
+        if (!load_rom_complete) {
             this->echo_ram[address - base_address] = value;
         }
         break;
 
     case mmu::section::unusuable_memory:
-        if (!_load_rom_complete) {
+        if (!load_rom_complete) {
             this->unusable_memory[address - base_address] = value;
         }
         break;
