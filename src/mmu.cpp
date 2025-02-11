@@ -1,5 +1,4 @@
 #include "MMU.h"
-#include "MMU.h"
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -69,7 +68,11 @@ uint8_t MMU::read_memory(uint16_t address) const {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't read!");
 
-        return this->cartridge->read_memory(address);
+        uint8_t result = this->cartridge->read_memory(address);
+
+        if (result != 0) { // TODO: how do we handle 0xff returns?
+            return result;
+        }
     }
 
     switch (locate_section(address)) {
@@ -124,7 +127,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
-uint8_t MMU::get_interrupt_flag() { 
+uint8_t MMU::get_interrupt_flag() {
     if (_cartridge_type == MMU::cartridge_type::mbc1) {
         // assert cartridge is not null ptr
         assert(this->cartridge.get() != nullptr &&
@@ -138,17 +141,22 @@ uint8_t MMU::get_interrupt_flag() {
 
 void MMU::write_memory(uint16_t address, uint8_t value) {
 
-    if (this->_cartridge_type ==
-        MMU::cartridge_type::mbc1) { // TODO: not rom_only
+    if (!this->load_rom_complete &&
+        (this->_cartridge_type ==
+         MMU::cartridge_type::mbc1)) { // TODO: not rom_only
 
-        // cartridge type should be identified and instantiated when writing to
-        // memory
         assert(this->cartridge.get() != nullptr &&
-               "Cartridge was not initiated! Call set_cartridge_type first!");
+               "Cartridge is NULL! Can't write!");
 
         this->cartridge->write_memory(address, value);
-
         return;
+    }
+
+    else if (this->_cartridge_type == MMU::cartridge_type::mbc1) {
+        assert(this->cartridge.get() != nullptr &&
+               "Cartridge is NULL! Can't write!");
+
+        this->cartridge->write_memory(address, value);
     }
 
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));

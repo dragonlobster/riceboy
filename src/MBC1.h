@@ -18,8 +18,8 @@ class MBC1 : public Cartridge {
     uint8_t ram_bank_number{0};  // Current RAM bank
     bool ram_enabled{false};     // ram enabled or not
     bool banking_mode{false}; // False = ROM banking, True = RAM banking
-
     bool load_rom_complete{false};
+
     uint8_t rom_size{0}; //0x00 - 0x08, 32KiB, 64KiB, 128KiB, 256KiB, 512KiB, 1MiB, 2MiB, 4MiB, 8MiB
 
     uint8_t ram_size{0}; //0x00 - 0x05, 0, 2KiB, 8KiB, 32KiB, 128KiB, 64KiB

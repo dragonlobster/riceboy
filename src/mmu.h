@@ -16,8 +16,6 @@ class MMU {
 
     virtual void write_memory(uint16_t address, uint8_t value);
 
-    std::vector<uint8_t> rom{}; // only need to load if its not rom_only (ram can't hold the entire rom)
-
     enum class section : uint16_t {
         restart_and_interrupt_vectors = 0,       // 0x00ff
         cartridge_header_area = 0x0100,          // 0x14f
@@ -128,11 +126,6 @@ class MMU {
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
 
     std::unique_ptr<Cartridge> cartridge{};
-
-    uint8_t rom_bank_number{1}; // Current ROM bank (1-based)
-    uint8_t ram_bank_number{0}; // Current RAM bank
-    bool ram_enabled{false};
-    bool rom_banking_mode{true}; // True = ROM banking, False = RAM banking
 
     bool load_rom_complete{false};
 };

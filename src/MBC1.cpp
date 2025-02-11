@@ -69,10 +69,6 @@ uint8_t MBC1::read_memory(uint16_t address) {
 
         return 0xff;
     }
-
-    else {
-        return this->rom.at(address);
-    }
 }
 */
 
@@ -96,10 +92,9 @@ uint8_t MBC1::read_memory(uint16_t address) {
             uint8_t ram_bank = this->banking_mode ? this->ram_bank_number : 0;
             return this->rom[(address) + (ram_bank * 0x2000)];
         }
-        return 0xff; // Return 0xff (undefined) if RAM is disabled
+        return 0; // Return 0xff (undefined) if RAM is disabled
     }
-
-    return this->rom[address];
+    return 0; // return 0 or 0xff??
 }
 
 /*
@@ -178,22 +173,18 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
                 }
             }
         }
-
-        else {
-            this->rom[address] = value;
-        }
     }
 }
 */
 
 void MBC1::write_memory(uint16_t address, uint8_t value) {
 
-    if (!this->load_rom_complete) {
+    if (!this->load_rom_complete) { // TODO: not rom_only
         this->rom.push_back(value);
+        return;
     }
 
     else {
-
         // RAM Enable/Disable - $0000 - $1FFF
         if (address <= 0x1fff) {
             // Enable RAM if value is 0x0A, disable otherwise
@@ -234,7 +225,7 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
         // Banking Mode Select - $6000 - $7FFF
         else if (address >= 0x6000 && address <= 0x7fff) {
             // Switch between ROM and RAM banking modes
-            this->banking_mode = (value & 0x01) == 1;
+            this->banking_mode = (value & 0x01) != 0;
             return;
         }
 
@@ -248,17 +239,6 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
                 this->rom[(address) + (ram_bank * 0x2000)] = value;
             }
             return;
-        } else {
-            // TODO: check locks here
-            // lock echo ram and unusable ram
-
-            if (address == 0xff04) {
-                this->rom[address] = 0; // trap div
-            } else {
-                this->rom[address] = value;
-            }
-
-
         }
     }
 }
