@@ -2,6 +2,7 @@
 
 #include "Cartridge.h"
 #include <array>
+#include <vector>
 
 class MBC1 : public Cartridge {
   public:
@@ -11,7 +12,8 @@ class MBC1 : public Cartridge {
 
 
   private:
-    std::array<uint8_t, 2097152> rom{};
+    //std::array<uint8_t, 2097152> rom{};
+    std::vector<uint8_t> rom{};
 
     uint8_t rom_bank_number{1};  // Current ROM bank (1-based)
     uint8_t ram_bank_number{0};  // Current RAM bank

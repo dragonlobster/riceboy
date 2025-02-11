@@ -26,8 +26,8 @@ int main() {
 
     // TODO: load chosen cartridge
     // std::string rom = "BOOT/instr_timing.gb";
-    std::string rom = "BOOT/cpu_instrs.gb";
-    // std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/bits_ramg.gb";
+    // std::string rom = "BOOT/cpu_instrs.gb";
+    std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/bits_bank1.gb";
     // std::string rom = "BOOT/individual_cpu/01-special.gb";
     // std::string rom = "BOOT/individual_cpu/02-interrupts.gb"; // FAILED
     // std::string rom = "BOOT/individual_cpu/03-op sp,hl.gb"; // n and zero
