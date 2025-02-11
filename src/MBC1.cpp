@@ -250,11 +250,15 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
             return;
         } else {
             // TODO: check locks here
+            // lock echo ram and unusable ram
+
             if (address == 0xff04) {
                 this->rom[address] = 0; // trap div
             } else {
                 this->rom[address] = value;
             }
+
+
         }
     }
 }

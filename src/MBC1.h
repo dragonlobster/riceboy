@@ -10,7 +10,6 @@ class MBC1 : public Cartridge {
     virtual void write_memory(uint16_t address, uint8_t value);
     virtual void set_load_rom_complete();
 
-
   private:
     //std::array<uint8_t, 2097152> rom{};
     std::vector<uint8_t> rom{};

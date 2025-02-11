@@ -1,4 +1,5 @@
 #include "MMU.h"
+#include "MMU.h"
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -120,6 +121,18 @@ uint8_t MMU::read_memory(uint16_t address) const {
                   << "hex: 0x" << std::hex << static_cast<unsigned int>(address)
                   << std::endl;
         return 0;
+    }
+}
+
+uint8_t MMU::get_interrupt_flag() { 
+    if (_cartridge_type == MMU::cartridge_type::mbc1) {
+        // assert cartridge is not null ptr
+        assert(this->cartridge.get() != nullptr &&
+               "Cartridge was not initiated! Call set_cartridge_type first!");
+
+        return this->cartridge->read_memory(0xffff);
+    } else {
+        return this->interrupt_enable_flag;
     }
 }
 

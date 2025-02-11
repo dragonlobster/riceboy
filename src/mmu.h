@@ -12,7 +12,7 @@ class MMU {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
 
-    uint8_t *read_pointer(uint16_t address);
+    uint8_t get_interrupt_flag();
 
     virtual void write_memory(uint16_t address, uint8_t value);
 
