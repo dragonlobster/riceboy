@@ -1,8 +1,8 @@
 #pragma once
 
-#include "cpu.h"
-#include "mmu.h"
-#include "ppu.h"
+#include "CPU.h"
+#include "MMU.h"
+#include "PPU.h"
 #include <SFML/Graphics.hpp>
 
 class Gameboy {
@@ -21,9 +21,9 @@ class Gameboy {
     // 4194304 T-cycles per second (tick cycles)
 
     // TODO: mmu, cpu, ppu
-    mmu gb_mmu{};
-    cpu gb_cpu = cpu(gb_mmu);
-    ppu gb_ppu = ppu(gb_mmu, window);
+    MMU gb_mmu{};
+    CPU gb_cpu = CPU(gb_mmu);
+    PPU gb_ppu = PPU(gb_mmu, window);
 
     void tick();
 

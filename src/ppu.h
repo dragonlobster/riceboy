@@ -1,27 +1,21 @@
 #pragma once
 
-#include "mmu.h"
+#include "MMU.h"
 #include <SFML/Graphics.hpp>
-#include <array>;
+#include <array>
 #include <vector>
 
-class fetcher {
+class Fetcher {
   public:
-    mmu &gb_mmu;
+    MMU &gb_mmu;
 
-    const uint8_t *LY{};
-    const uint8_t *SCX{};
-    const uint8_t *SCY{};
-    const uint8_t *LCDC{};
-    const uint8_t *BGP{};
+    const uint16_t LCDC{0xff40};
+    const uint16_t LY{0xff44};
+    const uint16_t SCY{0xff42};
+    const uint16_t SCX{0xff43};
+    const uint16_t BGP{0xff47};
 
-    fetcher(mmu &gb_mmu_) : gb_mmu(gb_mmu_) {
-        this->LCDC = this->gb_mmu.get_pointer_from_address(0xff40);
-        this->LY = this->gb_mmu.get_pointer_from_address(0xff44);
-        this->SCY = this->gb_mmu.get_pointer_from_address(0xff42);
-        this->SCX = this->gb_mmu.get_pointer_from_address(0xff43);
-        this->BGP = this->gb_mmu.get_pointer_from_address(0xff47);
-    };
+    Fetcher(MMU &gb_mmu_) : gb_mmu(gb_mmu_) {};
 
     // fetcher states
     uint16_t fetcher_ticks{0};
@@ -44,38 +38,20 @@ class fetcher {
 
     // background FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
     std::vector<uint8_t> fifo{}; // 2 bits
+
+  private:
+    // functions
+    uint8_t _get(uint16_t address);
+    void _set(uint16_t address, uint8_t value);
 };
 
-class ppu {
+class PPU {
   public:
-    mmu &gb_mmu; // the central mmu
+    MMU &gb_mmu; // the central mmu
 
     sf::RenderWindow &window;
 
-    ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
-        : gb_mmu(gb_mmu_), window(window_) {
-        this->LCDC = this->gb_mmu.get_pointer_from_address(0xff40);
-        this->STAT = this->gb_mmu.get_pointer_from_address(0xff41);
-        this->SCY = this->gb_mmu.get_pointer_from_address(0xff42);
-        this->SCX = this->gb_mmu.get_pointer_from_address(0xff43);
-        this->LY = this->gb_mmu.get_pointer_from_address(0xff44);
-        this->LYC = this->gb_mmu.get_pointer_from_address(0xff45);
-        this->DMA = this->gb_mmu.get_pointer_from_address(0xff46);
-        this->BGP = this->gb_mmu.get_pointer_from_address(0xff47);
-        this->OBP0 = this->gb_mmu.get_pointer_from_address(0xff48);
-        this->OBP1 = this->gb_mmu.get_pointer_from_address(0xff49);
-        this->WX = this->gb_mmu.get_pointer_from_address(0xff4b);
-        this->WY = this->gb_mmu.get_pointer_from_address(0xff4a);
-
-        this->IF = this->gb_mmu.get_pointer_from_address(0xff0f);
-
-        // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
-        *(this->STAT) = 0x80;
-
-        sf::Image image({window.getSize().x, window.getSize().y},
-                        sf::Color::White);
-        this->lcd_dots_image = image;
-    }; // pass mmu by reference
+    PPU(MMU &gb_mmu_, sf::RenderWindow &window_);
 
     // WY register: in memory 0xff4a
     // WX register: in memory 0xff4b (7 means left of screen)
@@ -94,24 +70,24 @@ class ppu {
     // WY (window Y pos): ff4a
     // WX (window X pos): ff4b
 
-    uint8_t *LY{};
-    uint8_t *LCDC{};
-    uint8_t *STAT{};
-    uint8_t *SCY{};
-    uint8_t *SCX{};
-    uint8_t *LYC{};
-    uint8_t *DMA{};
-    uint8_t *BGP{};
-    uint8_t *OBP0{};
-    uint8_t *OBP1{};
-    uint8_t *WX{};
-    uint8_t *WY{};
+    uint16_t LCDC{0xff40};
+    uint16_t STAT{0xff41};
+    uint16_t SCY{0xff42};
+    uint16_t SCX{0xff43};
+    uint16_t LY{0xff44};
+    uint16_t LYC{0xff45};
+    uint16_t DMA{0xff46};
+    uint16_t BGP{0xff47};
+    uint16_t OBP0{0xff48};
+    uint16_t OBP1{0xff49};
+    uint16_t WX{0xff4b};
+    uint16_t WY{0xff4a};
 
-    uint8_t *IF{};
+    uint16_t IF{0xff0f};
 
     // 4 modes
     enum class mode { OAM_Scan = 2, Drawing = 3, HBlank = 0, VBlank = 1 };
-    mode last_mode;
+    mode last_mode{};
 
     mode current_mode{2}; // start at OAM Scan
 
@@ -121,7 +97,7 @@ class ppu {
     // fetcher
 
     // initialize the fetcher
-    fetcher ppu_fetcher = fetcher(gb_mmu);
+    Fetcher ppu_fetcher = Fetcher(gb_mmu);
 
     // # of pixels output to the current scanline
     uint8_t dot_count{0};
@@ -142,7 +118,7 @@ class ppu {
 
     // LCD pixels to display
     /* DEBUG ONLY */
-    //std::vector<uint8_t> lcd_dots{}; // color only
+    // std::vector<uint8_t> lcd_dots{}; // color only
     std::vector<uint8_t> lcd_dots{}; // color only
     /* DEBUG ONLY */
 
@@ -166,4 +142,8 @@ class ppu {
   private:
     // color id
     std::array<uint8_t, 3> _get_color(uint8_t id);
+
+    // functions
+    uint8_t _get(uint16_t address);
+    void _set(uint16_t address, uint8_t value);
 };

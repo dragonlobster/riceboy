@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mmu.h"
+#include "MMU.h"
 #include <cstdint>
 #include <functional>
 #include <iomanip>
@@ -9,13 +9,13 @@
 #include <vector>
 #include <array>
 
-class cpu {
+class CPU {
     // TODO: make private
 
   public:
     // pointer to mmu
-    cpu(mmu &mmu);    // pass by reference
-    mmu *gb_mmu{}; // the central mmu
+    CPU(MMU &mmu);    // pass by reference
+    MMU *gb_mmu{}; // the central mmu
 
     // main 8-bit registers
     uint8_t A{0};

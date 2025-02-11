@@ -7,22 +7,22 @@
 #include "opcodes.h" // import all opcodes
 using json = nlohmann::json;
 
-class sst_mmu : public mmu {
+class sst_mmu : public MMU {
   public:
     uint8_t memory[0xffff]{};
 
-    uint8_t get_value_from_address(uint16_t address) const override {
+    uint8_t read_memory(uint16_t address) const override {
         return memory[address];
     };
 
-    void write_value_to_address(uint16_t address, uint8_t value) override {
+    void write_memory(uint16_t address, uint8_t value) override {
         memory[address] = value;
     };
 };
 
 sst_mmu test_mmu{};
 
-cpu test_cpu = cpu(test_mmu);
+CPU test_cpu = CPU(test_mmu);
 
 namespace sst {
 struct cpu_state {
@@ -85,7 +85,7 @@ void from_json(const json &j, sst &sst) {
 
 } // namespace sst
 
-void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
+void test_setup(CPU &test_cpu, sst::cpu_state &initial) {
     test_cpu.PC = initial.pc;
     test_cpu.SP = initial.sp;
     test_cpu.A = initial.a;
@@ -113,7 +113,7 @@ void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
     // TODO: what is ime?
 }
 
-void compare_final(cpu &test_cpu, sst::cpu_state &final) {
+void compare_final(CPU &test_cpu, sst::cpu_state &final) {
     EXPECT_EQ(test_cpu.PC, final.pc);
     EXPECT_EQ(test_cpu.SP, final.sp);
     EXPECT_EQ(test_cpu.A, final.a);

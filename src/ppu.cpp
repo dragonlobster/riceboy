@@ -1,19 +1,45 @@
-#include "ppu.h"
+#include "PPU.h"
 #include "DrawUtils.h"
 #include <iostream>
 
+uint8_t PPU::_get(uint16_t address) {
+    return this->gb_mmu.read_memory(address);
+}
+void PPU::_set(uint16_t address, uint8_t value) {
+    this->gb_mmu.write_memory(address, value);
+}
+uint8_t Fetcher::_get(uint16_t address) {
+    return this->gb_mmu.read_memory(address);
+}
+void Fetcher::_set(uint16_t address, uint8_t value) {
+    this->gb_mmu.write_memory(address, value);
+}
+
+// ppu constructor
+PPU::PPU(MMU &gb_mmu_, sf::RenderWindow &window_)
+    : gb_mmu(gb_mmu_), window(window_) {
+
+    // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
+    _set(STAT, 0x80);
+
+    sf::Image image({window.getSize().x, window.getSize().y}, sf::Color::White);
+    this->lcd_dots_image = image;
+}; // pass mmu by reference
+
+// TODO: move fetcher to another file
+
 // determine if sprite should be added to sprite buffer
 // TODO: need to change this to get all 4 bytes of the OAM sprite metadata
-void ppu::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
+void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     // byte 0 = y position, byte 1 = x position, byte 2 = tile number, byte 3 =
     // sprite flags
     const bool x_pos_gt_0 = oam_entry[1] > 0;
-    const bool LY_plus_16_gt_y_pos = *(this->LY) + 16 >= oam_entry[0];
+    const bool LY_plus_16_gt_y_pos = _get(LY) + 16 >= oam_entry[0];
     // get the tall mode LCDC bit 2
-    const uint8_t sprite_height = *(this->LCDC) >> 2 == 1 ? 16 : 8;
+    const uint8_t sprite_height = _get(LCDC) >> 2 == 1 ? 16 : 8;
     // LY + 16 < y pos + sprite_height
     const bool sprite_height_condition =
-        *(this->LCDC) + 16 < oam_entry[0] + sprite_height;
+        _get(LCDC) + 16 < oam_entry[0] + sprite_height;
 
     if (!x_pos_gt_0 || !LY_plus_16_gt_y_pos || !sprite_height ||
         !sprite_height_condition || this->oam_buffer.size() >= 10) {
@@ -23,7 +49,7 @@ void ppu::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     oam_buffer.push_back(oam_entry);
 }
 
-std::array<uint8_t, 3> ppu::_get_color(uint8_t id) {
+std::array<uint8_t, 3> PPU::_get_color(uint8_t id) {
     switch (id) {
     case 0 : return color_palette_white; break;
     case 1 : return color_palette_light_gray; break;
@@ -33,12 +59,12 @@ std::array<uint8_t, 3> ppu::_get_color(uint8_t id) {
     }
 }
 
-sf::Color ppu::get_dot_color(uint8_t dot) {
+sf::Color PPU::get_dot_color(uint8_t dot) {
     // TODO: maybe i only need to do this once per rom load
-    uint8_t id_0 = *BGP & 0x03;      // id 0 0x03 masks last 2 bits
-    uint8_t id_1 = *BGP >> 2 & 0x03; // id 1
-    uint8_t id_2 = *BGP >> 4 & 0x03; // id 2
-    uint8_t id_3 = *BGP >> 6 & 0x03; // id 3
+    uint8_t id_0 = _get(BGP) & 0x03;      // id 0 0x03 masks last 2 bits
+    uint8_t id_1 = _get(BGP) >> 2 & 0x03; // id 1
+    uint8_t id_2 = _get(BGP) >> 4 & 0x03; // id 2
+    uint8_t id_3 = _get(BGP) >> 6 & 0x03; // id 3
     // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
 
     std::array<uint8_t, 3> color_0 = _get_color(id_0);
@@ -74,7 +100,7 @@ sf::Color ppu::get_dot_color(uint8_t dot) {
     return {r, g, b};
 }
 
-void fetcher::tick() {
+void Fetcher::tick() {
     // TODO: modularize stuff here
     // fetcher
     this->fetcher_ticks++;
@@ -84,65 +110,65 @@ void fetcher::tick() {
     fetcher_ticks = 0;
 
     switch (current_mode) {
-    case fetcher::mode::FetchTileNo: {
+    case Fetcher::mode::FetchTileNo: {
         // check bit 3 of LCDC to see which background map to use
         uint16_t bgmap_start = 0x9800;
         uint16_t bgmap_end = 0x9bff;
-        if ((*LCDC >> 3 & 1) == 1) {
+        if ((_get(LCDC) >> 3 & 1) == 1) {
             bgmap_start = 0x9c00;
             bgmap_end = 0x9fff;
         }
 
         // fetch tile no.
         // TODO: check scx offset
-        uint16_t scy_offset = 32 * (((*LY + *SCY) % 256) / 8);
-        uint16_t scx_offset = (*SCX % 256) / 8;
+        uint16_t scy_offset = 32 * (((_get(LY) + _get(SCY)) % 256) / 8);
+        uint16_t scx_offset = (_get(SCX) % 256) / 8;
         uint16_t address =
             bgmap_start + ((scy_offset + scx_offset + tile_index) & 0x3ff);
 
         // TODO: here
-        this->tile_id = this->gb_mmu.get_value_from_address(address);
-        this->current_mode = fetcher::mode::FetchTileDataLow;
+        this->tile_id = this->gb_mmu.read_memory(address);
+        this->current_mode = Fetcher::mode::FetchTileDataLow;
         break;
     }
-    case fetcher::mode::FetchTileDataLow: {
-        uint16_t offset = 2 * ((*LY + *SCY) % 8);
+    case Fetcher::mode::FetchTileDataLow: {
+        uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
         uint8_t low_byte{};
 
         // 8000 method or 8800 method to read
-        if (((*LCDC >> 4) & 1) != 1) {
+        if (((_get(LCDC) >> 4) & 1) != 1) {
             // 8800 method
             uint16_t address =
                 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
-            low_byte = this->gb_mmu.get_value_from_address(address);
+            low_byte = this->gb_mmu.read_memory(address);
         } else {
             // 8000 method
             uint16_t address = 0x8000 + (tile_id * 16) + offset;
-            low_byte = this->gb_mmu.get_value_from_address(address);
+            low_byte = this->gb_mmu.read_memory(address);
         }
         for (unsigned int i = 0; i < 8; ++i) {
             this->pixel_buffer[i] = (low_byte >> i) & 1;
         }
 
         // bool eightk_method{true};
-        this->current_mode = fetcher::mode::FetchTileDataHigh;
+        this->current_mode = Fetcher::mode::FetchTileDataHigh;
         break;
     }
 
-    case fetcher::mode::FetchTileDataHigh: {
-        uint16_t offset = 2 * ((*LY + *SCY) % 8);
+    case Fetcher::mode::FetchTileDataHigh: {
+        uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
         uint8_t high_byte{};
 
         // 8000 method or 8800 method to read
-        if ((*LCDC >> 4 & 1) != 1) {
+        if ((_get(LCDC) >> 4 & 1) != 1) {
             // 8800 method
             uint16_t address =
                 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset + 1;
-            high_byte = this->gb_mmu.get_value_from_address(address);
+            high_byte = this->gb_mmu.read_memory(address);
         } else {
             // 8000 method
             uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
-            high_byte = this->gb_mmu.get_value_from_address(address);
+            high_byte = this->gb_mmu.read_memory(address);
         }
         for (unsigned int i = 0; i < 8; ++i) {
             uint8_t high_bit = ((high_byte >> i) << 1) &
@@ -151,10 +177,10 @@ void fetcher::tick() {
                 this->pixel_buffer[i] | high_bit; // combine 2 bits together
         }
 
-        this->current_mode = fetcher::mode::PushToFIFO;
+        this->current_mode = Fetcher::mode::PushToFIFO;
         break;
     }
-    case fetcher::mode::PushToFIFO: {
+    case Fetcher::mode::PushToFIFO: {
         if (fifo.size() <= 8) {
             // for (int i = 7; i >= 0; --i) {
             for (int i = 0; i < 8; ++i) {
@@ -162,26 +188,26 @@ void fetcher::tick() {
             }
         }
         this->tile_index++;
-        this->current_mode = fetcher::mode::FetchTileNo;
+        this->current_mode = Fetcher::mode::FetchTileNo;
         break;
     }
     }
 }
 
 // 1 tick = 1 T-Cycle
-void ppu::tick() {
+void PPU::tick() {
     this->ppu_ticks++;
-    
+
     // set stat to mode
-    *STAT = (*STAT & 0xfc) | static_cast<uint8_t>(current_mode);
+    _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
     last_mode = current_mode;
 
     switch (this->current_mode) {
     case mode::OAM_Scan: {
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (*STAT >> 5 & 1)) {
-            *IF = *IF | 2;
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
+            _set(IF, _get(IF) | 2);
         }
 
         if (this->ppu_ticks % 2 == 0 &&
@@ -191,7 +217,7 @@ void ppu::tick() {
             // sprite fetcher
             std::array<uint8_t, 4> oam_entry{};
             for (unsigned int i = 0; i < oam_entry.size(); ++i) {
-                oam_entry[i] = this->gb_mmu.get_value_from_address(
+                oam_entry[i] = this->gb_mmu.read_memory(
                     OAM_START_ADDRESS + 4 * oam_buffer_counter + i);
             }
             oam_buffer_counter++; // each oam entry is 4 bytes
@@ -204,11 +230,11 @@ void ppu::tick() {
             this->ppu_fetcher.fifo.clear();
 
             // reset tile index
-            //this->ppu_fetcher.tile_index = 0;
-            this->ppu_fetcher.tile_index = *SCX / 8;
+            // this->ppu_fetcher.tile_index = 0;
+            this->ppu_fetcher.tile_index = _get(SCX) / 8;
 
             // reset the ppu fetcher mode
-            this->ppu_fetcher.current_mode = fetcher::mode::FetchTileNo;
+            this->ppu_fetcher.current_mode = Fetcher::mode::FetchTileNo;
 
             this->current_mode = mode::Drawing;
         }
@@ -227,7 +253,7 @@ void ppu::tick() {
             sf::Vector2f position = {f_dot_count, f_ly};
             */
 
-            sf::Vector2u position = {dot_count, *(this->LY)};
+            sf::Vector2u position = {dot_count, _get(LY)};
 
             uint8_t dot = this->ppu_fetcher.fifo.back();
             this->ppu_fetcher.fifo.pop_back();
@@ -280,22 +306,24 @@ void ppu::tick() {
     case mode::HBlank: {
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (*STAT >> 3 & 1)) {
-            *IF = *IF | 2;
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+            _set(IF, _get(IF) | 2);
         }
 
         // wait 456 t-cycles
         if (this->ppu_ticks == 456) {
             this->ppu_ticks = 0;
-            ++*(this->LY); // new scanline reached
+            _set(LY, _get(LY)+1); // new scanline reached
 
             // reset dot
             this->dot_count = 0;
 
-            if (*(this->LY) == 144) {
+            if (_get(LY) == 144) {
 
                 // draw?
-                lcd_dots_texture.loadFromImage(lcd_dots_image);
+                bool success = lcd_dots_texture.loadFromImage(lcd_dots_image);
+                assert(success && "LCD dots texture error loading from image");
+
                 sf::Sprite lcd_dots_sprite(lcd_dots_texture);
 
                 window.clear(sf::Color::White);
@@ -303,7 +331,7 @@ void ppu::tick() {
                 window.display();
 
                 // v-blank IF interrupt
-                *IF = *IF | 1;
+                _set(IF, _get(IF) | 1);
                 // end v-blank if interrupt
 
                 this->current_mode = mode::VBlank;
@@ -318,32 +346,32 @@ void ppu::tick() {
     case mode::VBlank: {
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (*STAT >> 4 & 1)) {
-            *IF = *IF | 2;
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+            _set(IF, _get(IF) | 2);
         }
 
         if (this->ppu_ticks == 456) {
 
             this->ppu_ticks = 0;
-            ++*(this->LY); // new blank scanline reached
+            _set(LY, _get(LY)+1); // new scanline reached
 
             // stat interrupt check
             // TODO: check stat interrupt
-            if (*LY == *LYC) {
-                if ((*STAT >> 6) & 1) {
-                    if (((*STAT >> 2) & 1) == 0) {
-                        *IF = *IF | 2;
-                        *STAT = *STAT | 4;
+            if (_get(LY) == _get(LYC)) {
+                if ((_get(STAT) >> 6) & 1) {
+                    if (((_get(STAT) >> 2) & 1) == 0) {
+                        _set(IF, _get(IF) | 2);
+                        _set(STAT, _get(STAT) | 4);
                     }
                 }
             } else {
-                *STAT = *STAT & ~4;
+                _set(STAT, _get(STAT) & ~4);
             }
 
-            if (*(this->LY) == 153) {   // wait 10 more scanlines
-                (*(this->LY)) = 0;      // reset LY
+            if (_get(LY) == 153) {   // wait 10 more scanlines
+                _set(LY, 0);      // reset LY
                 this->lcd_dots.clear(); // reset LCD
-                this->current_mode = ppu::mode::OAM_Scan;
+                this->current_mode = PPU::mode::OAM_Scan;
             }
         }
         break;

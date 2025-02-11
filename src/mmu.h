@@ -1,16 +1,20 @@
 #pragma once
+
 #include <vector>
+#include <cstdint>
+#include "Cartridge.h"
+#include "MBC1.h"
+#include <memory>
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
-#include <cstdint>
-class mmu {
+class MMU {
   public:
-    virtual uint8_t get_value_from_address(uint16_t address) const;
+    virtual uint8_t read_memory(uint16_t address) const;
 
-    uint8_t *get_pointer_from_address(uint16_t address);
+    uint8_t *read_pointer(uint16_t address);
 
-    virtual void write_value_to_address(uint16_t address, uint8_t value);
+    virtual void write_memory(uint16_t address, uint8_t value);
 
     std::vector<uint8_t> rom{}; // only need to load if its not rom_only (ram can't hold the entire rom)
 
@@ -65,10 +69,12 @@ class mmu {
         huc1_ram_battery = 0xff
     };
 
-    static mmu::section locate_section(const uint16_t address);
+    static MMU::section locate_section(const uint16_t address);
 
-    bool load_rom_complete{false};
     cartridge_type _cartridge_type{};
+
+    void set_load_rom_complete();
+    void set_cartridge_type(uint8_t type);
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -121,8 +127,12 @@ class mmu {
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
 
+    std::unique_ptr<Cartridge> cartridge{};
+
     uint8_t rom_bank_number{1}; // Current ROM bank (1-based)
     uint8_t ram_bank_number{0}; // Current RAM bank
     bool ram_enabled{false};
     bool rom_banking_mode{true}; // True = ROM banking, False = RAM banking
+
+    bool load_rom_complete{false};
 };
