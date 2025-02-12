@@ -3,9 +3,17 @@
 #include <cassert>
 #include <iostream>
 
+// TODO: use constexpr function instead?
+#define IS_MBC1                                                                \
+    (_cartridge_type == MMU::cartridge_type::mbc1 ||                           \
+     _cartridge_type == MMU::cartridge_type::mbc1_ram ||                       \
+     _cartridge_type == MMU::cartridge_type::mbc1_ram_battery)
+
+// TODO: simplify entire MMU by using a single array as the main memory
+
 void MMU::set_load_rom_complete() {
 
-    if (this->_cartridge_type == MMU::cartridge_type::mbc1) {
+    if (IS_MBC1) {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't complete load_rom_complete");
         this->cartridge->set_load_rom_complete();
@@ -18,10 +26,13 @@ void MMU::set_cartridge_type(uint8_t type) {
 
     this->_cartridge_type = static_cast<MMU::cartridge_type>(type);
 
-    if (_cartridge_type == MMU::cartridge_type::mbc1) {
+    if (IS_MBC1) {
         this->cartridge = std::make_unique<MBC1>();
     }
 }
+
+// direct increment div ff04 to here, read ff04 also to read div
+void MMU::increment_div() { ++this->div_ff04; }
 
 MMU::section MMU::locate_section(const uint16_t address) {
     if (address <= 0x00ff) {
@@ -64,16 +75,22 @@ MMU::section MMU::locate_section(const uint16_t address) {
 uint8_t MMU::read_memory(uint16_t address) const {
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
-    if (this->_cartridge_type == MMU::cartridge_type::mbc1) {
+    if (IS_MBC1) {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't read!");
 
-        uint8_t result = this->cartridge->read_memory(address);
+        if (address == 0xff04) {
+            return this->div_ff04;
+        }
 
-        if (result != 0) { // TODO: how do we handle 0xff returns?
+        uint16_t result = this->cartridge->read_memory(address);
+
+        if (result <= 0xff) { // make sure result fits in 8 bits
             return result;
         }
     }
+
+    // read from mmu's base arrays if the read function in mbc1 resulted in 0
 
     switch (locate_section(address)) {
     case MMU::section::restart_and_interrupt_vectors:
@@ -111,7 +128,11 @@ uint8_t MMU::read_memory(uint16_t address) const {
     case MMU::section::oam_ram : return this->oam_ram[address - base_address];
 
     case MMU::section::hardware_registers:
-        return this->hardware_registers[address - base_address];
+        if (address == 0xff04) {
+            return div_ff04;
+        } else {
+            return this->hardware_registers[address - base_address];
+        }
 
     case MMU::section::zero_page:
         return this->zero_page[address - base_address];
@@ -127,23 +148,9 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
-uint8_t MMU::get_interrupt_flag() {
-    if (_cartridge_type == MMU::cartridge_type::mbc1) {
-        // assert cartridge is not null ptr
-        assert(this->cartridge.get() != nullptr &&
-               "Cartridge was not initiated! Call set_cartridge_type first!");
-
-        return this->cartridge->read_memory(0xffff);
-    } else {
-        return this->interrupt_enable_flag;
-    }
-}
-
 void MMU::write_memory(uint16_t address, uint8_t value) {
 
-    if (!this->load_rom_complete &&
-        (this->_cartridge_type ==
-         MMU::cartridge_type::mbc1)) { // TODO: not rom_only
+    if (!this->load_rom_complete && (IS_MBC1)) { // TODO: not rom_only
 
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't write!");
@@ -152,12 +159,19 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         return;
     }
 
-    else if (this->_cartridge_type == MMU::cartridge_type::mbc1) {
+    else if (IS_MBC1) {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't write!");
 
+        if (address == 0xff04) {
+            this->div_ff04 = 0;
+            return;
+        }
+
         this->cartridge->write_memory(address, value);
     }
+
+    // write to base memory if writing memory to mbc1 didn't occur
 
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
@@ -220,7 +234,7 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
-            this->hardware_registers[address - 0xff00] = 0; // trap div
+            this->div_ff04 = 0; // trap div
         } else {
             this->hardware_registers[address - base_address] = value;
         }

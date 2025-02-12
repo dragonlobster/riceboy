@@ -12,8 +12,6 @@ class MMU {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
 
-    uint8_t get_interrupt_flag();
-
     virtual void write_memory(uint16_t address, uint8_t value);
 
     enum class section : uint16_t {
@@ -71,8 +69,11 @@ class MMU {
 
     cartridge_type _cartridge_type{};
 
+
     void set_load_rom_complete();
     void set_cartridge_type(uint8_t type);
+
+    void increment_div();
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -124,6 +125,9 @@ class MMU {
 
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
+
+    // div counter stored in MMU
+    uint8_t div_ff04{0};
 
     std::unique_ptr<Cartridge> cartridge{};
 

@@ -27,18 +27,7 @@ int main() {
     // TODO: load chosen cartridge
     // std::string rom = "BOOT/instr_timing.gb";
     // std::string rom = "BOOT/cpu_instrs.gb";
-    std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/bits_bank1.gb";
-    // std::string rom = "BOOT/individual_cpu/01-special.gb";
-    // std::string rom = "BOOT/individual_cpu/02-interrupts.gb"; // FAILED
-    // std::string rom = "BOOT/individual_cpu/03-op sp,hl.gb"; // n and zero
-    // flag always cleared std::string rom = "BOOT/individual_cpu/04-op
-    // r,imm.gb"; std::string rom = "BOOT/individual_cpu/05-op rp.gb";
-    // std::string rom = "BOOT/individual_cpu/06-ld r,r.gb";
-    // std::string rom = "BOOT/individual_cpu/07-jr,jp,call,ret,rst.gb";
-    // std::string rom = "BOOT/individual_cpu/08-misc instrs.gb";
-    // std::string rom = "BOOT/individual_cpu/09-op r,r.gb";
-    // std::string rom = "BOOT/individual_cpu/10-bit ops.gb";
-    // std::string rom = "BOOT/individual_cpu/11-op a,(hl).gb";
+    std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/rom_8Mb.gb";
     riceboy->gb_cpu.prepare_rom(rom);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *

@@ -1,13 +1,14 @@
 #include "MBC1.h"
 #include <cassert>
+#include <iostream>
 
-/*
-uint8_t MBC1::read_memory(uint16_t address) {
-    // ROM Bank 0 (always accessible) (includes cartridge header and
+uint16_t MBC1::read_memory(uint16_t address) {
     if (address <= 0x3fff) {
-        // TODO: handle zero bank number based on mode flag
+        // mode 0 - only access to normal address range
+        // mode 1 - can access banks 1, 20, 40, 60 (stored in *0x4000) depending
+        // on size of rom
         if (!this->banking_mode) {
-            return this->rom.at(address);
+            return this->rom[address];
         } else {
             uint8_t zero_bank_number{0};
             if (this->rom_size < 0x05) {
@@ -27,23 +28,34 @@ uint8_t MBC1::read_memory(uint16_t address) {
             return this->rom[0x4000 * zero_bank_number + address];
         }
     }
+
     // Switchable ROM Bank - $4000 - $7FFF
     else if (address >= 0x4000 && address <= 0x7fff) {
 
         uint16_t high_bank_number{0};
 
-        if (this->rom_size < 0x05) {
+        if (this->rom_size < 0x05) { // less than 1MiB
             high_bank_number = this->rom_bank_number;
-        } else if (this->rom_size == 0x05) {
+
+        } else if (this->rom_size == 0x05) { // = 1MiB
             high_bank_number =
                 this->rom_bank_number + ((this->ram_bank_number & 1) << 5);
-        } else if (this->rom_size > 0x05) {
+            // TODO: lowest bit of ram bank number should take bit 5
+            // place of the rom bank number (use | instead?)
+        } else if (this->rom_size > 0x05) { // > 1MiB
             high_bank_number =
-                this->rom_bank_number + (this->ram_bank_number << 5);
+                this->rom_bank_number +
+                (this->ram_bank_number
+                 << 5); // TODO: both bits of ram bank number takes bit 5 and 6
+                        // of the rom bank number (use | instead?)
         }
 
-        uint16_t bank_offset = this->rom_bank_number * 0x4000;
-        return this->rom[(bank_offset * high_bank_number) + (address - 0x4000)];
+        // std::cout << final_address << '\n';
+
+        uint32_t final_address = 0x4000 * high_bank_number + (address - 0x4000);
+        uint8_t result = this->rom.at(final_address);
+        return result;
+
     }
 
     // Cartridge RAM - $A000 - $BFFF
@@ -66,42 +78,15 @@ uint8_t MBC1::read_memory(uint16_t address) {
                 return this->rom[final_address];
             }
         }
-
-        return 0xff;
-    }
-}
-*/
-
-uint8_t MBC1::read_memory(uint16_t address) {
-    // ROM Bank 0 (always accessible) (includes cartridge header and
-    if (address <= 0x3fff) {
-        // TODO: handle zero bank number based on mode flag
-        return this->rom[address];
-    }
-    // Switchable ROM Bank - $4000 - $7FFF
-    else if (address >= 0x4000 && address <= 0x7fff) {
-        uint16_t bank_offset = this->rom_bank_number * 0x4000;
-        return this->rom[bank_offset + (address - 0x4000)];
+        return 0xff; // TODO: handle 0xff return?
     }
 
-    // Cartridge RAM - $A000 - $BFFF
-    else if (address >= 0xa000 && address <= 0xbfff) {
-        if (this->ram_enabled) {
-            // If ROM Banking Mode: use bank 0
-            // If RAM Banking Mode: use selected RAM bank
-            uint8_t ram_bank = this->banking_mode ? this->ram_bank_number : 0;
-            return this->rom[(address) + (ram_bank * 0x2000)];
-        }
-        return 0; // Return 0xff (undefined) if RAM is disabled
-    }
-    return 0; // return 0 or 0xff??
+    return 0xfff;
 }
 
-/*
 void MBC1::write_memory(uint16_t address, uint8_t value) {
 
-    if (!this->load_rom_complete) {
-        // this->rom[address] = value;
+    if (!this->load_rom_complete) { // TODO: not rom_only
         this->rom.push_back(value);
     }
 
@@ -112,44 +97,71 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
             this->ram_enabled = (value & 0x0f) == 0x0a; // 0000 1010
         }
 
-        // ROM Bank Number - $2000 - $3FFF
         else if (address >= 0x2000 && address <= 0x3fff) {
 
-            uint8_t mask{0};
-
-            switch (this->rom_size) {
-            case 0: this->rom_bank_number = 1; return;
-            case 1: mask = 0x03; break;
-            case 2: mask = 0x07; break;
-            case 3: mask = 0x0f; break;
-            case 4: mask = 0x1f; break;
-            case 5: mask = 0x1f; break;
-            case 6: mask = 0x1f; break;
+            if ((value & 0x1f) == 0) {
+                this->rom_bank_number = 1;
             }
 
-            assert(mask > 0 && "ROM size was not expected!");
+            else {
+                uint8_t mask{0};
 
-            uint8_t bank_number = value ? value : 1;
+                assert(this->rom_size <= 6 && "ROM size was not expected!");
+                // the mask is used to address bank #'s that exceed the # of
+                // banks available on the cart. e.g., 256 KiB cart with 16 banks
+                // only needs 4 bits (0-15), so we mask it with 0000 1111 (lower
+                // 4 bits)
+                switch (this->rom_size) {
+                case 0: mask = this->rom_bank_number = 1; return;
+                case 1: mask = 0x03; break; // 0000 0011
+                case 2: mask = 0x07; break; // 0000 0111
+                case 3: mask = 0x0f; break; // 0000 1111
+                case 4: mask = 0x1f; break; // 0001 1111
+                case 5: mask = 0x1f; break; // 0001 1111
+                case 6: mask = 0x1f; break; // 0001 1111
+                }
 
-            this->rom_bank_number = bank_number & mask;
+                this->rom_bank_number = value & mask;
+            }
+
         }
 
         // RAM Bank Number or Upper ROM Bank Bits - $4000 - $5FFF
         else if (address >= 0x4000 && address <= 0x5fff) {
             if (!this->banking_mode) {
                 // ROM Banking Mode: Set upper 2 bits of ROM bank
-                this->rom_bank_number =
-                    (this->rom_bank_number & 0x1f) | ((value & 0x03) << 5);
+                if (this->rom_size >= 0x05) {
+
+                    this->rom_bank_number =
+                        (this->rom_bank_number & 0x9f) |
+                        ((value & 0x03) << 5); // upper 2 bits
+
+                    if (rom_size == 0x05) {
+                        this->rom_bank_number %= 64;
+                    }
+                    else if (rom_size == 0x06) {
+                        this->rom_bank_number %= 128;
+                    }
+
+                }
+
             } else {
                 // RAM Banking Mode: Select RAM bank
-                this->ram_bank_number = value & 0x03;
+                // TODO: getting error with moon eye test, so i need to do this all the time i think instead of just in non banking mode
+                if (this->ram_size >= 3) {
+                    this->ram_bank_number = value & 3;
+                }
             }
         }
 
         // Banking Mode Select - $6000 - $7FFF
         else if (address >= 0x6000 && address <= 0x7fff) {
             // Switch between ROM and RAM banking modes
-            this->banking_mode = (value & 0x01) == 1;
+            if (this->ram_size <= 2 && this->rom_size <= 4) {
+                // ram <= 8Kib && rom <= 512 KiB - no observable effect
+                return;
+            }
+            this->banking_mode = (value & 0x01) != 0;
         }
 
         // Cartridge RAM Write - $A000 - $BFFF
@@ -172,73 +184,6 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
                     this->rom[final_address] = value;
                 }
             }
-        }
-    }
-}
-*/
-
-void MBC1::write_memory(uint16_t address, uint8_t value) {
-
-    if (!this->load_rom_complete) { // TODO: not rom_only
-        this->rom.push_back(value);
-        return;
-    }
-
-    else {
-        // RAM Enable/Disable - $0000 - $1FFF
-        if (address <= 0x1fff) {
-            // Enable RAM if value is 0x0A, disable otherwise
-            this->ram_enabled = (value & 0x0f) == 0x0a; // 0000 1010
-            return;
-        }
-
-        // ROM Bank Number - $2000 - $3FFF
-        else if (address >= 0x2000 && address <= 0x3fff) {
-            // Get the lower 5 bits
-            uint8_t bank_number = value;
-
-            // Handle special cases
-            if (bank_number == 0) {
-                bank_number = 1;
-            }
-
-            // Update ROM bank number
-            // Clear lower 5 bits and set new value
-            this->rom_bank_number =
-                (this->rom_bank_number & 0xe0) | (bank_number & 0x1f);
-            return;
-        }
-
-        // RAM Bank Number or Upper ROM Bank Bits - $4000 - $5FFF
-        else if (address >= 0x4000 && address <= 0x5fff) {
-            if (!this->banking_mode) {
-                // ROM Banking Mode: Set upper 2 bits of ROM bank
-                this->rom_bank_number =
-                    (this->rom_bank_number & 0x1f) | ((value & 0x03) << 5);
-            } else {
-                // RAM Banking Mode: Select RAM bank
-                this->ram_bank_number = value & 0x03;
-            }
-            return;
-        }
-
-        // Banking Mode Select - $6000 - $7FFF
-        else if (address >= 0x6000 && address <= 0x7fff) {
-            // Switch between ROM and RAM banking modes
-            this->banking_mode = (value & 0x01) != 0;
-            return;
-        }
-
-        // Cartridge RAM Write - $A000 - $BFFF
-        else if (address >= 0xa000 && address <= 0xbfff) {
-            if (this->ram_enabled) {
-                // If ROM Banking Mode: use bank 0
-                // If RAM Banking Mode: use selected RAM bank
-                uint8_t ram_bank =
-                    this->banking_mode ? this->ram_bank_number : 0;
-                this->rom[(address) + (ram_bank * 0x2000)] = value;
-            }
-            return;
         }
     }
 }

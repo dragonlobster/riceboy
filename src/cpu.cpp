@@ -1942,9 +1942,12 @@ void CPU::timer_tick() {
     this->div_ticks++;
 
     while (div_ticks >= 64) {
+        /*
         uint8_t div = _read_memory(0xff04);
-        //++div; // increment div every 64 M-cycles
-        _write_memory(0xff04, ++div);
+        ++div; // increment div every 64 M-cycles
+        _write_memory(0xff04, div);
+        */
+        this->gb_mmu->increment_div();
         div_ticks -= 64;
     }
 
@@ -1971,7 +1974,7 @@ void CPU::timer_tick() {
 
         // increment TIMA
         uint8_t tima = _read_memory(0xff05);
-        _write_memory(0xff05, ++tima);
+        _write_memory(0xff05, tima+1);
         // check for TIMA overflow after 1 M-cycle
         if (_read_memory(0xff05) == 0) {
             // set timer interrupt
