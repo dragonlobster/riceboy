@@ -14,8 +14,8 @@ class MBC1 : public Cartridge {
     //std::array<uint8_t, 2097152> rom{};
     std::vector<uint8_t> rom{};
 
-    uint8_t rom_bank_number{1};  // Current ROM bank (1-based)
-    uint8_t ram_bank_number{0};  // Current RAM bank
+    uint8_t rom_bank_number{1};  // (1-based) 5 bit register (bank1)
+    uint8_t ram_bank_number{0};  // 2 bit register (bank2)
     bool ram_enabled{false};     // ram enabled or not
     bool banking_mode{false};    // 0 - rom banking mode, 1 - ram banking mode
     bool load_rom_complete{false};

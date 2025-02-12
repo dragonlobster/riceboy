@@ -15,7 +15,9 @@ uint16_t MBC1::read_memory(uint16_t address) {
                 // less than 1 MiB
                 // offset = 0
             } else if (this->rom_size == 0x05) {
-                zero_bank_number = (this->ram_bank_number) ? 0x20 : 0;
+                //zero_bank_number = (this->ram_bank_number) ? 0x20 : 0;
+                // TODO: fix this
+                zero_bank_number = ((this->ram_bank_number << 5) & 1);
             } else if (this->rom_size > 0x05) {
                 // rom size > 0x05
                 switch (this->ram_bank_number) {
@@ -53,6 +55,7 @@ uint16_t MBC1::read_memory(uint16_t address) {
         // std::cout << final_address << '\n';
 
         uint32_t final_address = 0x4000 * high_bank_number + (address - 0x4000);
+        final_address %= this->rom.size(); // wrap # of banks
         uint8_t result = this->rom.at(final_address);
         return result;
 
@@ -128,10 +131,16 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
 
         // RAM Bank Number or Upper ROM Bank Bits - $4000 - $5FFF
         else if (address >= 0x4000 && address <= 0x5fff) {
+            if (this->ram_size < 3 && this->rom_size < 5) {
+                return;
+            }
+            else {
+                this->ram_bank_number = value & 3;
+            }
+            /*
             if (!this->banking_mode) {
                 // ROM Banking Mode: Set upper 2 bits of ROM bank
                 if (this->rom_size >= 0x05) {
-
                     this->rom_bank_number =
                         (this->rom_bank_number & 0x9f) |
                         ((value & 0x03) << 5); // upper 2 bits
@@ -142,16 +151,14 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
                     else if (rom_size == 0x06) {
                         this->rom_bank_number %= 128;
                     }
-
                 }
 
             } else {
                 // RAM Banking Mode: Select RAM bank
-                // TODO: getting error with moon eye test, so i need to do this all the time i think instead of just in non banking mode
                 if (this->ram_size >= 3) {
                     this->ram_bank_number = value & 3;
                 }
-            }
+            }*/
         }
 
         // Banking Mode Select - $6000 - $7FFF
