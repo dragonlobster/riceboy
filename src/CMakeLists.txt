@@ -7,7 +7,10 @@ FetchContent_Declare(SFML
     SYSTEM)
 FetchContent_MakeAvailable(SFML)
 
-set(SOURCES "DrawUtils.cpp" "Gameboy.cpp" "Cartridge.cpp" "CPU.cpp" "MMU.cpp" "PPU.cpp" "opcodes.cpp" "MBC1.cpp" "HandleInput.h" "DrawUtils.h" "Gameboy.h" "CPU.h" "MMU.h" "PPU.h" "Cartridge.h" "MBC1.h")
+set(SOURCES "DrawUtils.cpp" "Gameboy.cpp" "Cartridge.cpp" "cpu.cpp" "mmu.cpp" "ppu.cpp" "opcodes.cpp" "MBC1.cpp" "HandleInput.h" "DrawUtils.h" "Gameboy.h" "cpu.h" "mmu.h" "ppu.h" "Cartridge.h" "MBC1.h"
+        Timer.cpp
+        Timer.h
+        )
 
 add_library(gb_components STATIC ${SOURCES})
 

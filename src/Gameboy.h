@@ -3,6 +3,7 @@
 #include "CPU.h"
 #include "MMU.h"
 #include "PPU.h"
+#include "Timer.h"
 #include <SFML/Graphics.hpp>
 
 class Gameboy {
@@ -10,7 +11,10 @@ class Gameboy {
   public:
 
     sf::RenderWindow &window; // the sfml window (need to draw)
-    Gameboy(sf::RenderWindow &window_) : window(window_) {};
+    Gameboy(sf::RenderWindow &window_) : window(window_) {
+        this->gb_mmu.set_timer(gb_timer);
+        this->gb_timer.set_mmu(gb_mmu);
+    };
 
     // dimensions
     static constexpr unsigned int WIDTH{160};
@@ -22,6 +26,7 @@ class Gameboy {
 
     // TODO: mmu, cpu, ppu
     MMU gb_mmu{};
+    Timer gb_timer{};
     CPU gb_cpu = CPU(gb_mmu);
     PPU gb_ppu = PPU(gb_mmu, window);
 

@@ -6,6 +6,8 @@
 #include "MBC1.h"
 #include <memory>
 
+class Timer;
+
 // TODO: restrict access to ROM, VRAM, and OAM
 
 class MMU {
@@ -76,7 +78,17 @@ class MMU {
     void increment_div();
     uint16_t read_div();
 
+    // timer
+    Timer *timer{};
+    void set_timer(Timer &timer) {
+        this->timer = &timer;
+    }
+
   private:
+
+    //timer
+    //Timer &timer;
+
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
 

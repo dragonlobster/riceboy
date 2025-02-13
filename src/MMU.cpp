@@ -1,6 +1,5 @@
 #include "MMU.h"
-#include "MMU.h"
-#include <array>
+#include "Timer.h"
 #include <cassert>
 #include <iostream>
 
@@ -72,7 +71,13 @@ MMU::section MMU::locate_section(const uint16_t address) {
     return MMU::section::unknown;
 }
 
-uint16_t MMU::read_div() { return this->div_ff04; }
+uint16_t MMU::read_div() { return (this->div_ff04 & 0xff) >> 8; }
+
+/*
+void MMU::set_timer(Timer &timer_) {
+    this->timer = timer_;
+}*/
+// uint16_t MMU::read_div() { return this->div_ff04; }
 
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {
@@ -83,7 +88,21 @@ uint8_t MMU::read_memory(uint16_t address) const {
                "Cartridge is NULL! Can't read!");
 
         if (address == 0xff04) {
-            return this->div_ff04;
+            //return this->div_ff04;
+            return timer->get_div();
+            //return (this->div_ff04 & 0xff) >> 8;
+        }
+
+        if (address == 0xff05) {
+            //return this->div_ff04;
+            return timer->get_tima();
+            //return (this->div_ff04 & 0xff) >> 8;
+        }
+
+        if (address == 0xff07) {
+            //return this->div_ff04;
+            return timer->get_tac();
+            //return (this->div_ff04 & 0xff) >> 8;
         }
 
         uint16_t result = this->cartridge->read_memory(address);
@@ -132,8 +151,21 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
-            return div_ff04;
-        } else {
+            //return this->div_ff04;
+            return timer->get_div();
+            //return (this->div_ff04 & 0xff) >> 8;
+        }
+        else if (address == 0xff05) {
+            //return this->div_ff04;
+            return timer->get_tima();
+            //return (this->div_ff04 & 0xff) >> 8;
+        }
+        else if (address == 0xff07) {
+            //return this->div_ff04;
+            return timer->get_tac();
+            //return (this->div_ff04 & 0xff) >> 8;
+        }
+        else {
             return this->hardware_registers[address - base_address];
         }
 
@@ -167,7 +199,18 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
                "Cartridge is NULL! Can't write!");
 
         if (address == 0xff04) {
-            this->div_ff04 = 0;
+            this->timer->set_div();
+            //this->div_ff04 = 0;
+            return;
+        }
+        if (address == 0xff05) {
+            this->timer->set_tima(value);
+            //this->div_ff04 = 0;
+            return;
+        }
+        if (address == 0xff07) {
+            this->timer->set_tac(value);
+            //this->div_ff04 = 0;
             return;
         }
 
@@ -237,8 +280,16 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
-            this->div_ff04 = 0; // trap div
-        } else {
+            this->timer->set_div();
+            //this->div_ff04 = 0; // trap div
+        }
+        else if (address == 0xff05) {
+            this->timer->set_tima(value);
+        }
+        else if (address == 0xff07) {
+            this->timer->set_tac(value);
+        }
+        else {
             this->hardware_registers[address - base_address] = value;
         }
         break;

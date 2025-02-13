@@ -112,8 +112,8 @@ class CPU {
     uint16_t div_ticks{0};
 
     // timer related (only for falling edge version)
-    //uint16_t old_div_edge{0};
-    //bool tima_overflow{false};
+    uint16_t old_div_bit{0};
+    bool tima_overflow{false};
 
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};

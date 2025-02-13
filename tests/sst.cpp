@@ -1,10 +1,10 @@
-#include "../src/cpu.h"
-#include "../src/mmu.h"
+#include "../src/CPU.h"
+#include "../src/MMU.h"
+#include "opcodes.h" // import all opcodes
 #include <array>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
-#include "opcodes.h" // import all opcodes
 using json = nlohmann::json;
 
 class sst_mmu : public MMU {
