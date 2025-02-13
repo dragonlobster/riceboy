@@ -13,6 +13,7 @@ class MBC1 : public Cartridge {
   private:
     //std::array<uint8_t, 2097152> rom{};
     std::vector<uint8_t> rom{};
+    std::vector<uint8_t> ram{}; // ram 
 
     uint8_t rom_bank_number{1};  // (1-based) 5 bit register (bank1)
     uint8_t ram_bank_number{0};  // 2 bit register (bank2)

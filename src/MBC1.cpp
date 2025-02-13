@@ -2,6 +2,8 @@
 #include <cassert>
 #include <iostream>
 
+// TODO: implement MBCM1 (multicart)
+
 uint16_t MBC1::read_memory(uint16_t address) {
     if (address <= 0x3fff) {
         // mode 0 - only access to normal address range
@@ -11,21 +13,15 @@ uint16_t MBC1::read_memory(uint16_t address) {
             return this->rom[address];
         } else {
             uint8_t zero_bank_number{0};
+
             if (this->rom_size < 0x05) {
                 // less than 1 MiB
                 // offset = 0
             } else if (this->rom_size == 0x05) {
-                //zero_bank_number = (this->ram_bank_number) ? 0x20 : 0;
-                // TODO: fix this
-                zero_bank_number = ((this->ram_bank_number << 5) & 1);
+                zero_bank_number = ((this->ram_bank_number & 1) << 5);
             } else if (this->rom_size > 0x05) {
                 // rom size > 0x05
-                switch (this->ram_bank_number) {
-                // case 0: zero_bank_number = 0; break;
-                case 1: zero_bank_number = 0x20; break;
-                case 2: zero_bank_number = 0x40; break;
-                case 3: zero_bank_number = 0x60; break;
-                }
+                zero_bank_number = ((this->ram_bank_number) << 5);
             }
             return this->rom[0x4000 * zero_bank_number + address];
         }
@@ -42,13 +38,13 @@ uint16_t MBC1::read_memory(uint16_t address) {
         } else if (this->rom_size == 0x05) { // = 1MiB
             high_bank_number =
                 this->rom_bank_number + ((this->ram_bank_number & 1) << 5);
-            // TODO: lowest bit of ram bank number should take bit 5
+            // lowest bit of ram bank number should take bit 5
             // place of the rom bank number (use | instead?)
         } else if (this->rom_size > 0x05) { // > 1MiB
             high_bank_number =
                 this->rom_bank_number +
                 (this->ram_bank_number
-                 << 5); // TODO: both bits of ram bank number takes bit 5 and 6
+                 << 5); // both bits of ram bank number takes bit 5 and 6
                         // of the rom bank number (use | instead?)
         }
 
@@ -69,7 +65,9 @@ uint16_t MBC1::read_memory(uint16_t address) {
 
             if (this->ram_size <= 0x02) {
                 uint16_t ram = ram_size == 0x01 ? 2048 : 8192;
-                return this->rom[(address - 0xa000) % ram];
+                try {
+                    return this->ram.at((address - 0xa000) % ram);
+                } catch (std::out_of_range) { return 0xff; }
             } // 2KiB or 8KiB Ram
 
             else {
@@ -78,7 +76,10 @@ uint16_t MBC1::read_memory(uint16_t address) {
                         ? 0x2000 * this->ram_bank_number + (address - 0xa000)
                         : address - 0xa000;
 
-                return this->rom[final_address];
+                return this->ram[final_address];
+                try {
+                    return this->ram.at(final_address);
+                } catch (std::out_of_range) { return 0xff; }
             }
         }
         return 0xff; // TODO: handle 0xff return?
@@ -89,7 +90,7 @@ uint16_t MBC1::read_memory(uint16_t address) {
 
 void MBC1::write_memory(uint16_t address, uint8_t value) {
 
-    if (!this->load_rom_complete) { // TODO: not rom_only
+    if (!this->load_rom_complete) {
         this->rom.push_back(value);
     }
 
@@ -131,34 +132,13 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
 
         // RAM Bank Number or Upper ROM Bank Bits - $4000 - $5FFF
         else if (address >= 0x4000 && address <= 0x5fff) {
+            /*
             if (this->ram_size < 3 && this->rom_size < 5) {
                 return;
-            }
-            else {
-                this->ram_bank_number = value & 3;
-            }
-            /*
-            if (!this->banking_mode) {
-                // ROM Banking Mode: Set upper 2 bits of ROM bank
-                if (this->rom_size >= 0x05) {
-                    this->rom_bank_number =
-                        (this->rom_bank_number & 0x9f) |
-                        ((value & 0x03) << 5); // upper 2 bits
-
-                    if (rom_size == 0x05) {
-                        this->rom_bank_number %= 64;
-                    }
-                    else if (rom_size == 0x06) {
-                        this->rom_bank_number %= 128;
-                    }
-                }
-
             } else {
-                // RAM Banking Mode: Select RAM bank
-                if (this->ram_size >= 3) {
-                    this->ram_bank_number = value & 3;
-                }
+                this->ram_bank_number = value & 3;
             }*/
+            this->ram_bank_number = value & 3;
         }
 
         // Banking Mode Select - $6000 - $7FFF
@@ -178,17 +158,20 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
                 // If RAM Banking Mode: use selected RAM bank
 
                 if (this->ram_size <= 0x02) {
-                    uint16_t ram = ram_size == 0x01 ? 2048 : 8192;
-                    this->rom[(address - 0xa000) % ram] = value;
+                    // uint16_t ram_size_bytes = ram_size == 0x01 ? 2048 : 8192;
+                    this->ram[(address - 0xa000) % this->ram.size()] = value;
                 } // 2KiB or 8KiB Ram
 
-                else {
+                else if (this->ram_size == 0x03) {
                     uint16_t final_address =
                         this->banking_mode ? 0x2000 * this->ram_bank_number +
                                                  (address - 0xa000)
                                            : address - 0xa000;
 
-                    this->rom[final_address] = value;
+                    assert(final_address <= this->ram.size() &&
+                           "final address is out of bounds of the RAM!");
+
+                    this->ram[final_address] = value;
                 }
             }
         }
@@ -201,6 +184,12 @@ void MBC1::set_load_rom_complete() {
     // set rom size
     this->rom_size = this->rom.at(0x148);
     this->ram_size = this->rom.at(0x149);
+
+    switch (ram_size) {
+    case 1: this->ram.resize(2048); break;
+    case 2: this->ram.resize(8192); break;
+    case 3: this->ram.resize(32768); break;
+    }
 
     assert(
         this->rom_size <= 6 &&

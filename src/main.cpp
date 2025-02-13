@@ -27,7 +27,7 @@ int main() {
     // TODO: load chosen cartridge
     // std::string rom = "BOOT/instr_timing.gb";
     // std::string rom = "BOOT/cpu_instrs.gb";
-    std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/rom_8Mb.gb";
+    std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/rom_512Kb.gb";
     riceboy->gb_cpu.prepare_rom(rom);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
