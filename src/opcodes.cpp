@@ -28,11 +28,9 @@ int CPU::handle_opcode(const uint8_t opcode) {
         case 0:
             switch (y) {
             // beginning of switch case for y
-            case 0: break; // NOP
+            case 0: break; // TODO: NOP
             case 1: ld_imm16_sp(); break;
-            case 2:
-                // TODO: STOP
-                break;
+            case 2: break; // TODO: STOP
             case 3: jr_s8(conditions::NA); break;
             case 4: jr_s8(conditions::NZ); break;
             case 5: jr_s8(conditions::Z); break;
@@ -215,7 +213,7 @@ int CPU::handle_opcode(const uint8_t opcode) {
             case 0: jp_imm16(conditions::NA); break;
             case 1: {
                 // TODO: cb create another CB handler
-                const uint8_t cb_opcode = this->_read_memory(this->PC);
+                const uint8_t cb_opcode = this->_get(this->PC);
                 this->PC++; // increment the program counter
                 this->handle_cb_opcode(cb_opcode);
                 break;

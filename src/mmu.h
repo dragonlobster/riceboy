@@ -69,11 +69,12 @@ class MMU {
 
     cartridge_type _cartridge_type{};
 
-
     void set_load_rom_complete();
     void set_cartridge_type(uint8_t type);
 
+    // div
     void increment_div();
+    uint16_t read_div();
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -127,7 +128,7 @@ class MMU {
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
 
     // div counter stored in MMU
-    uint8_t div_ff04{0};
+    uint16_t div_ff04{0};
 
     std::unique_ptr<Cartridge> cartridge{};
 

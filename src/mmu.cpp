@@ -1,4 +1,5 @@
 #include "MMU.h"
+#include "MMU.h"
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -70,6 +71,8 @@ MMU::section MMU::locate_section(const uint16_t address) {
     }
     return MMU::section::unknown;
 }
+
+uint16_t MMU::read_div() { return this->div_ff04; }
 
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {

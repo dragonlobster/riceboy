@@ -1,20 +1,20 @@
 #pragma once
 
 #include "MMU.h"
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <iomanip>
 #include <iostream>
 #include <tuple>
 #include <vector>
-#include <array>
 
 class CPU {
     // TODO: make private
 
   public:
     // pointer to mmu
-    CPU(MMU &mmu);    // pass by reference
+    CPU(MMU &mmu); // pass by reference
     MMU *gb_mmu{}; // the central mmu
 
     // main 8-bit registers
@@ -57,13 +57,16 @@ class CPU {
     int handle_opcode(const uint8_t opcode);
     int handle_cb_opcode(const uint8_t cb_opcode);
 
-    void execute_M_operations(); // execute M operations and set state of fetch_opcode to true or false depending on whether all M operations have completed
+    void execute_M_operations(); // execute M operations and set state of
+                                 // fetch_opcode to true or false depending on
+                                 // whether all M operations have completed
 
-    uint8_t identify_opcode(const uint8_t opcode); // get the next opcode and increment the PC
+    uint8_t identify_opcode(
+        const uint8_t opcode); // get the next opcode and increment the PC
 
-    void tick(); // single cpu tick
+    void tick();           // single cpu tick
     void interrupt_tick(); // interrupt tick
-    void timer_tick(); // timer tick
+    void timer_tick();     // timer tick
 
     void handle_interrupts(); // handle interrupts
 
@@ -77,9 +80,8 @@ class CPU {
     std::string rom;
 
     // read write memory
-    uint8_t _read_memory(const uint16_t address);
-    uint8_t* _read_pointer(const uint16_t address);
-    void _write_memory(const uint16_t address, const uint8_t value);
+    uint8_t _get(const uint16_t address);
+    void _set(const uint16_t address, const uint8_t value);
 
     // registers
     enum class registers {
@@ -93,19 +95,9 @@ class CPU {
         NA // NA means null (if register is SP
     };
 
-    enum class conditions {
-        NA,
-        Z,
-        NZ,
-        C,
-        NC
-    };
+    enum class conditions { NA, Z, NZ, C, NC };
 
-    enum class bitops {
-        AND,
-        XOR,
-        OR
-    };
+    enum class bitops { AND, XOR, OR };
 
   private:
     // debugging only
@@ -119,60 +111,76 @@ class CPU {
     uint16_t tima_ticks{0};
     uint16_t div_ticks{0};
 
+    // timer related (only for falling edge version)
+    //uint16_t old_div_edge{0};
+    //bool tima_overflow{false};
+
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};
 
     // TODO: convert all arguments to pass by reference and make them const
     // micro operations
     // NOTE: d16 = address
-    void add_a_hl();                      // add content from address HL to A
-    void add_hl_rr(const registers r1, const registers r2, const bool sp);                      // add content from address HL to A
+    void add_a_hl(); // add content from address HL to A
+    void add_hl_rr(const registers r1, const registers r2,
+                   const bool sp);     // add content from address HL to A
     void add_a_r8(const registers r8); // add content from register r8 to A
     void add_sp_s8();
-    void bit_b_r8(const registers r8, uint8_t b); // b is 0 or 1
     void call(const conditions condition);
     void cp_a_imm8(); // compare immediate next byte with A no effect on A
-    void cp_a_r(const registers r, const bool hl);   // compare memory[hl] with A no effect on A
-    void inc_or_dec_r8(const registers r8, const bool inc); // decrement register
+    void cp_a_r(const registers r,
+                const bool hl); // compare memory[hl] with A no effect on A
+    void inc_or_dec_r8(const registers r8,
+                       const bool inc); // decrement register
     void inc_or_dec_hl(const bool inc); // decrement register
-    void inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
-                        const bool sp); // inc or dec r16 register, either SP (stack
-                                  // pointer) or 2 individual registers
+    void
+    inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
+                   const bool sp); // inc or dec r16 register, either SP (stack
+                                   // pointer) or 2 individual registers
     void jp_imm16(const conditions condition); // absolute jump, check z flag
     void jp_hl();
-    void jr_s8(conditions condition); // relative jump, check z flag, nz means check if z flag is not 0
-    void ld_imm16_a(const bool to_a); // to a means should i load imm16 to a, or a to
-    void ld_imm16_sp(); // to a means should i load imm16 to a, or a to
-                                // imm16, covers ld_imm16_a and ld_a_imm16
+    void jr_s8(conditions condition); // relative jump, check z flag, nz means
+                                      // check if z flag is not 0
+    void
+    ld_imm16_a(const bool to_a); // to a means should i load imm16 to a, or a to
+    void ld_imm16_sp();          // to a means should i load imm16 to a, or a to
+                                 // imm16, covers ld_imm16_a and ld_a_imm16
     void ld_r_r(const registers r_to,
                 const registers
                     r_from); // load value from 1 register to another register
     void ld_r_imm8(const registers r);
     void ld_hl_imm8();
     void ld_rr_address(const registers r1, const registers r2, const bool sp);
-    void ld_hl_a(const bool increment, const bool to_a);      // hl+ and hl-, and hl
-    void ld_hl_r8(const registers r, const bool to_hl); // hl+ and hl-, and hl
+    void ld_hl_a(const bool increment, const bool to_a); // hl+ and hl-, and hl
+    void ld_hl_r8(const registers r, const bool to_hl);  // hl+ and hl-, and hl
     void ld_hl_sp_s8();
     void ld_sp_hl();
     void pop_rr(const registers r1, const registers r2, const bool af = false);
     void push_rr(const registers r1, const registers r2, const bool af = false);
-    void ret(conditions condition, bool ime_condition = false);                     // return
-    void rl_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate left accumulator
-    void rlc_r(const registers r, const bool hl = false, const bool z_flag = false);
-    void rr_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate right accumulator
-    void rrc_r(const registers r, const bool hl = false, const bool z_flag = false);                     // rotate right accumulator
-    void sla_r(const registers r, const bool hl = false); // rotate left accumulator
-    void sra_r(const registers r, const bool hl = false); // rotate right accumulator
+    void ret(conditions condition, bool ime_condition = false); // return
+    void rl_r(const registers r, const bool hl = false,
+              const bool z_flag = false); // rotate left accumulator
+    void rlc_r(const registers r, const bool hl = false,
+               const bool z_flag = false);
+    void rr_r(const registers r, const bool hl = false,
+              const bool z_flag = false); // rotate right accumulator
+    void rrc_r(const registers r, const bool hl = false,
+               const bool z_flag = false); // rotate right accumulator
+    void sla_r(const registers r,
+               const bool hl = false); // rotate left accumulator
+    void sra_r(const registers r,
+               const bool hl = false); // rotate right accumulator
     void swap_r(const registers r, const bool hl = false);
     void srl_r(const registers r, const bool hl = false);
     // TODO: combine srl and rr, try to find other combos
     void sub(const registers r, const bool hl);
     void xor_r(const registers r, const bool hl);
-    void ld_c_a(const bool to_a);    // also known as LDH (C), A, to_a reverses LD
-    void ld_imm8_a(const bool to_a); // also known as LDH (n), A, to_a reverses LD
-    void ld_a_rr(const registers r1,
-                 const registers
-                     r2, const bool to_a); // load memory value from register pair address to A
+    void ld_c_a(const bool to_a); // also known as LDH (C), A, to_a reverses LD
+    void
+    ld_imm8_a(const bool to_a); // also known as LDH (n), A, to_a reverses LD
+    void ld_a_rr(
+        const registers r1, const registers r2,
+        const bool to_a); // load memory value from register pair address to A
     void cpl();
     void scf();
     void ccf();
@@ -187,7 +195,8 @@ class CPU {
 
     void rst(const uint8_t opcode);
 
-    void res_or_set(const uint8_t bit, const registers r, const bool set, const bool hl = false);
+    void res_or_set(const uint8_t bit, const registers r, const bool set,
+                    const bool hl = false);
 
     void bit(const uint8_t bit, const registers r, const bool hl = false);
 
@@ -200,7 +209,7 @@ class CPU {
     uint16_t
     _combine_2_8bits(const uint8_t r1,
                      const uint8_t r2); // get the register pairs value by
-                                         // combining them into a 16 bit uint
+                                        // combining them into a 16 bit uint
     std::tuple<uint8_t, uint8_t> _split_16bit(const uint16_t r16);
 
     // all return result, zero, subtract, half-carry, carry
@@ -208,8 +217,9 @@ class CPU {
     std::tuple<uint8_t, bool, bool, bool, bool> _addition_8bit(Args... args);
 
     std::tuple<uint16_t, bool, bool, bool, bool>
-    _addition_16bit(uint16_t x, uint16_t y,  bool s8 = false);
-    std::tuple<uint8_t, bool, bool, bool, bool> _subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf = 0);
+    _addition_16bit(uint16_t x, uint16_t y, bool s8 = false);
+    std::tuple<uint8_t, bool, bool, bool, bool>
+    _subtraction_8bit(uint8_t x, uint8_t y, uint8_t Cf = 0);
 
     uint8_t _flags_to_byte()
         const; // const after function declaration makes it a compiler error to
@@ -218,10 +228,8 @@ class CPU {
     std::tuple<bool, bool, bool, bool> _byte_to_flags(uint8_t byte);
 
     // TODO: make enum
-    uint8_t *_get_register(
-        const registers
-            r8); // get the pointer to the register value based on char8
-
+    uint8_t *_get_register(const registers r8); // get the pointer to the
+                                                // register value based on char8
 
     // opcode lookup tables
     std::array<registers, 8> rp_table{

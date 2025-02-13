@@ -108,7 +108,7 @@ void test_setup(CPU &test_cpu, sst::cpu_state &initial) {
     test_cpu.L = initial.l;
 
     for (const std::array<int, 2> &i : initial.ram) {
-        test_cpu._write_memory(i[0], i[1]);
+        test_cpu._set(i[0], i[1]);
     }
     // TODO: what is ime?
 }
@@ -136,7 +136,7 @@ void compare_final(CPU &test_cpu, sst::cpu_state &final) {
     EXPECT_EQ(test_cpu.L, final.l);
 
     for (const std::array<int, 2> &i : final.ram) {
-        EXPECT_EQ(test_cpu._read_memory(i[0]), i[1]);
+        EXPECT_EQ(test_cpu._get(i[0]), i[1]);
     }
 }
 
@@ -188,7 +188,7 @@ TEST_P(OpcodeTest, opcode) {
         // initialize cpu values
         test_setup(test_cpu, test.initial);
         // fetch the opcode
-        test_cpu.identify_opcode(test_cpu._read_memory(test_cpu.PC));
+        test_cpu.identify_opcode(test_cpu._get(test_cpu.PC));
         // execute the operations
         while (!test_cpu.M_operations.empty()) {
             test_cpu.execute_M_operations();
@@ -204,7 +204,7 @@ TEST_P(CBOpcodeTest, opcode_cb) {
         // initialize cpu values
         test_setup(test_cpu, test.initial);
         // fetch the opcode
-        test_cpu.identify_opcode(test_cpu._read_memory(test_cpu.PC));
+        test_cpu.identify_opcode(test_cpu._get(test_cpu.PC));
         // execute the operations
         while (!test_cpu.M_operations.empty()) {
             test_cpu.execute_M_operations();

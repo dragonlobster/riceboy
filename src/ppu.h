@@ -37,7 +37,10 @@ class Fetcher {
     std::array<uint8_t, 8> pixel_buffer{};
 
     // background FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
-    std::vector<uint8_t> fifo{}; // 2 bits
+    std::vector<uint8_t> background_fifo{}; // 2 bits
+
+    // sprite FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
+    std::vector<uint8_t> sprite_fifo{}; // 2 bits
 
   private:
     // functions

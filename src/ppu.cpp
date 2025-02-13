@@ -36,7 +36,7 @@ void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     const bool x_pos_gt_0 = oam_entry[1] > 0;
     const bool LY_plus_16_gt_y_pos = _get(LY) + 16 >= oam_entry[0];
     // get the tall mode LCDC bit 2
-    const uint8_t sprite_height = _get(LCDC) >> 2 == 1 ? 16 : 8;
+    const uint8_t sprite_height = (_get(LCDC) >> 2) == 1 ? 16 : 8;
     // LY + 16 < y pos + sprite_height
     const bool sprite_height_condition =
         _get(LCDC) + 16 < oam_entry[0] + sprite_height;
@@ -181,10 +181,10 @@ void Fetcher::tick() {
         break;
     }
     case Fetcher::mode::PushToFIFO: {
-        if (fifo.size() <= 8) {
+        if (background_fifo.size() <= 8) {
             // for (int i = 7; i >= 0; --i) {
             for (int i = 0; i < 8; ++i) {
-                this->fifo.push_back(this->pixel_buffer[i]);
+                this->background_fifo.push_back(this->pixel_buffer[i]);
             }
         }
         this->tile_index++;
@@ -220,14 +220,18 @@ void PPU::tick() {
                 oam_entry[i] = this->gb_mmu.read_memory(
                     OAM_START_ADDRESS + 4 * oam_buffer_counter + i);
             }
+            add_to_sprite_buffer(
+                oam_entry); // attempt to add it to the oam_buffer
+
             oam_buffer_counter++; // each oam entry is 4 bytes
+
         } else if (this->ppu_ticks == 80) {
             // TODO: start the fetcher based on LY
             assert(oam_buffer_counter == 40 && "OAM counter is not 40!");
 
             // prepare for drawing
             // clear fifo
-            this->ppu_fetcher.fifo.clear();
+            this->ppu_fetcher.background_fifo.clear();
 
             // reset tile index
             // this->ppu_fetcher.tile_index = 0;
@@ -245,7 +249,7 @@ void PPU::tick() {
         // fetcher tick
         this->ppu_fetcher.tick();
 
-        if (!this->ppu_fetcher.fifo.empty()) {
+        if (!this->ppu_fetcher.background_fifo.empty()) {
             // draw
             /*
             float f_dot_count = dot_count;
@@ -255,8 +259,8 @@ void PPU::tick() {
 
             sf::Vector2u position = {dot_count, _get(LY)};
 
-            uint8_t dot = this->ppu_fetcher.fifo.back();
-            this->ppu_fetcher.fifo.pop_back();
+            uint8_t dot = this->ppu_fetcher.background_fifo.back();
+            this->ppu_fetcher.background_fifo.pop_back();
 
             sf::Color rgb = get_dot_color(dot);
 
@@ -313,7 +317,7 @@ void PPU::tick() {
         // wait 456 t-cycles
         if (this->ppu_ticks == 456) {
             this->ppu_ticks = 0;
-            _set(LY, _get(LY)+1); // new scanline reached
+            _set(LY, _get(LY) + 1); // new scanline reached
 
             // reset dot
             this->dot_count = 0;
@@ -353,7 +357,7 @@ void PPU::tick() {
         if (this->ppu_ticks == 456) {
 
             this->ppu_ticks = 0;
-            _set(LY, _get(LY)+1); // new scanline reached
+            _set(LY, _get(LY) + 1); // new scanline reached
 
             // stat interrupt check
             // TODO: check stat interrupt
@@ -368,8 +372,8 @@ void PPU::tick() {
                 _set(STAT, _get(STAT) & ~4);
             }
 
-            if (_get(LY) == 153) {   // wait 10 more scanlines
-                _set(LY, 0);      // reset LY
+            if (_get(LY) == 153) {      // wait 10 more scanlines
+                _set(LY, 0);            // reset LY
                 this->lcd_dots.clear(); // reset LCD
                 this->current_mode = PPU::mode::OAM_Scan;
             }
