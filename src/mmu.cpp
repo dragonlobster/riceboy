@@ -1,5 +1,4 @@
 #include "MMU.h"
-#include "MMU.h"
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -11,6 +10,33 @@
      _cartridge_type == MMU::cartridge_type::mbc1_ram_battery)
 
 // TODO: simplify entire MMU by using a single array as the main memory
+
+void MMU::falling_edge() {
+
+    uint8_t div_bit = 9;
+    uint8_t tac_freq_bit = this->tac_ff07 & 3;
+
+    switch (tac_freq_bit) {
+    case 1: div_bit = 3; break;
+    case 2: div_bit = 5; break;
+    case 3: div_bit = 7; break;
+    }
+
+    uint8_t current_div_state =
+        (this->div_ff04 >> div_bit) & ((this->tac_ff07 >> 2) & 1);
+
+    if (current_div_state == 0 && this->last_div_state == 1) {
+        // falling edge
+        // uint8_t tima = this->read_memory(0xff05);
+        if (this->tima_ff05 == 0xff) {
+            this->tima_ff05 = 0;
+            this->tima_oveflow = true;
+        } else {
+            this->tima_ff05++;
+        }
+    }
+    this->last_div_state = current_div_state;
+}
 
 void MMU::set_load_rom_complete() {
 
@@ -83,7 +109,15 @@ uint8_t MMU::read_memory(uint16_t address) const {
                "Cartridge is NULL! Can't read!");
 
         if (address == 0xff04) {
-            return this->div_ff04;
+            return (this->div_ff04 & 0x00ff) >> 8;
+        }
+
+        if (address == 0xff05) {
+            return this->tima_ff05;
+        }
+
+        if (address == 0xff07) {
+            return this->tac_ff07;
         }
 
         uint16_t result = this->cartridge->read_memory(address);
@@ -132,7 +166,11 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
-            return div_ff04;
+            return (this->div_ff04 & 0x00ff) >> 8;
+        } else if (address == 0xff05) {
+            return this->tima_ff05;
+        } else if (address == 0xff07) {
+            return this->tac_ff07;
         } else {
             return this->hardware_registers[address - base_address];
         }
@@ -168,6 +206,19 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
         if (address == 0xff04) {
             this->div_ff04 = 0;
+            this->falling_edge();
+            return;
+        }
+
+        if (address == 0xff05) {
+            this->tima_ff05 = value;
+            this->tima_oveflow = false;
+            return;
+        }
+
+        if (address == 0xff07) {
+            this->tac_ff07 = value;
+            this->falling_edge();
             return;
         }
 
@@ -238,7 +289,18 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
             this->div_ff04 = 0; // trap div
-        } else {
+            this->falling_edge();
+        } else if (address == 0xff05) { // tima_ff05
+            this->tima_ff05 = value;
+            this->tima_oveflow = false;
+        }
+
+        else if (address == 0xff07) {
+            this->tac_ff07 = value;
+            this->falling_edge();
+        }
+
+        else {
             this->hardware_registers[address - base_address] = value;
         }
         break;
