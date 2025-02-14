@@ -12,7 +12,6 @@
 // TODO: simplify entire MMU by using a single array as the main memory
 
 void MMU::falling_edge() {
-
     uint8_t div_bit = 9;
     uint8_t tac_freq_bit = this->tac_ff07 & 3;
 
@@ -23,19 +22,17 @@ void MMU::falling_edge() {
     }
 
     uint8_t current_div_state =
-        (this->div_ff04 >> div_bit) & ((this->tac_ff07 >> 2) & 1);
+        ((this->div_ff04 >> div_bit) & 1) & ((this->tac_ff07 >> 2) & 1);
 
-    if (current_div_state == 0 && this->last_div_state == 1) {
-        // falling edge
-        // uint8_t tima = this->read_memory(0xff05);
-        if (this->tima_ff05 == 0xff) {
-            this->tima_ff05 = 0;
-            this->tima_oveflow = true;
-        } else {
-            this->tima_ff05++;
-        }
+    if (current_div_state == 0 && this->last_div_state_t == 1) {
+        this->tima_ff05++;
+        if (this->tima_ff05 == 0) {
+            this->tima_overflow = true;
+        }     
     }
-    this->last_div_state = current_div_state;
+    this->last_div_state_t = current_div_state;
+    this->falling_edge_ran = true;
+
 }
 
 void MMU::set_load_rom_complete() {
@@ -212,7 +209,7 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
         if (address == 0xff05) {
             this->tima_ff05 = value;
-            this->tima_oveflow = false;
+            this->tima_overflow = false;
             return;
         }
 
@@ -290,9 +287,11 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         if (address == 0xff04) {
             this->div_ff04 = 0; // trap div
             this->falling_edge();
-        } else if (address == 0xff05) { // tima_ff05
+        } 
+        
+        else if (address == 0xff05) { // tima_ff05
             this->tima_ff05 = value;
-            this->tima_oveflow = false;
+            this->tima_overflow = false;
         }
 
         else if (address == 0xff07) {

@@ -77,11 +77,12 @@ class MMU {
     uint16_t div_ff04{0};
     uint8_t tima_ff05{0};        // tima_ff05
     uint8_t tac_ff07{0};
-    uint8_t last_div_state{}; // for falling edge detection
-    bool tima_oveflow{false};
+    uint8_t last_div_state_t{0}; // for falling edge detection
+    bool tima_overflow{false};
     void increment_div();
     uint16_t read_div();
     void falling_edge();
+    bool falling_edge_ran{false};
 
   private:
     // Interrupt enable flag - 0xFFFF
