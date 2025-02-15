@@ -72,9 +72,20 @@ class MMU {
     void set_load_rom_complete();
     void set_cartridge_type(uint8_t type);
 
-    // div
+    // div, timer related
+    // div counter stored in MMU
+    uint16_t div_ff04{0};
+    uint8_t tima_ff05{0};        // tima_ff05
+    uint8_t tac_ff07{0};
+    uint8_t last_div_state{0}; // for falling edge detection
+    bool tima_overflow{false};
     void increment_div();
     uint16_t read_div();
+    void handle_div_write();
+    void handle_tac_write(uint8_t value);
+    bool falling_edge_ran{false};
+    uint8_t tima_ticks{0};
+    uint8_t timer_ticks{0};
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -127,8 +138,6 @@ class MMU {
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
 
-    // div counter stored in MMU
-    uint16_t div_ff04{0};
 
     std::unique_ptr<Cartridge> cartridge{};
 
