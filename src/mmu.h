@@ -76,12 +76,14 @@ class MMU {
     // div counter stored in MMU
     uint16_t div_ff04{0};
     uint8_t tima_ff05{0};        // tima_ff05
-    uint8_t tac_ff07{0};
-    uint8_t last_div_state_t{0}; // for falling edge detection
+    uint8_t tac_ff07{0xf8};
+    uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
-    void increment_div();
+    void increment_div(uint16_t value = 1);
     uint16_t read_div();
-    void falling_edge(bool increment = true);
+    void falling_edge();
+    void handle_div_write();
+    void handle_tac_write(uint8_t value);
     bool falling_edge_ran{false};
 
   private:

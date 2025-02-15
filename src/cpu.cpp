@@ -1868,7 +1868,6 @@ CPU::CPU(MMU &mmu) {
 void CPU::tick() {
     this->ticks++;
 
-
     if (ticks < 4) {
         return;
     }
@@ -1915,197 +1914,46 @@ void CPU::interrupt_tick() {
     }
 }
 
-/*
+// please help
 void CPU::timer_tick() {
-    this->gb_mmu->increment_div();
-
     timer_ticks++;
+    if (this->gb_mmu->falling_edge_ran) {
+        this->gb_mmu->falling_edge_ran = false;
+        if (timer_ticks == 4) {
+            if (this->gb_mmu->tima_overflow) {
+                // request interrupts
+                uint8_t _if = _get(0xff0f);
+                _set(0xff0f, _if | 4);
 
+                // set tima to tma
+                uint8_t tma = _get(0xff06);
+                _set(0xff05, tma);
+                this->gb_mmu->tima_overflow = false;
+            }
+            timer_ticks = 0;
+        }
+        return;
+    }
+    this->gb_mmu->increment_div();
     if (timer_ticks < 4) {
         return;
     }
-
     timer_ticks = 0;
-    // operates in M cycles
 
-    // handle overflow here?
-    // check for TIMA overflow after 1 M-cycle
     if (this->gb_mmu->tima_overflow) {
-        // set timer interrupt
+        // request interrupts
         uint8_t _if = _get(0xff0f);
         _set(0xff0f, _if | 4);
 
-        // reset timer modulo
+        // set tima to tma
         uint8_t tma = _get(0xff06);
         _set(0xff05, tma);
-        //this->gb_mmu->tima_overflow = false; // overflow implictly set to
-false
+        this->gb_mmu->tima_overflow = false;
+        return; // during tima overflow, do you still do falling edge on the same cycle
     }
 
-    uint32_t tima_m_cycle = 256;
-    uint8_t div_bit = 9;
-    uint8_t tac_freq_bit = _get(0xff07) & 3;
-
-    switch (tac_freq_bit) {
-    case 1:
-        tima_m_cycle = 4;
-        div_bit = 3;
-        break;
-    case 2:
-        tima_m_cycle = 16;
-        div_bit = 5;
-        break;
-    case 3:
-        tima_m_cycle = 64;
-        div_bit = 7;
-        break;
-    }
-
-    this->gb_mmu->last_div_state_m =
-        (this->gb_mmu->read_div() >> div_bit) & ((_get(0xff07) >> 2) & 1);
-
-    // TAC
-    // if timer is off return
-    if (!((_get(0xff07) >> 2) & 1)) {
-        return;
-    }
-
-    tima_ticks++; // increment every M-cycle
-    // while (tima_ticks >= (4194304 / frequency)) {
-
-    while (tima_ticks >= tima_m_cycle) {
-
-        // increment TIMA
-        uint8_t tima = _get(0xff05);
-
-        if (tima == 0xff) {
-            _set(0xff05, 0);
-            this->gb_mmu->tima_overflow = true;
-        }
-
-        else {
-            _set(0xff05, tima + 1);
-        }
-
-        // tima_ticks -= (4194304 / frequency);
-        tima_ticks -= tima_m_cycle;
-    }
+    this->gb_mmu->falling_edge();
 }
-*/
-
-// falling edge version
-void CPU::timer_tick() {
-
-    timer_ticks++;
-
-    if (this->gb_mmu->falling_edge_ran) {
-        if (timer_ticks == 4) {
-            timer_ticks = 0;
-        }
-        this->gb_mmu->falling_edge_ran = false;
-        return;
-    }
-
-    this->gb_mmu->increment_div(); // the DIV is incremented every T-cycle
-                                   // regardless of anything
-
-
-    if (timer_ticks == 4) {
-        // return;
-        // check for TIMA overflow after 1 M-cycle
-        if (this->gb_mmu->tima_overflow) {
-            // set timer interrupt
-            uint8_t _if = _get(0xff0f);
-            _set(0xff0f, _if | 4);
-
-            // reset timer modulo
-            uint8_t tma = _get(0xff06);
-            _set(0xff05, tma);
-            // this->gb_mmu->tima_overflow = false; // overflow implictly set to
-            // false
-        }
-        timer_ticks = 0;
-    }
-
-    uint8_t div_bit = 9;
-    uint8_t tac_freq_bit = _get(0xff07) & 3;
-
-    switch (tac_freq_bit) {
-    case 1: div_bit = 3; break;
-    case 2: div_bit = 5; break;
-    case 3: div_bit = 7; break;
-    }
-
-    uint8_t current_div_state =
-        ((this->gb_mmu->read_div() >> div_bit) & 1) & ((_get(0xff07) >> 2) & 1);
-
-    assert(current_div_state <= 1 && "div state must be 1 or 0 only!");
-
-    // while (tima_ticks >= (4194304 / frequency)) {
-    if (current_div_state == 0 && this->gb_mmu->last_div_state_t == 1) {
-
-        // increment TIMA
-        uint8_t tima = _get(0xff05);
-        tima++;
-        _set(0xff05, tima);
-
-        if (tima == 0) {
-            this->gb_mmu->tima_overflow = true;
-        }
-        // tima_ticks -= (4194304 / frequency);
-    }
-    this->gb_mmu->last_div_state_t = current_div_state;
-}
-
-// falling edge v2
-/*
-void CPU::timer_tick() {
-    this->gb_mmu->increment_div();
-
-    timer_ticks++;
-    if (timer_ticks == 4) {
-        if (this->gb_mmu->tima_overflow) {
-            // set timer interrupt
-            uint8_t _if = _get(0xff0f);
-            _set(0xff0f, _if | 4);
-
-            // reset timer modulo
-            uint8_t tma = _get(0xff06);
-            _set(0xff05, tma);
-            // this->gb_mmu->tima_overflow = false; // overflow implictly set to
-            // false
-        }
-        timer_ticks = 0;
-    } else if (tima_ticks < 4 && this->gb_mmu->tima_overflow) {
-        return;
-    }
-
-    uint8_t div_bit = 9;
-    uint8_t tac_freq_bit = _get(0xff07) & 3;        // first 2 bits
-    uint8_t timer_enable = (_get(0xff07) & 4) >> 2; // second bit
-
-    switch (tac_freq_bit) {
-    case 1: div_bit = 3; break;
-    case 2: div_bit = 5; break;
-    case 3: div_bit = 7; break;
-    }
-
-    uint8_t div = this->gb_mmu->read_div();
-
-    uint8_t current_div_state_t = ((div >> div_bit) & 1) & (timer_enable);
-    if (current_div_state_t == 0 && this->gb_mmu->last_div_state_t == 1) {
-        // increment TIMA
-        uint8_t tima = _get(0xff05);
-        _set(0xff05, tima + 1);
-        if ((tima + 1) == 0) {
-            this->gb_mmu->tima_overflow = true;
-        }
-    }
-
-    this->gb_mmu->last_div_state_t = current_div_state_t;
-
-}
-*/
 
 void CPU::handle_interrupts() {
 
