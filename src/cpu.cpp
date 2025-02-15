@@ -1915,22 +1915,21 @@ void CPU::interrupt_tick() {
 }
 
 void CPU::timer_tick() {
-
     this->gb_mmu->timer_ticks++;
-
-    if (this->gb_mmu->falling_edge_ran) {
-        this->gb_mmu->falling_edge_ran = false;
-        return;
-    }
-
-    this->gb_mmu->increment_div();
 
     if (this->gb_mmu->timer_ticks < 4) {
         return;
     }
 
     this->gb_mmu->timer_ticks = 0;
+
     // operates in M cycles
+    if (this->gb_mmu->falling_edge_ran) {
+        this->gb_mmu->falling_edge_ran = false;
+        return;
+    }
+
+    this->gb_mmu->increment_div(4);
 
     if (this->gb_mmu->tima_overflow) {
         // set timer interrupt
@@ -1942,11 +1941,16 @@ void CPU::timer_tick() {
         _set(0xff05, tma);
     }
 
-    this->gb_mmu->tima_ticks++; // need to tick tima every M-Cycle unless div was set to 0
+    this->gb_mmu->tima_ticks++; // need to tick tima every M-Cycle unless div
+                                // was set to 0
 
     // if timer is off return
     // TAC
     uint8_t timer_enable = ((_get(0xff07) >> 2) & 1);
+
+    if (!timer_enable) {
+        return;
+    }
 
     uint32_t tima_m_cycle{256};
     uint8_t tac_freq_bit = _get(0xff07) & 3;
@@ -1958,7 +1962,7 @@ void CPU::timer_tick() {
     }
 
     // while (tima_ticks >= (4194304 / frequency)) {
-    while ((this->gb_mmu->tima_ticks >= tima_m_cycle) && timer_enable) {
+    while ((this->gb_mmu->tima_ticks >= tima_m_cycle)) {
         // increment TIMA
         uint8_t tima = _get(0xff05);
         _set(0xff05, tima + 1);
@@ -1970,6 +1974,11 @@ void CPU::timer_tick() {
         // tima_ticks -= (4194304 / frequency);
         this->gb_mmu->tima_ticks -= tima_m_cycle;
     }
+
+    if (true) {} // 0x165
+
+
+    if (true) {} // first time div_timer hits 0x0100 (div = 1) should be 0x165 (but right now at 0x167
 }
 
 void CPU::handle_interrupts() {

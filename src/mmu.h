@@ -79,13 +79,14 @@ class MMU {
     uint8_t tac_ff07{0};
     uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
-    void increment_div();
+    void increment_div(uint16_t value = 1);
     uint16_t read_div();
     void handle_div_write();
     void handle_tac_write(uint8_t value);
     bool falling_edge_ran{false};
     uint8_t tima_ticks{0};
     uint8_t timer_ticks{0};
+    void falling_edge();
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -137,7 +138,6 @@ class MMU {
 
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
-
 
     std::unique_ptr<Cartridge> cartridge{};
 

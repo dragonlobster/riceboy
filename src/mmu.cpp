@@ -11,42 +11,46 @@
 
 // TODO: simplify entire MMU by using a single array as the main memory
 
-void MMU::handle_div_write() {
-    this->div_ff04 = 0;
-    this->tima_ticks = 0;
-    this->falling_edge_ran = true;
-}
+void MMU::falling_edge() {
+    uint8_t div_bit{9};
+    uint8_t tac_freq_bit = this->tac_ff07 & 3;
 
-void MMU::handle_tac_write(uint8_t value) {
-    uint8_t new_tac = value;
-    uint8_t new_div = this->div_ff04 + 1;
-    uint8_t new_div_bit = 9;
-    uint8_t new_tac_freq = new_tac & 3;
-    switch (new_tac_freq) {
-    case 1: new_div_bit = 3; break;
-    case 2: new_div_bit = 5; break;
-    case 3: new_div_bit = 7; break;
+    switch (tac_freq_bit) {
+    case 1: div_bit = 3; break;
+    case 2: div_bit = 5; break;
+    case 3: div_bit = 7; break;
     }
-    uint8_t new_div_state =
-        ((new_div >> new_div_bit) & 1) & ((new_tac >> 2) & 1);
 
-    if (new_div_state == 0 && last_div_state == 1) {
+    uint8_t current_div_state =
+        ((this->div_ff04 >> div_bit) & 1) & ((this->tac_ff07 & 4) >> 2);
+
+    if (this->last_div_state == 1 && current_div_state == 0) {
         this->tima_ff05++;
+
         if (this->tima_ff05 == 0) {
             this->tima_overflow = true;
         }
     }
-
-    // update at the end
-    this->last_div_state = new_div_state;
-
-    this->div_ff04 = new_div;
-    this->tac_ff07 = new_tac;
+    this->last_div_state = current_div_state;
     this->falling_edge_ran = true;
-    //this->tac_ff07 = value;
 }
 
+void MMU::handle_div_write() {
+    this->div_ff04 = 0;
+    //this->tima_ticks = 0;
 
+    this->falling_edge();
+    //this->increment_div();
+}
+
+void MMU::handle_tac_write(uint8_t value) {
+    // might need to increment div here?
+    this->increment_div();
+    //this->tima_ticks++;
+
+    this->tac_ff07 = (value & 4) | 0xf8;
+    this->falling_edge();
+}
 
 void MMU::set_load_rom_complete() {
 
@@ -69,7 +73,9 @@ void MMU::set_cartridge_type(uint8_t type) {
 }
 
 // direct increment div ff04 to here, read ff04 also to read div
-void MMU::increment_div() { ++this->div_ff04; }
+void MMU::increment_div(uint16_t value) { this->div_ff04 += value; }
+
+uint16_t MMU::read_div() { return this->div_ff04; }
 
 MMU::section MMU::locate_section(const uint16_t address) {
     if (address <= 0x00ff) {
@@ -108,8 +114,6 @@ MMU::section MMU::locate_section(const uint16_t address) {
     return MMU::section::unknown;
 }
 
-uint16_t MMU::read_div() { return this->div_ff04; }
-
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
@@ -127,7 +131,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
         }
 
         if (address == 0xff07) {
-            return this->tac_ff07;
+            return this->tac_ff07 | 0xf8; // 1111 1000
         }
 
         uint16_t result = this->cartridge->read_memory(address);
@@ -180,7 +184,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
         } else if (address == 0xff05) {
             return this->tima_ff05;
         } else if (address == 0xff07) {
-            return this->tac_ff07;
+            return this->tac_ff07 | 0xf8; // 1111 1000
         } else {
             return this->hardware_registers[address - base_address];
         }
