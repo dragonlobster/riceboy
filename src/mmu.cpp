@@ -12,6 +12,9 @@
 // TODO: simplify entire MMU by using a single array as the main memory
 
 void MMU::falling_edge() {
+
+    this->increment_div();
+
     uint8_t div_bit = 9;
     uint8_t tac_freq_bit = this->tac_ff07 & 3;
 
@@ -32,7 +35,6 @@ void MMU::falling_edge() {
     }
     this->last_div_state_t = current_div_state;
     this->falling_edge_ran = true;
-
 }
 
 void MMU::set_load_rom_complete() {

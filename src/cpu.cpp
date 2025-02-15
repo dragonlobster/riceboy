@@ -1868,8 +1868,6 @@ CPU::CPU(MMU &mmu) {
 void CPU::tick() {
     this->ticks++;
 
-    this->gb_mmu->increment_div(); // the DIV is incremented every T-cycle
-                                   // regardless of anything
 
     if (ticks < 4) {
         return;
@@ -2000,29 +1998,33 @@ void CPU::timer_tick() {
 
     timer_ticks++;
 
-    if (timer_ticks < 4) {
-        return;
-    }
-
-    timer_ticks = 0;
-    // operates in M cycles
-
     if (this->gb_mmu->falling_edge_ran) {
+        if (timer_ticks == 4) {
+            timer_ticks = 0;
+        }
         this->gb_mmu->falling_edge_ran = false;
         return;
     }
 
-    // check for TIMA overflow after 1 M-cycle
-    if (this->gb_mmu->tima_overflow) {
-        // set timer interrupt
-        uint8_t _if = _get(0xff0f);
-        _set(0xff0f, _if | 4);
+    this->gb_mmu->increment_div(); // the DIV is incremented every T-cycle
+                                   // regardless of anything
 
-        // reset timer modulo
-        uint8_t tma = _get(0xff06);
-        _set(0xff05, tma);
-        // this->gb_mmu->tima_overflow = false; // overflow implictly set to
-        // false
+
+    if (timer_ticks == 4) {
+        // return;
+        // check for TIMA overflow after 1 M-cycle
+        if (this->gb_mmu->tima_overflow) {
+            // set timer interrupt
+            uint8_t _if = _get(0xff0f);
+            _set(0xff0f, _if | 4);
+
+            // reset timer modulo
+            uint8_t tma = _get(0xff06);
+            _set(0xff05, tma);
+            // this->gb_mmu->tima_overflow = false; // overflow implictly set to
+            // false
+        }
+        timer_ticks = 0;
     }
 
     uint8_t div_bit = 9;
@@ -2049,7 +2051,7 @@ void CPU::timer_tick() {
 
         if (tima == 0) {
             this->gb_mmu->tima_overflow = true;
-        } 
+        }
         // tima_ticks -= (4194304 / frequency);
     }
     this->gb_mmu->last_div_state_t = current_div_state;
