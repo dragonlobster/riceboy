@@ -11,9 +11,11 @@
 
 // TODO: simplify entire MMU by using a single array as the main memory
 
-void MMU::falling_edge() {
+void MMU::falling_edge(bool increment) {
 
-    this->increment_div();
+    if (increment) {
+        this->increment_div();
+    }
 
     uint8_t div_bit = 9;
     uint8_t tac_freq_bit = this->tac_ff07 & 3;
@@ -205,7 +207,7 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
         if (address == 0xff04) {
             this->div_ff04 = 0;
-            this->falling_edge();
+            this->falling_edge(false);
             return;
         }
 
@@ -288,7 +290,7 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
             this->div_ff04 = 0; // trap div
-            this->falling_edge();
+            this->falling_edge(false);
         } 
         
         else if (address == 0xff05) { // tima_ff05

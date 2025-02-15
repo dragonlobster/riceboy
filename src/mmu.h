@@ -81,7 +81,7 @@ class MMU {
     bool tima_overflow{false};
     void increment_div();
     uint16_t read_div();
-    void falling_edge();
+    void falling_edge(bool increment = true);
     bool falling_edge_ran{false};
 
   private:
