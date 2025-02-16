@@ -1612,6 +1612,7 @@ void CPU::ld_imm8_a(const bool to_a) {
             std::cout << "";
         } else {
             this->_set(address, this->A);
+            std::cout << "";
         }
     };
 
@@ -1917,42 +1918,30 @@ void CPU::interrupt_tick() {
 // please help
 void CPU::timer_tick() {
     timer_ticks++;
-    if (this->gb_mmu->falling_edge_ran) {
-        this->gb_mmu->falling_edge_ran = false;
-        if (timer_ticks == 4) {
-            if (this->gb_mmu->tima_overflow) {
-                // request interrupts
-                uint8_t _if = _get(0xff0f);
-                _set(0xff0f, _if | 4);
 
-                // set tima to tma
-                uint8_t tma = _get(0xff06);
-                _set(0xff05, tma);
-                this->gb_mmu->tima_overflow = false;
-            }
-            timer_ticks = 0;
-        }
-        return;
+    if (boot_rom_complete) {
+        tima_ticks++;
     }
-    this->gb_mmu->increment_div();
+
+    // this->gb_mmu->increment_div();
+
     if (timer_ticks < 4) {
         return;
     }
     timer_ticks = 0;
 
     if (this->gb_mmu->tima_overflow) {
-        // request interrupts
-        uint8_t _if = _get(0xff0f);
-        _set(0xff0f, _if | 4);
-
-        // set tima to tma
-        uint8_t tma = _get(0xff06);
-        _set(0xff05, tma);
-        this->gb_mmu->tima_overflow = false;
-        return; // during tima overflow, do you still do falling edge on the same cycle
+        this->gb_mmu->handle_tima_overflow();
+        return; // don't do falling edge this cycle
     }
 
-    this->gb_mmu->falling_edge();
+    if (this->gb_mmu->tac_write_ran || this->gb_mmu->div_write_ran) {
+        this->gb_mmu->tac_write_ran = false;
+        this->gb_mmu->div_write_ran = false;
+        return;
+    }
+
+    this->gb_mmu->increment_div(4, true);
 }
 
 void CPU::handle_interrupts() {

@@ -79,12 +79,15 @@ class MMU {
     uint8_t tac_ff07{0xf8};
     uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
-    void increment_div(uint16_t value = 1);
+    void increment_div(uint16_t value = 1, bool check_falling_edge = false);
     uint16_t read_div();
     void falling_edge();
+    void handle_tima_overflow();
     void handle_div_write();
     void handle_tac_write(uint8_t value);
     bool falling_edge_ran{false};
+    bool div_write_ran{false};
+    bool tac_write_ran{false};
 
   private:
     // Interrupt enable flag - 0xFFFF

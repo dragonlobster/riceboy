@@ -11,7 +11,27 @@
 
 // TODO: simplify entire MMU by using a single array as the main memory
 
+void MMU::handle_tima_overflow() {
+    if (this->tima_overflow) {
+        increment_div(4); // we must increment the timer by 4 cycles
+
+        assert(this->tima_ff05 == 0 && "tima must be 0 for overflow!");
+        // request interrupts
+        uint8_t _if = read_memory(0xff0f);
+        write_memory(0xff0f, _if | 4);
+
+        // set tima to tma
+        uint8_t tma = read_memory(0xff06);
+        write_memory(0xff05, tma);
+        this->tima_overflow = false;
+    }
+}
+
 void MMU::falling_edge() {
+    if (tima_overflow) {
+        return;
+    }
+
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
     uint8_t tac_freq_bit = tac_ff07 & 3;
 
@@ -36,24 +56,52 @@ void MMU::falling_edge() {
             this->tima_overflow = true;
         }
     }
-
     this->last_div_state = div_state;
 }
 
 void MMU::handle_div_write() {
     this->div_ff04 = 0;
-
-    this->falling_edge();
-    this->falling_edge_ran = true;
+    falling_edge();
+    this->div_write_ran = true;
 }
 
 void MMU::handle_tac_write(uint8_t value) {
-    this->increment_div(4);
-    this->tac_ff07 = value & 0xf7;
-
-    this->falling_edge();
-    this->falling_edge_ran = true;
+    this->tac_ff07 = value | 0xf8;
+    this->increment_div(4, true);
+    this->tac_write_ran = true;
 }
+
+/*
+void MMU::handle_tac_write(uint8_t value) {
+    this->increment_div(4);
+    // this->tac_write_ran = true;
+
+    uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
+    uint8_t tac_freq_bit = value & 3;
+
+    assert(tac_freq_bit <= 3 && "tac freq bit abnormal!");
+    assert(timer_enable_bit <= 1 && "tac timer bit abnormal!");
+
+    uint8_t div_bit{9};
+    switch (tac_freq_bit) {
+    case 1: div_bit = 3; break;
+    case 2: div_bit = 5; break;
+    case 3: div_bit = 7; break;
+    }
+
+    if ((this->tac_ff07 & 4) && !(value & 4)) {
+        if ((this->div_ff04 >> div_bit) & 1) {
+            this->tima_ff05++;
+
+            if (tima_ff05 == 0) {
+                this->tima_overflow = true;
+            }
+        }
+    }
+
+    this->tac_ff07 = value | 0xf8;
+}
+*/
 
 void MMU::set_load_rom_complete() {
 
@@ -76,7 +124,14 @@ void MMU::set_cartridge_type(uint8_t type) {
 }
 
 // direct increment div ff04 to here, read ff04 also to read div
-void MMU::increment_div(uint16_t value) { this->div_ff04 += value; }
+void MMU::increment_div(uint16_t value, bool check_falling_edge) {
+    // if (!this->div_write_ran && !this->tac_write_ran) {
+    this->div_ff04 += value;
+    //}
+    if (check_falling_edge) {
+        falling_edge();
+    }
+}
 
 MMU::section MMU::locate_section(const uint16_t address) {
     if (address <= 0x00ff) {
@@ -126,7 +181,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
                "Cartridge is NULL! Can't read!");
 
         if (address == 0xff04) {
-            return (this->div_ff04 & 0x00ff) >> 8;
+            return (this->div_ff04 & 0x0ff00) >> 8;
         }
 
         if (address == 0xff05) {
@@ -183,7 +238,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
-            return (this->div_ff04 & 0x00ff) >> 8;
+            return (this->div_ff04 & 0xff00) >> 8;
         } else if (address == 0xff05) {
             return this->tima_ff05;
         } else if (address == 0xff07) {
