@@ -71,38 +71,6 @@ void MMU::handle_tac_write(uint8_t value) {
     this->tac_write_ran = true;
 }
 
-/*
-void MMU::handle_tac_write(uint8_t value) {
-    this->increment_div(4);
-    // this->tac_write_ran = true;
-
-    uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
-    uint8_t tac_freq_bit = value & 3;
-
-    assert(tac_freq_bit <= 3 && "tac freq bit abnormal!");
-    assert(timer_enable_bit <= 1 && "tac timer bit abnormal!");
-
-    uint8_t div_bit{9};
-    switch (tac_freq_bit) {
-    case 1: div_bit = 3; break;
-    case 2: div_bit = 5; break;
-    case 3: div_bit = 7; break;
-    }
-
-    if ((this->tac_ff07 & 4) && !(value & 4)) {
-        if ((this->div_ff04 >> div_bit) & 1) {
-            this->tima_ff05++;
-
-            if (tima_ff05 == 0) {
-                this->tima_overflow = true;
-            }
-        }
-    }
-
-    this->tac_ff07 = value | 0xf8;
-}
-*/
-
 void MMU::set_load_rom_complete() {
 
     if (IS_MBC1) {
@@ -126,10 +94,14 @@ void MMU::set_cartridge_type(uint8_t type) {
 // direct increment div ff04 to here, read ff04 also to read div
 void MMU::increment_div(uint16_t value, bool check_falling_edge) {
     // if (!this->div_write_ran && !this->tac_write_ran) {
-    this->div_ff04 += value;
     //}
     if (check_falling_edge) {
-        falling_edge();
+        for (uint8_t i = 0; i < value; i++) {
+            this->div_ff04++;
+            falling_edge();
+        }
+    } else {
+        this->div_ff04 += value;
     }
 }
 

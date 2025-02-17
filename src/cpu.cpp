@@ -564,6 +564,7 @@ void CPU::inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
             auto [r1, r2] = _split_16bit(current_value);
             *r1_pointer = r1;
             *r2_pointer = r2;
+            std::cout << "";
         }
     };
 
@@ -1757,12 +1758,8 @@ void CPU::ei_or_di(const bool ei) {
 }
 
 uint8_t CPU::identify_opcode(const uint8_t opcode) {
-    this->PC++;                       // increment program counter
-    handle_opcode(opcode);            // handle the opcode
-    if (ei_delay && opcode != 0xfb) { // don't do it during ei (0xfb
-        this->ime = true;
-        this->ei_delay = false;
-    }
+    this->PC++;            // increment program counter
+    handle_opcode(opcode); // handle the opcode
     if (!this->M_operations.empty()) {
         this->fetch_opcode = false; // going past fetch opcode,
     }
@@ -1889,14 +1886,20 @@ void CPU::tick() {
 
     if (!this->halt) {
 
+        // fetch opcode, then execute what you can this M-cycle
+        const uint8_t opcode = this->_get(this->PC); // get current opcode
+
         if (this->fetch_opcode) {
-            // fetch opcode, then execute what you can this M-cycle
-            const uint8_t opcode = this->_get(this->PC); // get current opcode
             identify_opcode(opcode);
 
         } else {
             // execute any further instructions
             this->execute_M_operations();
+        }
+
+        if (this->M_operations.empty() && ei_delay && opcode != 0xfb) { // don't do it during ei (0xfb
+            this->ime = true;
+            this->ei_delay = false;
         }
     }
 }
@@ -1923,8 +1926,6 @@ void CPU::timer_tick() {
         tima_ticks++;
     }
 
-    // this->gb_mmu->increment_div();
-
     if (timer_ticks < 4) {
         return;
     }
@@ -1942,6 +1943,8 @@ void CPU::timer_tick() {
     }
 
     this->gb_mmu->increment_div(4, true);
+
+    assert(1 == 1);
 }
 
 void CPU::handle_interrupts() {
