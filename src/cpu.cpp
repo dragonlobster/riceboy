@@ -1774,7 +1774,8 @@ void CPU::execute_M_operations() {
         this->M_operations.pop_back();
         // TODO: check if this reference is valid
         operation();
-    } else if (this->M_operations.empty()) {
+    } 
+    if (this->M_operations.empty()) {
         this->fetch_opcode = true;
     }
 }
@@ -1897,7 +1898,8 @@ void CPU::tick() {
             this->execute_M_operations();
         }
 
-        if (this->M_operations.empty() && ei_delay && opcode != 0xfb) { // don't do it during ei (0xfb
+        if (this->M_operations.empty() && ei_delay &&
+            opcode != 0xfb) { // don't do it during ei (0xfb
             this->ime = true;
             this->ei_delay = false;
         }
