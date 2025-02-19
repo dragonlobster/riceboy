@@ -1053,7 +1053,8 @@ void CPU::sla_r(const registers r, const bool hl) {
     }
 }
 
-void CPU::rl_r(const registers r, const bool hl, const bool z_flag) {
+void CPU::rl_r(const registers r, const bool hl, const bool z_flag,
+               const bool one_cycle) {
     auto m1 = [=]() {
         uint8_t *rp = _get_register(r);
         uint8_t msbit = (*rp >> 7) & 1;  // save the "carry" bit
@@ -1071,6 +1072,13 @@ void CPU::rl_r(const registers r, const bool hl, const bool z_flag) {
 
         this->Cf = msbit == 1;
     };
+
+    if (one_cycle) {
+        assert(r == registers::A &&
+               "You are running RLA but the register is not A!");
+        m1();
+        return;
+    }
 
     auto m1_hl = [=]() {
         uint16_t address = _combine_2_8bits(this->H, this->L);
@@ -1104,7 +1112,8 @@ void CPU::rl_r(const registers r, const bool hl, const bool z_flag) {
     }
 }
 
-void CPU::rlc_r(const registers r, const bool hl, const bool z_flag) {
+void CPU::rlc_r(const registers r, const bool hl, const bool z_flag,
+                const bool one_cycle) {
     auto m1 = [=]() {
         uint8_t *rp = _get_register(r);
         uint8_t msbit = (*rp >> 7) & 1; // save the "carry" bit
@@ -1120,6 +1129,13 @@ void CPU::rlc_r(const registers r, const bool hl, const bool z_flag) {
         this->Hf = false;
         this->Cf = msbit == 1;
     };
+
+    if (one_cycle) {
+        assert(r == registers::A &&
+               "You are running RLCA but the register is not A!");
+        m1();
+        return;
+    }
 
     auto m1_hl = [=]() {
         uint16_t address = _combine_2_8bits(this->H, this->L);
@@ -1151,7 +1167,8 @@ void CPU::rlc_r(const registers r, const bool hl, const bool z_flag) {
     }
 }
 
-void CPU::rr_r(const registers r, const bool hl, const bool z_flag) {
+void CPU::rr_r(const registers r, const bool hl, const bool z_flag,
+               const bool one_cycle) {
     auto m1 = [=]() {
         uint8_t *rp = _get_register(r);
         uint8_t lsbit = *rp & 1;                // save the "carry" bit
@@ -1168,6 +1185,13 @@ void CPU::rr_r(const registers r, const bool hl, const bool z_flag) {
         this->Hf = false;
         this->Cf = lsbit == 1;
     };
+
+    if (one_cycle) {
+        assert(r == registers::A &&
+               "You are running RRA but the register is not A!");
+        m1();
+        return;
+    }
 
     auto m1_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
@@ -1200,7 +1224,8 @@ void CPU::rr_r(const registers r, const bool hl, const bool z_flag) {
     }
 }
 
-void CPU::rrc_r(const registers r, const bool hl, const bool z_flag) {
+void CPU::rrc_r(const registers r, const bool hl, const bool z_flag,
+                const bool one_cycle) {
     auto m1 = [=]() {
         uint8_t *rp = _get_register(r);
         uint8_t lsbit = *rp & 1;           // save the "carry" bit
@@ -1216,6 +1241,13 @@ void CPU::rrc_r(const registers r, const bool hl, const bool z_flag) {
         this->Hf = false;
         this->Cf = lsbit == 1;
     };
+
+    if (one_cycle) {
+        assert(r == registers::A &&
+               "You are running RRCA but the register is not A!");
+        m1();
+        return;
+    }
 
     auto m1_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
@@ -1750,7 +1782,7 @@ void CPU::daa() {
 
 void CPU::ei_or_di(const bool ei) {
     if (ei) {
-        //this->ime = true;
+        // this->ime = true;
         this->ei_delay = true;
 
     } else {
@@ -1888,6 +1920,8 @@ void CPU::tick() {
 
     this->ticks = 0; // reset ticks
 
+    this->gb_mmu->increment_div(4); // increment internal div before cpu writes
+
     // check if boot rom is completed
     if (!boot_rom_complete && _get(0xff50)) {
         // boot rom has completed
@@ -1917,12 +1951,11 @@ void CPU::tick() {
             // execute interrupt opertaions
             this->execute_I_operations();
         }
-        
+
         if (ei_delay && opcode != 0xfb && M_operations.empty()) {
             this->ime = true;
             this->ei_delay = false;
         }
-
     }
 }
 
@@ -1948,18 +1981,14 @@ void CPU::timer_tick() {
     }
     timer_ticks = 0;
 
-    if (this->gb_mmu->tima_overflow) {
+    if (this->gb_mmu->tima_overflow_standby) {
         this->gb_mmu->handle_tima_overflow();
-        return; // don't do falling edge this cycle
     }
 
-    if (this->gb_mmu->tac_write_ran || this->gb_mmu->div_write_ran) {
-        this->gb_mmu->tac_write_ran = false;
-        this->gb_mmu->div_write_ran = false;
-        return;
+    // handles the tima overflow case one cycle later
+    if (this->gb_mmu->tima_overflow) {
+        this->gb_mmu->tima_overflow_standby = true;
     }
-
-    this->gb_mmu->increment_div(4, true);
 }
 
 void CPU::handle_interrupts() {

@@ -13,25 +13,21 @@
 
 void MMU::handle_tima_overflow() {
 
-    assert(this->tima_overflow && "tima is not overflown!");
-    increment_div(4); // we must increment the timer by 4 cycles
+    assert(this->tima_overflow_standby && "tima overflown was not requested!");
 
-    assert(this->tima_ff05 == 0 && "tima must be 0 for overflow!");
-    // request interrupts
     uint8_t _if = read_memory(0xff0f);
     write_memory(0xff0f, _if | 4);
 
     // set tima to tma
     uint8_t tma = read_memory(0xff06);
     write_memory(0xff05, tma);
-    this->tima_overflow = false;
+
+    // reset tima overflow and tima overflow standby
+    //this->tima_overflow = false;
+    this->tima_overflow_standby = false;
 }
 
 void MMU::falling_edge() {
-    if (tima_overflow) {
-        return;
-    }
-
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
     uint8_t tac_freq_bit = tac_ff07 & 3;
 
@@ -49,7 +45,7 @@ void MMU::falling_edge() {
 
     assert(div_state <= 1 && "div state abnormal!");
 
-    if (div_state == 0 && last_div_state == 1) {
+    if (div_state == 0 && last_div_state == 1 && !tima_overflow) { // skip incrementing on tima overflow, it's no use
         this->tima_ff05++;
 
         if (tima_ff05 == 0) {
@@ -62,13 +58,11 @@ void MMU::falling_edge() {
 void MMU::handle_div_write() {
     this->div_ff04 = 0;
     falling_edge();
-    this->div_write_ran = true;
 }
 
 void MMU::handle_tac_write(uint8_t value) {
     this->tac_ff07 = value | 0xf8;
-    this->increment_div(4, true);
-    this->tac_write_ran = true;
+    this->falling_edge();
 }
 
 void MMU::set_load_rom_complete() {
@@ -141,8 +135,6 @@ MMU::section MMU::locate_section(const uint16_t address) {
     }
     return MMU::section::unknown;
 }
-
-uint16_t MMU::read_div() { return this->div_ff04; }
 
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {

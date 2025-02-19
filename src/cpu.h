@@ -104,20 +104,10 @@ class CPU {
     enum class bitops { AND, XOR, OR };
 
   private:
-    // debugging only
-    std::vector<uint8_t> opcodes{};
-    std::vector<uint16_t> pcs{};
-
     // tick counter
     uint16_t ticks{0};
     uint16_t interrupt_ticks{0};
     uint16_t timer_ticks{0};
-    uint16_t tima_ticks{0};
-    uint16_t div_ticks{0};
-
-    // timer related (only for falling edge version)
-    uint16_t old_div_edge{0};
-    //bool tima_overflow{false};
 
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};
@@ -162,14 +152,17 @@ class CPU {
     void pop_rr(const registers r1, const registers r2, const bool af = false);
     void push_rr(const registers r1, const registers r2, const bool af = false);
     void ret(conditions condition, bool ime_condition = false); // return
+
     void rl_r(const registers r, const bool hl = false,
-              const bool z_flag = false); // rotate left accumulator
+              const bool z_flag = false, const bool one_cycle = false); // rotate left accumulator
     void rlc_r(const registers r, const bool hl = false,
-               const bool z_flag = false);
+               const bool z_flag = false, const bool one_cycle = false);
     void rr_r(const registers r, const bool hl = false,
-              const bool z_flag = false); // rotate right accumulator
+              const bool z_flag = false, const bool one_cycle = false); // rotate right accumulator
     void rrc_r(const registers r, const bool hl = false,
-               const bool z_flag = false); // rotate right accumulator
+               const bool z_flag = false, const bool one_cycle = false); // rotate right accumulator
+
+
     void sla_r(const registers r,
                const bool hl = false); // rotate left accumulator
     void sra_r(const registers r,

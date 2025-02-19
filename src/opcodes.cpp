@@ -111,10 +111,10 @@ int CPU::handle_opcode(const uint8_t opcode) {
 
         case 7:
             switch (y) {
-            case 0: rlc_r(registers::A); break;
-            case 1: rrc_r(registers::A); break;
-            case 2: rl_r(registers::A); break;
-            case 3: rr_r(registers::A); break;
+            case 0: rlc_r(registers::A,false,false,true); break;
+            case 1: rrc_r(registers::A,false,false,true); break;
+            case 2: rl_r(registers::A,false,false,true); break;
+            case 3: rr_r(registers::A,false,false,true); break;
             case 4: daa(); break;
             case 5: cpl(); break;
             case 6: scf(); break;
