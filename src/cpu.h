@@ -51,6 +51,9 @@ class CPU {
     bool halt{false};
 
     std::vector<std::function<void()>> M_operations{};
+    
+    // for interrupt operations
+    std::vector<std::function<void()>> I_operations{}; // interrupt operations
 
     // execute instructions
     // int is status (0 = success, 1 = error)
@@ -60,6 +63,7 @@ class CPU {
     void execute_M_operations(); // execute M operations and set state of
                                  // fetch_opcode to true or false depending on
                                  // whether all M operations have completed
+    void execute_I_operations();
 
     uint8_t identify_opcode(
         const uint8_t opcode); // get the next opcode and increment the PC

@@ -1750,6 +1750,7 @@ void CPU::daa() {
 
 void CPU::ei_or_di(const bool ei) {
     if (ei) {
+        //this->ime = true;
         this->ei_delay = true;
 
     } else {
@@ -1774,8 +1775,22 @@ void CPU::execute_M_operations() {
         this->M_operations.pop_back();
         // TODO: check if this reference is valid
         operation();
-    } 
+    }
     if (this->M_operations.empty()) {
+        this->fetch_opcode = true;
+    }
+}
+
+void CPU::execute_I_operations() {
+    // execute any further instructions
+    if (!this->I_operations.empty()) {
+        this->fetch_opcode = false;
+        std::function<void()> operation = this->I_operations.back();
+        this->I_operations.pop_back();
+        // TODO: check if this reference is valid
+        operation();
+    }
+    if (this->I_operations.empty()) {
         this->fetch_opcode = true;
     }
 }
@@ -1886,23 +1901,28 @@ void CPU::tick() {
     }
 
     if (!this->halt) {
-
         // fetch opcode, then execute what you can this M-cycle
         const uint8_t opcode = this->_get(this->PC); // get current opcode
 
         if (this->fetch_opcode) {
             identify_opcode(opcode);
+        }
 
-        } else {
+        else if (!M_operations.empty()) {
             // execute any further instructions
             this->execute_M_operations();
         }
 
-        if (this->M_operations.empty() && ei_delay &&
-            opcode != 0xfb) { // don't do it during ei (0xfb
+        else if (!I_operations.empty()) {
+            // execute interrupt opertaions
+            this->execute_I_operations();
+        }
+        
+        if (ei_delay && opcode != 0xfb && M_operations.empty()) {
             this->ime = true;
             this->ei_delay = false;
         }
+
     }
 }
 
@@ -1920,13 +1940,8 @@ void CPU::interrupt_tick() {
     }
 }
 
-// please help
 void CPU::timer_tick() {
     timer_ticks++;
-
-    if (boot_rom_complete) {
-        tima_ticks++;
-    }
 
     if (timer_ticks < 4) {
         return;
@@ -1945,11 +1960,13 @@ void CPU::timer_tick() {
     }
 
     this->gb_mmu->increment_div(4, true);
-
-    assert(1 == 1);
 }
 
 void CPU::handle_interrupts() {
+
+    if (!this->I_operations.empty()) {
+        return;
+    }
 
     // takes 5 M-Cycles
     uint8_t _ie = this->_get(0xffff);
@@ -2031,9 +2048,11 @@ void CPU::handle_interrupts() {
         uint8_t _if_2 = this->_get(0xff0f);
     };
 
-    this->M_operations.push_back(m5);
-    this->M_operations.push_back(m4);
-    this->M_operations.push_back(m3);
-    this->M_operations.push_back(m2);
-    this->M_operations.push_back(m1);
+    this->I_operations.push_back(m5);
+    this->I_operations.push_back(m4);
+    this->I_operations.push_back(m3);
+    this->I_operations.push_back(m2);
+    this->I_operations.push_back(m1);
+
+    this->fetch_opcode = false;
 }

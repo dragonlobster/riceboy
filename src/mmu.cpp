@@ -12,19 +12,19 @@
 // TODO: simplify entire MMU by using a single array as the main memory
 
 void MMU::handle_tima_overflow() {
-    if (this->tima_overflow) {
-        increment_div(4); // we must increment the timer by 4 cycles
 
-        assert(this->tima_ff05 == 0 && "tima must be 0 for overflow!");
-        // request interrupts
-        uint8_t _if = read_memory(0xff0f);
-        write_memory(0xff0f, _if | 4);
+    assert(this->tima_overflow && "tima is not overflown!");
+    increment_div(4); // we must increment the timer by 4 cycles
 
-        // set tima to tma
-        uint8_t tma = read_memory(0xff06);
-        write_memory(0xff05, tma);
-        this->tima_overflow = false;
-    }
+    assert(this->tima_ff05 == 0 && "tima must be 0 for overflow!");
+    // request interrupts
+    uint8_t _if = read_memory(0xff0f);
+    write_memory(0xff0f, _if | 4);
+
+    // set tima to tma
+    uint8_t tma = read_memory(0xff06);
+    write_memory(0xff05, tma);
+    this->tima_overflow = false;
 }
 
 void MMU::falling_edge() {

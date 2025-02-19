@@ -26,7 +26,7 @@ int main() {
 
     // TODO: load chosen cartridge
     //std::string rom = "BOOT/instr_timing/instr_timing.gb";
-    std::string rom = "BOOT/cpu_instrs.gb";
+    std::string rom = "BOOT/individual_cpu/02-interrupts.gb";
     //std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/rom_512Kb.gb";
     //std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/tim00.gb";
     //std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb";
