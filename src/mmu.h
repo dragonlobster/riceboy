@@ -80,6 +80,7 @@ class MMU {
     uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
     bool tima_overflow_standby{false};
+    bool tima_overflow_ran{false};
     void increment_div(uint16_t value = 1, bool check_falling_edge = true);
     void falling_edge();
     void handle_tima_overflow();

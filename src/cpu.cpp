@@ -1922,6 +1922,10 @@ void CPU::tick() {
 
     this->gb_mmu->increment_div(4); // increment internal div before cpu writes
 
+    if (this->gb_mmu->tima_overflow_standby) {
+        this->gb_mmu->handle_tima_overflow();
+    }
+
     // check if boot rom is completed
     if (!boot_rom_complete && _get(0xff50)) {
         // boot rom has completed
@@ -1947,15 +1951,31 @@ void CPU::tick() {
             this->execute_M_operations();
         }
 
+        /*
         else if (!I_operations.empty()) {
             // execute interrupt opertaions
             this->execute_I_operations();
-        }
+        }*/
+    }
 
-        if (ei_delay && opcode != 0xfb && M_operations.empty()) {
-            this->ime = true;
-            this->ei_delay = false;
-        }
+    if (ei_delay && _get(this->PC) != 0xfb && M_operations.empty()) {
+        this->ime = true;
+        this->ei_delay = false;
+    }
+
+}
+
+void CPU::timer_tick() {
+    timer_ticks++;
+
+    if (timer_ticks < 4) {
+        return;
+    }
+    timer_ticks = 0;
+
+    // handles the tima overflow case one cycle later
+    if (this->gb_mmu->tima_overflow) {
+        this->gb_mmu->tima_overflow_standby = true;
     }
 }
 
@@ -1973,27 +1993,10 @@ void CPU::interrupt_tick() {
     }
 }
 
-void CPU::timer_tick() {
-    timer_ticks++;
-
-    if (timer_ticks < 4) {
-        return;
-    }
-    timer_ticks = 0;
-
-    if (this->gb_mmu->tima_overflow_standby) {
-        this->gb_mmu->handle_tima_overflow();
-    }
-
-    // handles the tima overflow case one cycle later
-    if (this->gb_mmu->tima_overflow) {
-        this->gb_mmu->tima_overflow_standby = true;
-    }
-}
-
 void CPU::handle_interrupts() {
 
     if (!this->I_operations.empty()) {
+        this->execute_I_operations();
         return;
     }
 

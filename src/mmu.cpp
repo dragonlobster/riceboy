@@ -13,21 +13,31 @@
 
 void MMU::handle_tima_overflow() {
 
-    assert(this->tima_overflow_standby && "tima overflown was not requested!");
+    //assert(this->tima_overflow_standby && "tima overflown was not requested!");
 
     uint8_t _if = read_memory(0xff0f);
     write_memory(0xff0f, _if | 4);
 
     // set tima to tma
     uint8_t tma = read_memory(0xff06);
-    write_memory(0xff05, tma);
+    //write_memory(0xff05, tma);
+    this->tima_ff05 = tma;
+    this->tima_overflow = false;
 
     // reset tima overflow and tima overflow standby
     //this->tima_overflow = false;
+    assert(tima_overflow == false && "tima overflow was not set to false!");
     this->tima_overflow_standby = false;
+
+   // this->tima_overflow_ran = true;
 }
 
 void MMU::falling_edge() {
+
+    if (tima_overflow) {
+        return;
+    }
+
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
     uint8_t tac_freq_bit = tac_ff07 & 3;
 
@@ -246,6 +256,11 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         }
 
         if (address == 0xff05) {
+            /*
+            if (tima_overflow_ran) {
+                tima_overflow_ran = false;
+                return;
+            }*/
             this->tima_ff05 = value;
             this->tima_overflow = false;
             return;
@@ -326,6 +341,11 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         }
 
         else if (address == 0xff05) { // tima_ff05
+            /*
+            if (tima_overflow_ran) {
+                tima_overflow_ran = false;
+                return;
+            }*/
             this->tima_ff05 = value;
             this->tima_overflow = false;
         }
