@@ -1934,6 +1934,18 @@ void CPU::tick() {
         this->gb_mmu->set_load_rom_complete();
     }
 
+    // interrupts here
+
+
+    if (this->gb_mmu->lock_tima_write) {
+        this->gb_mmu->lock_tima_write = false;
+    }
+
+    if (this->gb_mmu->tima_overflow_standby) {
+        this->gb_mmu->handle_tima_overflow();
+        this->gb_mmu->lock_tima_write = true;
+    }
+
     if (!this->halt) {
         // fetch opcode, then execute what you can this M-cycle
         const uint8_t opcode = this->_get(this->PC); // get current opcode
@@ -1957,6 +1969,7 @@ void CPU::tick() {
             this->ei_delay = false;
         }
     }
+
 }
 
 void CPU::interrupt_tick() {
@@ -1968,7 +1981,7 @@ void CPU::interrupt_tick() {
     this->interrupt_ticks = 0;
     // operates in M-cycles
 
-    if (M_operations.empty()) {
+    if (M_operations.empty() && I_operations.empty()) {
         this->handle_interrupts();
     }
 }
@@ -1980,10 +1993,6 @@ void CPU::timer_tick() {
         return;
     }
     timer_ticks = 0;
-
-    if (this->gb_mmu->tima_overflow_standby) {
-        this->gb_mmu->handle_tima_overflow();
-    }
 
     // handles the tima overflow case one cycle later
     if (this->gb_mmu->tima_overflow) {

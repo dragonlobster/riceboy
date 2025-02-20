@@ -11,6 +11,29 @@
 
 // TODO: simplify entire MMU by using a single array as the main memory
 
+void MMU::handle_tma_write(uint8_t value) {
+
+    // tma address at the moment
+    hardware_registers[0x06] = value;
+
+    if (lock_tima_write) {
+        this->tima_ff05 = value;
+    }
+
+}
+
+void MMU::handle_tima_write(uint8_t value) {
+
+    if (this->lock_tima_write) {
+        assert(!this->tima_overflow &&
+               "tima overflow should be false on lock tima write!");
+        return;
+    }
+
+    this->tima_ff05 = value;
+    this->tima_overflow = false;
+}
+
 void MMU::handle_tima_overflow() {
 
     assert(this->tima_overflow_standby && "tima overflown was not requested!");
@@ -20,10 +43,14 @@ void MMU::handle_tima_overflow() {
 
     // set tima to tma
     uint8_t tma = read_memory(0xff06);
-    write_memory(0xff05, tma);
+    //write_memory(0xff05, tma);
+    this->tima_ff05 = tma;
+    this->tima_overflow = false;
+
+    assert(!lock_tima_write && "tima write should not be locked yet!");
 
     // reset tima overflow and tima overflow standby
-    //this->tima_overflow = false;
+    // this->tima_overflow = false;
     this->tima_overflow_standby = false;
 }
 
@@ -45,7 +72,8 @@ void MMU::falling_edge() {
 
     assert(div_state <= 1 && "div state abnormal!");
 
-    if (div_state == 0 && last_div_state == 1 && !tima_overflow) { // skip incrementing on tima overflow, it's no use
+    if (div_state == 0 && last_div_state == 1 &&
+        !tima_overflow) { // skip incrementing on tima overflow, it's no use
         this->tima_ff05++;
 
         if (tima_ff05 == 0) {
@@ -246,8 +274,12 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         }
 
         if (address == 0xff05) {
-            this->tima_ff05 = value;
-            this->tima_overflow = false;
+            handle_tima_write(value);
+            return;
+        }
+
+        if (address == 0xff06) {
+            handle_tma_write(value);
             return;
         }
 
@@ -326,8 +358,12 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         }
 
         else if (address == 0xff05) { // tima_ff05
-            this->tima_ff05 = value;
-            this->tima_overflow = false;
+            handle_tima_write(value);
+        }
+
+        if (address == 0xff06) {
+            handle_tma_write(value);
+            return;
         }
 
         else if (address == 0xff07) {

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <vector>
-#include <cstdint>
 #include "Cartridge.h"
 #include "MBC1.h"
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
@@ -75,16 +75,19 @@ class MMU {
     // div, timer related
     // div counter stored in MMU
     uint16_t div_ff04{0};
-    uint8_t tima_ff05{0};        // tima_ff05
+    uint8_t tima_ff05{0}; // tima_ff05
     uint8_t tac_ff07{0xf8};
     uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
     bool tima_overflow_standby{false};
+    bool lock_tima_write{false};
     void increment_div(uint16_t value = 1, bool check_falling_edge = true);
     void falling_edge();
     void handle_tima_overflow();
     void handle_div_write();
     void handle_tac_write(uint8_t value);
+    void handle_tima_write(uint8_t value);
+    void handle_tma_write(uint8_t value);
 
   private:
     // Interrupt enable flag - 0xFFFF
@@ -136,7 +139,6 @@ class MMU {
 
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
-
 
     std::unique_ptr<Cartridge> cartridge{};
 
