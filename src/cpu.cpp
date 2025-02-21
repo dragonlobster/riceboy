@@ -728,7 +728,7 @@ void CPU::ld_r_r(const registers r_to, const registers r_from) {
 
 void CPU::ld_hl_imm8() {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->PC);
+        this->Z = _get(this->PC);
         this->PC++;
     };
 
@@ -844,7 +844,7 @@ void CPU::ld_hl_r8(const registers r, const bool to_hl) {
 
 void CPU::ld_hl_sp_s8() {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->PC);
+        this->Z = _get(this->PC);
         this->PC++;
     };
 
@@ -866,12 +866,12 @@ void CPU::ld_hl_sp_s8() {
 
 void CPU::pop_rr(const registers r1, const registers r2, const bool af) {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->SP); // lsb
+        this->Z = _get(this->SP); // lsb
         this->SP++;
     };
 
     auto m2 = [=]() {
-        this->W = this->gb_mmu->read_memory(this->SP); // msb
+        this->W = _get(this->SP); // msb
         this->SP++;
 
         uint8_t *r_pointer1 = _get_register(r1);
@@ -882,7 +882,7 @@ void CPU::pop_rr(const registers r1, const registers r2, const bool af) {
     };
 
     auto m2_af = [=]() {
-        this->W = this->gb_mmu->read_memory(this->SP); // msb
+        this->W = _get(this->SP); // msb
         this->SP++;
 
         uint8_t *r_pointer1 = _get_register(registers::A);
@@ -945,12 +945,12 @@ void CPU::ret(conditions condition, bool ime_condition) {
     auto fill = [=]() {};
 
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->SP);
+        this->Z = _get(this->SP);
         this->SP++;
     };
 
     auto m2 = [=]() {
-        this->W = this->gb_mmu->read_memory(this->SP);
+        this->W = _get(this->SP);
         this->SP++;
     };
 
@@ -1024,11 +1024,13 @@ void CPU::sla_r(const registers r, const bool hl) {
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothing, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z <<= 1;                      // left shift A by 1 bit
         // bit 0 is reset to 0
@@ -1081,11 +1083,13 @@ void CPU::rl_r(const registers r, const bool hl, const bool z_flag,
     }
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothign, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t msbit = (this->Z >> 7) & 1;      // save the "carry" bit
         uint8_t carry_flag = this->Cf;           // take current carry flag
         this->Z = this->Z << 1;                  // left shift A by 1 bit
@@ -1138,11 +1142,13 @@ void CPU::rlc_r(const registers r, const bool hl, const bool z_flag,
     }
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothing, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z = this->Z << 1;
         this->Z = (this->Z & 0xfe) | msbit; // put carry_flag into bit 0
@@ -1194,11 +1200,13 @@ void CPU::rr_r(const registers r, const bool hl, const bool z_flag,
     }
 
     auto m1_hl = [=]() {
-        uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothing, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t lsbit = this->Z & 1;   // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
         this->Z = this->Z >> 1;        // left shift A by 1 bit
@@ -1250,11 +1258,13 @@ void CPU::rrc_r(const registers r, const bool hl, const bool z_flag,
     }
 
     auto m1_hl = [=]() {
-        uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothing, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t lsbit = this->Z & 1; // save the "carry" bit
         this->Z = this->Z >> 1;
         this->Z = (this->Z & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
@@ -1297,11 +1307,13 @@ void CPU::sra_r(const registers r, const bool hl) {
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        // does nothing, gets opcode fater cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = this->_combine_2_8bits(this->H, this->L);
+        this->Z = this->gb_mmu->read_memory(address);
+
         uint8_t msbit_retain = this->Z & 0x80;
         uint8_t lsbit = this->Z & 1;
         this->Z = (this->Z >> 1) | msbit_retain;
@@ -1344,11 +1356,13 @@ void CPU::swap_r(const registers r, const bool hl) {
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = _get(address);
+        // does nothing, gets opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _get(address);
+
         uint8_t lsb = this->Z & 0x0f;
         this->Z >>= 4;
         this->Z = this->Z | (lsb << 4);
@@ -1391,11 +1405,13 @@ void CPU::srl_r(const registers r, const bool hl) {
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = _get(address);
+        // does nothing, get opcode after cb prefix
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _get(address);
+
         uint8_t lsbit = this->Z & 1;   // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
         this->Z = this->Z >> 1;        // left shift A by 1 bit
@@ -1697,8 +1713,7 @@ void CPU::res_or_set(const uint8_t bit, const registers r, const bool set,
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = _get(address);
+        // does nothing, get opcode after cb
     };
 
     auto m2_hl = [=]() {
@@ -1706,6 +1721,9 @@ void CPU::res_or_set(const uint8_t bit, const registers r, const bool set,
         // 1111 1110
         // 0 = 1, 1 = 2, 2 = 4, 3 = 8, 4 = 16, 5 = 32, 6 = 64, 7 = 128
         // 0000 0001, 0000 0010, 0000 0011, 0000 0100, 0000 0101, 00000
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _get(address);
+
         if (!set) {
             uint8_t mask = ~(1 << bit);
             this->Z = this->Z & mask;
@@ -1741,11 +1759,12 @@ void CPU::bit(const uint8_t bit, const registers r, const bool hl) {
     };
 
     auto m1_hl = [=]() {
-        uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = _get(address);
+        // does nothing, get prefix after cb opcode
     };
 
     auto m2_hl = [=]() {
+        uint16_t address = _combine_2_8bits(this->H, this->L);
+        this->Z = _get(address);
         this->Zf = !((this->Z >> bit) & 1);
         this->Nf = false;
         this->Hf = true;
@@ -1941,6 +1960,9 @@ void CPU::tick() {
     if (this->gb_mmu->tima_overflow_standby) {
         this->gb_mmu->handle_tima_overflow();
         this->gb_mmu->lock_tima_write = true;
+    }
+
+    if (M_operations.empty()) {
         handle_interrupts();
     }
 
@@ -1967,7 +1989,6 @@ void CPU::tick() {
             this->ei_delay = false;
         }
     }
-
 }
 
 void CPU::interrupt_tick() {
@@ -1979,9 +2000,9 @@ void CPU::interrupt_tick() {
     this->interrupt_ticks = 0;
     // operates in M-cycles
 
-    if (M_operations.empty() && I_operations.empty()) {
-        this->handle_interrupts();
-    }
+    //if (M_operations.empty() && I_operations.empty()) {
+    //    this->handle_interrupts();
+    //}
 }
 
 void CPU::timer_tick() {

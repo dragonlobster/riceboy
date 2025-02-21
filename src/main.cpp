@@ -31,19 +31,36 @@ int main() {
     std::array<std::string, 10> blargg{
         "BOOT/blargg/cpu_instrs/cpu_instrs.gb",
         "BOOT/blargg/instr_timing/instr_timing.gb",
-        "BOOT/blargg/interrupt_time/interrupt_time.gb", // fail
-        "BOOT/blargg/mem_timing/mem_timing.gb", // fail
-        "BOOT/blargg/mem_timing-2/mem_timing.gb", // fail
-        "BOOT/blargg/oam_bug/oam_bug.gb",
-        "BOOT/blargg/halt_bug.gb"};
+        //"BOOT/blargg/interrupt_time/interrupt_time.gb", // fail (expected, need CGB)
+        "BOOT/blargg/mem_timing/mem_timing.gb",
+        "BOOT/blargg/mem_timing-2/mem_timing.gb",
+        "BOOT/blargg/oam_bug/oam_bug.gb", // not implemented yet
+        "BOOT/blargg/halt_bug.gb"}; // not implemented yet
 
-    riceboy->gb_cpu.prepare_rom(blargg[2]);
+    std::array<std::string, 13> mooneye_timing{
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/div_write.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim00.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim00_div_trigger.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim01.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim01_div_trigger.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim10.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim10_div_trigger.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim11.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tim11_div_trigger.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tima_reload.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tima_write_reloading.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tma_write_reloading.gb"
+    };
+
+    riceboy->gb_cpu.prepare_rom(blargg[3]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
     // "RiceBoy");
 
-    // double accumulator{0};
+   // double accumulator{0};
     // double last_frame_time{0};
 
     // frame clock (avoiding setFrameRateLimit imprecision)
