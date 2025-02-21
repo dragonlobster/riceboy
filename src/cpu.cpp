@@ -1934,9 +1934,6 @@ void CPU::tick() {
         this->gb_mmu->set_load_rom_complete();
     }
 
-    // interrupts here
-
-
     if (this->gb_mmu->lock_tima_write) {
         this->gb_mmu->lock_tima_write = false;
     }
@@ -1944,6 +1941,7 @@ void CPU::tick() {
     if (this->gb_mmu->tima_overflow_standby) {
         this->gb_mmu->handle_tima_overflow();
         this->gb_mmu->lock_tima_write = true;
+        handle_interrupts();
     }
 
     if (!this->halt) {

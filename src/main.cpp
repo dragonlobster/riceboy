@@ -25,14 +25,19 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // TODO: load chosen cartridge
-    //std::string rom = "BOOT/instr_timing/instr_timing.gb";
-    //std::string rom = "BOOT/cpu_instrs/individual/02-interrupts.gb";
-    //std::string rom = "BOOT/mooneye-gb_hwtests/emulator-only/mbc1/rom_512Kb.gb";
-    //std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/tima_reload.gb";
-    //std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/tma_write_reloading.gb";
-    //std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/tim00_div_trigger.gb";
-    std::string rom = "BOOT/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb";
-    riceboy->gb_cpu.prepare_rom(rom);
+    // std::string rom =
+    // "BOOT/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb";
+
+    std::array<std::string, 10> blargg{
+        "BOOT/blargg/cpu_instrs/cpu_instrs.gb",
+        "BOOT/blargg/instr_timing/instr_timing.gb",
+        "BOOT/blargg/interrupt_time/interrupt_time.gb", // fail
+        "BOOT/blargg/mem_timing/mem_timing.gb", // fail
+        "BOOT/blargg/mem_timing-2/mem_timing.gb", // fail
+        "BOOT/blargg/oam_bug/oam_bug.gb",
+        "BOOT/blargg/halt_bug.gb"};
+
+    riceboy->gb_cpu.prepare_rom(blargg[2]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
