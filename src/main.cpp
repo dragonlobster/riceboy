@@ -53,7 +53,11 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/timer/tma_write_reloading.gb"
     };
 
-    riceboy->gb_cpu.prepare_rom(blargg[3]);
+    std::array<std::string, 1> mooneye_interrupts{
+        "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"
+    };
+
+    riceboy->gb_cpu.prepare_rom(mooneye_timing[1]);
     //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *

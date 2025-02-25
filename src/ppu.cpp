@@ -15,6 +15,11 @@ void Fetcher::_set(uint16_t address, uint8_t value) {
     this->gb_mmu.write_memory(address, value);
 }
 
+void Fetcher::reset() {
+    this->current_mode = Fetcher::mode::FetchTileNo;
+    this->dummy_fetch = true;
+}
+
 // ppu constructor
 PPU::PPU(MMU &gb_mmu_, sf::RenderWindow &window_)
     : gb_mmu(gb_mmu_), window(window_) {
@@ -42,11 +47,11 @@ void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
         _get(LCDC) + 16 < oam_entry[0] + sprite_height;
 
     if (!x_pos_gt_0 || !LY_plus_16_gt_y_pos || !sprite_height ||
-        !sprite_height_condition || this->oam_buffer.size() >= 10) {
+        !sprite_height_condition || ppu_fetcher.oam_buffer.size() >= 10) {
         // none of the conditions were met
         return;
     }
-    oam_buffer.push_back(oam_entry);
+    ppu_fetcher.oam_buffer.push_back(oam_entry);
 }
 
 std::array<uint8_t, 3> PPU::_get_color(uint8_t id) {
@@ -104,13 +109,16 @@ void Fetcher::tick() {
     // TODO: modularize stuff here
     // fetcher
     this->fetcher_ticks++;
-    if (fetcher_ticks < 2) {
-        return;
-    }
-    fetcher_ticks = 0;
 
     switch (current_mode) {
     case Fetcher::mode::FetchTileNo: {
+
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
+        }
+        fetcher_ticks = 0;
+
         // check bit 3 of LCDC to see which background map to use
         uint16_t bgmap_start = 0x9800;
         uint16_t bgmap_end = 0x9bff;
@@ -132,6 +140,12 @@ void Fetcher::tick() {
         break;
     }
     case Fetcher::mode::FetchTileDataLow: {
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
+        }
+        fetcher_ticks = 0;
+
         uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
         uint8_t low_byte{};
 
@@ -147,7 +161,7 @@ void Fetcher::tick() {
             low_byte = this->gb_mmu.read_memory(address);
         }
         for (unsigned int i = 0; i < 8; ++i) {
-            this->pixel_buffer[i] = (low_byte >> i) & 1;
+            this->temp_background_fifo[i] = (low_byte >> i) & 1;
         }
 
         // bool eightk_method{true};
@@ -156,6 +170,12 @@ void Fetcher::tick() {
     }
 
     case Fetcher::mode::FetchTileDataHigh: {
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
+        }
+        fetcher_ticks = 0;
+
         uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
         uint8_t high_byte{};
 
@@ -173,22 +193,69 @@ void Fetcher::tick() {
         for (unsigned int i = 0; i < 8; ++i) {
             uint8_t high_bit = ((high_byte >> i) << 1) &
                                2; // use second position for the high bits
-            this->pixel_buffer[i] =
-                this->pixel_buffer[i] | high_bit; // combine 2 bits together
+            this->temp_background_fifo[i] = this->temp_background_fifo[i] |
+                                            high_bit; // combine 2 bits together
+        }
+
+        if (dummy_fetch) {
+            this->current_mode = Fetcher::mode::FetchTileNo;
+            dummy_fetch = false;
+            break; // dont set mode to pushtofifo
+        }
+
+        // 6 cycles passed - deal with sprite (sprite fetch tile no)
+        // note: DMG LCDC bit 1 disables obj fetcher entirely, CGB doesn't
+
+        // TODO: need to extend by 1 tick (oam fetch takes 2 ticks)
+        if (_get(LCDC) & 2 &&
+            !background_fifo.empty()) { // sprite drawing enabled
+            for (int i = 0; i < oam_buffer.size(); ++i) {
+                if (oam_buffer[i][1] <=
+                    tile_index + 8) { // x position <= internal x (dot or
+                                      // tile_index?) + 8
+                    this->sprite_fetch_buffer.push_back(oam_buffer[i]);
+                }
+            }
+            // if not empty, fetch sprites
+            if (!sprite_fetch_buffer.empty()) {
+                this->current_mode = Fetcher::mode::SpriteFetchTileNo2;
+                break;
+            }
         }
 
         this->current_mode = Fetcher::mode::PushToFIFO;
         break;
     }
+
+        // TODO: sprite: fetch tile no1, no2, datalow, datahigh
+
+    case Fetcher::mode::SpriteFetchTileNo2: {
+        fetcher_ticks = 0; // 1 tick only, reset fetcher ticks
+
+        this->sprite_tile_id = sprite_fetch_buffer.back()[2];
+        sprite_fetch_buffer.pop_back();
+        this->current_mode = Fetcher::mode::SpriteFetchTileDataLow;
+
+        break;
+    }
+
     case Fetcher::mode::PushToFIFO: {
-        if (background_fifo.size() <= 8) {
-            // for (int i = 7; i >= 0; --i) {
-            for (int i = 0; i < 8; ++i) {
-                this->background_fifo.push_back(this->pixel_buffer[i]);
-            }
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
         }
-        this->tile_index++;
-        this->current_mode = Fetcher::mode::FetchTileNo;
+        fetcher_ticks = 0;
+
+        // only runs if background fifo is empty, otherwise it repeats
+        if (background_fifo.empty()) {
+            for (int i = 0; i < 8; ++i) {
+                this->background_fifo.push_back(this->temp_background_fifo[i]);
+            }
+
+            this->tile_index++; // internal x-position counter
+            this->current_mode = Fetcher::mode::FetchTileNo;
+        }
+
         break;
     }
     }
@@ -211,34 +278,37 @@ void PPU::tick() {
         }
 
         if (this->ppu_ticks % 2 == 0 &&
-            oam_buffer_counter < 40) { // 40 oam entries
+            ppu_fetcher.oam_buffer_counter < 40) { // 40 oam entries
             // oam scan 1 entry (4 bytes) every 2 ticks
             // bytes from fe00 to fe9f
             // sprite fetcher
             std::array<uint8_t, 4> oam_entry{};
             for (unsigned int i = 0; i < oam_entry.size(); ++i) {
                 oam_entry[i] = this->gb_mmu.read_memory(
-                    OAM_START_ADDRESS + 4 * oam_buffer_counter + i);
+                    ppu_fetcher.OAM_START_ADDRESS +
+                    4 * ppu_fetcher.oam_buffer_counter + i);
             }
             add_to_sprite_buffer(
                 oam_entry); // attempt to add it to the oam_buffer
 
-            oam_buffer_counter++; // each oam entry is 4 bytes
+            ppu_fetcher.oam_buffer_counter++; // each oam entry is 4 bytes
 
         } else if (this->ppu_ticks == 80) {
             // TODO: start the fetcher based on LY
-            assert(oam_buffer_counter == 40 && "OAM counter is not 40!");
+            assert(ppu_fetcher.oam_buffer_counter == 40 &&
+                   "OAM counter is not 40!");
 
             // prepare for drawing
             // clear fifo
             this->ppu_fetcher.background_fifo.clear();
+            this->ppu_fetcher.sprite_fifo.clear();
 
             // reset tile index
-            // this->ppu_fetcher.tile_index = 0;
-            this->ppu_fetcher.tile_index = _get(SCX) / 8;
+            this->ppu_fetcher.tile_index = 0;
+            // this->ppu_fetcher.tile_index = _get(SCX) / 8;
 
             // reset the ppu fetcher mode
-            this->ppu_fetcher.current_mode = Fetcher::mode::FetchTileNo;
+            this->ppu_fetcher.reset();
 
             this->current_mode = mode::Drawing;
         }
@@ -250,26 +320,13 @@ void PPU::tick() {
         this->ppu_fetcher.tick();
 
         if (!this->ppu_fetcher.background_fifo.empty()) {
-            // draw
-            /*
-            float f_dot_count = dot_count;
-            float f_ly = *(this->LY);
-            sf::Vector2f position = {f_dot_count, f_ly};
-            */
 
-            sf::Vector2u position = {dot_count, _get(LY)};
+            sf::Vector2u position = {ppu_fetcher.dot_count, _get(LY)};
 
             uint8_t dot = this->ppu_fetcher.background_fifo.back();
             this->ppu_fetcher.background_fifo.pop_back();
 
             sf::Color rgb = get_dot_color(dot);
-
-            // sf::Vertex lcd_dot =
-            //     DrawUtils::add_vertex(position, r, g, b);
-
-            // sf::RectangleShape lcd_dot =
-            //     DrawUtils::add_pixel({f_dot_count, f_ly}, rgb.r, rgb.g,
-            //     rgb.b);
 
             this->lcd_dots.push_back(dot);
 
@@ -294,13 +351,10 @@ void PPU::tick() {
             // TODO: need to find a way to clear while drawing the
             // original pixels need a vector of dots to draw
 
-            this->dot_count++;
+            this->ppu_fetcher.dot_count++;
         }
 
-        // TODO: draw without fifo first, remove after
-
-        if (dot_count == 160) {
-
+        if (ppu_fetcher.dot_count == 160) {
             // finished
             this->current_mode = mode::HBlank;
         }
@@ -320,7 +374,7 @@ void PPU::tick() {
             _set(LY, _get(LY) + 1); // new scanline reached
 
             // reset dot
-            this->dot_count = 0;
+            this->ppu_fetcher.dot_count = 0;
 
             if (_get(LY) == 144) {
 
