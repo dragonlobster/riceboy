@@ -35,7 +35,7 @@ class Fetcher {
         SpritePushToFIFO = 8,
     };
     uint8_t tile_id{0};   // the current tile id read
-    uint8_t sprite_tile_id{0};   // the current sprite tile id read
+    std::array<uint8_t, 4> sprite_tile{};   // the current sprite tile read
     mode current_mode{0}; // start at fetch tile no
 
     // need to run dummy fetch? (once per scanline)

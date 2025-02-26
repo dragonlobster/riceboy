@@ -242,7 +242,7 @@ void Fetcher::tick() {
     case Fetcher::mode::SpriteFetchTileNo2: {
         fetcher_ticks = 0; // 1 tick only, reset fetcher ticks
 
-        this->sprite_tile_id = sprite_fetch_buffer.back()[2];
+        this->sprite_tile = sprite_fetch_buffer.back(); // 2 is tile id
         sprite_fetch_buffer.pop_back();
         this->current_mode = Fetcher::mode::SpriteFetchTileDataLow;
 
@@ -255,6 +255,15 @@ void Fetcher::tick() {
             return;
         }
 
+        uint8_t low_byte{};
+
+        // 8000 method
+        uint16_t address = 0x8000 + (tile_id * 16); // is there offset?
+        low_byte = this->gb_mmu.read_memory(address);
+
+        for (unsigned int i = 0; i < 8; ++i) {
+            this->temp_background_fifo[i] = (low_byte >> i) & 1;
+        }
 
         this->current_mode = Fetcher::mode::SpriteFetchTileDataHigh;
 
