@@ -227,8 +227,18 @@ void Fetcher::tick() {
         break;
     }
 
-        // TODO: sprite: fetch tile no1, no2, datalow, datahigh
+    case Fetcher::mode::SpriteFetchTileNo1: {
+        fetcher_ticks = 0; // 1 tick only, reset fetcher ticks
 
+        assert(_get(LCDC) & 2 && !background_fifo.empty() &&
+               "sprite fetching disabled!, or background fifo is empty!");
+
+        // do nothing, waste 1 tick
+        this->current_mode = Fetcher::mode::SpriteFetchTileNo2;
+        break;
+    }
+
+    // TODO: sprite: fetch tile no1, no2, datalow, datahigh
     case Fetcher::mode::SpriteFetchTileNo2: {
         fetcher_ticks = 0; // 1 tick only, reset fetcher ticks
 
@@ -236,6 +246,28 @@ void Fetcher::tick() {
         sprite_fetch_buffer.pop_back();
         this->current_mode = Fetcher::mode::SpriteFetchTileDataLow;
 
+        break;
+    }
+
+    case Fetcher::mode::SpriteFetchTileDataLow: {
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
+        }
+
+
+        this->current_mode = Fetcher::mode::SpriteFetchTileDataHigh;
+
+        break;
+    }
+
+    case Fetcher::mode::SpriteFetchTileDataHigh: {
+        // 2 ticks
+        if (fetcher_ticks < 2) {
+            return;
+        }
+
+        this->current_mode = Fetcher::mode::SpritePushToFIFO;
         break;
     }
 
