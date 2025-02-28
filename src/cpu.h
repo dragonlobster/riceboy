@@ -68,9 +68,9 @@ class CPU {
     uint8_t identify_opcode(
         const uint8_t opcode); // get the next opcode and increment the PC
 
-    void tick();           // single cpu tick
-    void interrupt_tick(); // interrupt tick
-    void timer_tick();     // timer tick
+    void tick();           // single cpu background_tick
+    void interrupt_tick(); // interrupt background_tick
+    void timer_tick();     // timer background_tick
 
     void handle_interrupts(); // handle interrupts
 
@@ -104,7 +104,7 @@ class CPU {
     enum class bitops { AND, XOR, OR };
 
   private:
-    // tick counter
+    // background_tick counter
     uint16_t ticks{0};
     uint16_t interrupt_ticks{0};
     uint16_t timer_ticks{0};

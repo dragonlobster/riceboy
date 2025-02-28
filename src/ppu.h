@@ -18,25 +18,26 @@ class Fetcher {
     Fetcher(MMU &gb_mmu_) : gb_mmu(gb_mmu_) {};
 
     // fetcher states
-    uint16_t fetcher_ticks{0};
+    uint16_t background_fetcher_ticks{0};
+    uint16_t sprite_fetcher_ticks{0};
     uint16_t tile_index{0}; // incremented after every push to FIFO
 
 
-    void tick();
+    void background_tick();
+    void sprite_tick();
+
     enum class mode {
         FetchTileNo = 0,
         FetchTileDataLow = 1,
         FetchTileDataHigh = 2,
         PushToFIFO = 3,
-        SpriteFetchTileNo1 = 4, // step 1 (1 tick)
-        SpriteFetchTileNo2 = 5, // step 2 (1 tick)
-        SpriteFetchTileDataLow = 6,
-        SpriteFetchTileDataHigh = 7,
-        SpritePushToFIFO = 8,
+        Paused = 4
     };
+
     uint8_t tile_id{0};   // the current tile id read
     std::array<uint8_t, 4> sprite_tile{};   // the current sprite tile read
-    mode current_mode{0}; // start at fetch tile no
+    mode background_current_mode{0}; // start at fetch tile no
+    mode sprite_current_mode{0}; // start at fetch tile no
 
     // need to run dummy fetch? (once per scanline)
     bool dummy_fetch{true};
@@ -48,6 +49,7 @@ class Fetcher {
     // stored from lsb to msb, need to push out backwards to FIFO (first in
     // first out)
     std::array<uint8_t, 8> temp_background_fifo{};
+    std::array<uint8_t, 8> temp_sprite_fifo{};
 
     // background FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
     std::vector<uint8_t> background_fifo{}; // 2 bits
@@ -59,11 +61,11 @@ class Fetcher {
     const uint16_t OAM_END_ADDRESS{0xfe9f};
 
     // # of pixels output to the current scanline
-    uint8_t dot_count{0};
+    uint8_t lcd_x_position{0};
 
     // TODO: maybe use std::array
     // store sprite metadata (4 bytes each), fits up to 10 pixels
-    std::vector<std::array<uint8_t, 4>> oam_buffer{};
+    std::vector<std::array<uint8_t, 4>> sprite_buffer{};
     // sprite FIFO - stores 8 2-bit (for 8 pixels) (for pixel fetcher)
     std::vector<uint8_t> sprite_fifo{}; // 2 bits
     // sprites to fetch based on X + 8 from OAM buffer
@@ -121,7 +123,7 @@ class PPU {
 
     mode current_mode{2}; // start at OAM Scan
 
-    // tick counter
+    // background_tick counter
     uint16_t ppu_ticks{0}; // resets every LY
 
     // fetcher
@@ -130,7 +132,7 @@ class PPU {
     Fetcher ppu_fetcher = Fetcher(gb_mmu);
 
 
-    // main tick function
+    // main background_tick function
     void tick();
 
     // background map 0x9800 to 0x9bff, tile data: 0x8000 to 0x8fff

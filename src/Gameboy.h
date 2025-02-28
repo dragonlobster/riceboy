@@ -18,7 +18,7 @@ class Gameboy {
 
     // clock speed
     static constexpr unsigned int clock_speed = 4194304;
-    // 4194304 T-cycles per second (tick cycles)
+    // 4194304 T-cycles per second (background_tick cycles)
 
     // TODO: mmu, cpu, ppu
     MMU gb_mmu{};
