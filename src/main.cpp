@@ -31,11 +31,12 @@ int main() {
     std::array<std::string, 10> blargg{
         "BOOT/blargg/cpu_instrs/cpu_instrs.gb",
         "BOOT/blargg/instr_timing/instr_timing.gb",
-        //"BOOT/blargg/interrupt_time/interrupt_time.gb", // fail (expected, need CGB)
+        //"BOOT/blargg/interrupt_time/interrupt_time.gb", // fail (expected,
+        //need CGB)
         "BOOT/blargg/mem_timing/mem_timing.gb",
         "BOOT/blargg/mem_timing-2/mem_timing.gb",
         "BOOT/blargg/oam_bug/oam_bug.gb", // not implemented yet
-        "BOOT/blargg/halt_bug.gb"}; // not implemented yet
+        "BOOT/blargg/halt_bug.gb"};       // not implemented yet
 
     std::array<std::string, 13> mooneye_timing{
         "BOOT/mooneye-gb_hwtests/acceptance/timer/div_write.gb",
@@ -50,21 +51,19 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/timer/tim11_div_trigger.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/timer/tima_reload.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/timer/tima_write_reloading.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/timer/tma_write_reloading.gb"
-    };
+        "BOOT/mooneye-gb_hwtests/acceptance/timer/tma_write_reloading.gb"};
 
     std::array<std::string, 1> mooneye_interrupts{
-        "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"
-    };
+        "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
     riceboy->gb_cpu.prepare_rom(mooneye_timing[1]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
     // "RiceBoy");
 
-   // double accumulator{0};
+    // double accumulator{0};
     // double last_frame_time{0};
 
     // frame clock (avoiding setFrameRateLimit imprecision)
@@ -72,9 +71,11 @@ int main() {
 
     while (window.isOpen()) {
 
+        /*
         window.handleEvents(
             // on close
             [&](const sf::Event::Closed &) { window.close(); });
+        */
 
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
 
