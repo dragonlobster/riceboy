@@ -32,7 +32,7 @@ int main() {
         "BOOT/blargg/cpu_instrs/cpu_instrs.gb",
         "BOOT/blargg/instr_timing/instr_timing.gb",
         //"BOOT/blargg/interrupt_time/interrupt_time.gb", // fail (expected,
-        //need CGB)
+        // need CGB)
         "BOOT/blargg/mem_timing/mem_timing.gb",
         "BOOT/blargg/mem_timing-2/mem_timing.gb",
         "BOOT/blargg/oam_bug/oam_bug.gb", // not implemented yet
@@ -56,7 +56,7 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    riceboy->gb_cpu.prepare_rom(mooneye_timing[1]);
+    riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
@@ -71,11 +71,11 @@ int main() {
 
     while (window.isOpen()) {
 
-        /*
-        window.handleEvents(
-            // on close
-            [&](const sf::Event::Closed &) { window.close(); });
-        */
+        while (const std::optional event = window.pollEvent()) {
+            // Close window: exit
+            if (event->is<sf::Event::Closed>())
+                window.close();
+        }
 
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
 

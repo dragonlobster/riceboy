@@ -29,6 +29,9 @@ void Fetcher::reset() {
     this->lcd_x_position = -1 * (_get(SCX) % 8);
     // this->lcd_x_position = 0;
 
+    // reset window fetch mode
+    this->window_fetch = false;
+
     this->sprite_current_mode = Fetcher::mode::FetchTileNo;
     this->background_current_mode = Fetcher::mode::FetchTileNo;
     this->dummy_fetch = true;
@@ -88,23 +91,54 @@ std::array<uint8_t, 3> PPU::_get_color(uint8_t id) {
     }
 }
 
-sf::Color PPU::get_dot_color(uint8_t dot) {
-    // TODO: maybe i only need to do this once per rom load
-    uint8_t id_0 = _get(BGP) & 0x03;      // id 0 0x03 masks last 2 bits
-    uint8_t id_1 = _get(BGP) >> 2 & 0x03; // id 1
-    uint8_t id_2 = _get(BGP) >> 4 & 0x03; // id 2
-    uint8_t id_3 = _get(BGP) >> 6 & 0x03; // id 3
-    // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
+sf::Color PPU::get_pixel_color(uint8_t pixel, uint8_t *palette) {
+    uint8_t id_0{};
+    uint8_t id_1{};
+    uint8_t id_2{};
+    uint8_t id_3{};
 
-    std::array<uint8_t, 3> color_0 = _get_color(id_0);
-    std::array<uint8_t, 3> color_1 = _get_color(id_1);
-    std::array<uint8_t, 3> color_2 = _get_color(id_2);
-    std::array<uint8_t, 3> color_3 = _get_color(id_3);
+    std::array<uint8_t, 3> color_0{};
+    std::array<uint8_t, 3> color_1{};
+    std::array<uint8_t, 3> color_2{};
+    std::array<uint8_t, 3> color_3{};
+
+    if (!palette) {
+        // TODO: maybe i only need to do this once per rom load
+        id_0 = _get(BGP) & 0x03;      // id 0 0x03 masks last 2 bits
+        id_1 = _get(BGP) >> 2 & 0x03; // id 1
+        id_2 = _get(BGP) >> 4 & 0x03; // id 2
+        id_3 = _get(BGP) >> 6 & 0x03; // id 3
+        // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
+
+        color_0 = _get_color(id_0);
+        color_1 = _get_color(id_1);
+        color_2 = _get_color(id_2);
+        color_3 = _get_color(id_3);
+    }
+
+    else {
+        assert(*palette == 0 ||
+               *palette == 1 && "sprite palette is not 0 or 1!");
+
+        uint8_t obp = *palette ? _get(0xff49) : _get(0xff48);
+
+        id_0 = obp & 0x03; // id 0 0x03 masks last 2 bits (ignored in sprites)
+        id_1 = obp >> 2 & 0x03; // id 1
+        id_2 = obp >> 4 & 0x03; // id 2
+        id_3 = obp >> 6 & 0x03; // id 3
+        // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
+
+        color_0 = _get_color(id_0);
+        color_1 = _get_color(id_1);
+        color_2 = _get_color(id_2);
+        color_3 = _get_color(id_3);
+    }
 
     uint8_t r = color_palette_white[0];
     uint8_t g = color_palette_white[1];
     uint8_t b = color_palette_white[2];
-    switch (dot) {
+
+    switch (pixel) {
     case 0:
         r = color_0[0];
         g = color_0[1];
@@ -284,20 +318,37 @@ void Fetcher::background_tick() {
         }
         background_fetcher_ticks = 0;
 
+        uint16_t address{};
+
         // check bit 3 of LCDC to see which background map to use
         uint16_t bgmap_start = 0x9800;
         uint16_t bgmap_end = 0x9bff;
-        if ((_get(LCDC) >> 3 & 1) == 1) {
-            bgmap_start = 0x9c00;
-            bgmap_end = 0x9fff;
+
+        if (!this->window_fetch) {
+            if (((_get(LCDC) >> 3) & 1) == 1) {
+                bgmap_start = 0x9c00;
+                bgmap_end = 0x9fff;
+            }
+
+            // fetch tile no.
+            // TODO: check scx offset
+            uint16_t scy_offset = 32 * (((_get(LY) + _get(SCY)) % 256) / 8);
+            uint16_t scx_offset = (_get(SCX) % 256) / 8;
+            address =
+                bgmap_start + ((scy_offset + scx_offset + tile_index) & 0x3ff);
         }
 
-        // fetch tile no.
-        // TODO: check scx offset
-        uint16_t scy_offset = 32 * (((_get(LY) + _get(SCY)) % 256) / 8);
-        uint16_t scx_offset = (_get(SCX) % 256) / 8;
-        uint16_t address =
-            bgmap_start + ((scy_offset + scx_offset + tile_index) & 0x3ff);
+        else {
+            // window fetch
+            if (((_get(LCDC) >> 6) & 1) == 1) {
+                bgmap_start = 0x9c00;
+                bgmap_end = 0x9fff;
+            }
+
+            uint16_t wy_offset = 32 * (window_ly / 8);
+
+            address = bgmap_start + ((wy_offset + tile_index) & 0x3ff);
+        }
 
         // TODO: here
         this->tile_id = this->gb_mmu.read_memory(address);
@@ -311,20 +362,24 @@ void Fetcher::background_tick() {
         }
         background_fetcher_ticks = 0;
 
-        uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
         uint8_t low_byte{};
 
+        uint16_t offset = this->window_fetch ? 2 * (this->window_ly % 8)
+                                             : 2 * ((_get(LY) + _get(SCY)) % 8);
+
         // 8000 method or 8800 method to read
-        if (((_get(LCDC) >> 4) & 1) != 1) {
+        if (((_get(LCDC) >> 4) & 1) == 0) {
             // 8800 method
             uint16_t address =
                 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
             low_byte = this->gb_mmu.read_memory(address);
+
         } else {
             // 8000 method
             uint16_t address = 0x8000 + (tile_id * 16) + offset;
             low_byte = this->gb_mmu.read_memory(address);
         }
+
         for (unsigned int i = 0; i < 8; ++i) {
             this->temp_background_fifo[i] = (low_byte >> i) & 1;
         }
@@ -341,7 +396,9 @@ void Fetcher::background_tick() {
         }
         background_fetcher_ticks = 0;
 
-        uint16_t offset = 2 * ((_get(LY) + _get(SCY)) % 8);
+        uint16_t offset = this->window_fetch ? 2 * (this->window_ly % 8)
+                                             : 2 * ((_get(LY) + _get(SCY)) % 8);
+
         uint8_t high_byte{};
 
         // 8000 method or 8800 method to read
@@ -418,6 +475,7 @@ void Fetcher::background_tick() {
 
 // 1 background_tick = 1 T-Cycle
 void PPU::tick() {
+
     this->ppu_ticks++;
 
     // set stat to mode
@@ -426,6 +484,10 @@ void PPU::tick() {
 
     switch (this->current_mode) {
     case mode::OAM_Scan: {
+
+        if (!this->ppu_fetcher.wy_condition) {
+            this->ppu_fetcher.wy_condition = _get(WY) == _get(LY);
+        }
 
         // set IF for interrupt
         if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
@@ -473,6 +535,17 @@ void PPU::tick() {
         break;
     }
     case mode::Drawing: {
+        // check for window fetch
+        if (((_get(LCDC) >> 5) & 1) &&
+            ppu_fetcher.lcd_x_position >= (_get(WX) - 1) &&
+            this->ppu_fetcher.wy_condition && !this->ppu_fetcher.window_fetch) {
+
+            this->ppu_fetcher.background_current_mode =
+                Fetcher::mode::FetchTileNo;
+            this->ppu_fetcher.tile_index = 0;
+            this->ppu_fetcher.background_fifo.clear();
+            this->ppu_fetcher.window_fetch = true;
+        }
 
         // fetcher background_tick
         this->ppu_fetcher.background_tick();
@@ -517,9 +590,12 @@ void PPU::tick() {
 
                 if (!this->ppu_fetcher.sprite_fetch_buffer.empty() &&
                     lcdc_sprites_enabled) {
-                    
+
                     if (this->ppu_fetcher.background_current_mode !=
-                        Fetcher::mode::PushToFIFO && this->ppu_fetcher.background_current_mode != Fetcher::mode::Paused) {
+                            Fetcher::mode::PushToFIFO &&
+                        this->ppu_fetcher.background_current_mode !=
+                            Fetcher::mode::Paused) {
+                        this->ppu_fetcher.background_fifo.clear();
                         return;
                     }
 
@@ -536,11 +612,39 @@ void PPU::tick() {
                 uint8_t bg_pixel = this->ppu_fetcher.background_fifo.back();
                 this->ppu_fetcher.background_fifo.pop_back();
 
-                sf::Color bg_rgb = get_dot_color(bg_pixel);
+                sf::Color result_pixel = get_pixel_color(bg_pixel);
+
+                if (!this->ppu_fetcher.sprite_fifo.empty()) {
+                    assert(
+                        this->ppu_fetcher.sprite_fifo.size() ==
+                            this->ppu_fetcher.sprite_attr_fifo.size() &&
+                        "sprite fifo and sprite attr fifo not the same size!");
+
+                    uint8_t sprite_pixel = this->ppu_fetcher.sprite_fifo.back();
+                    this->ppu_fetcher.sprite_fifo.pop_back();
+
+                    uint8_t sprite_attr =
+                        this->ppu_fetcher.sprite_attr_fifo.back();
+                    this->ppu_fetcher.sprite_attr_fifo.pop_back();
+
+                    if (sprite_pixel != 0) {
+
+                        uint8_t sprite_palette =
+                            (sprite_attr >> 4) & 1; // palette is bit 4
+
+                        if (((sprite_attr >> 7) & 1) && bg_pixel != 0) {
+                            // sprite not always on top of bg, result pixel
+                            // stays the same
+                        } else {
+                            result_pixel =
+                                get_pixel_color(sprite_pixel, &sprite_palette);
+                        }
+                    }
+                }
 
                 // TODO: add sprite pixel and rgb
 
-                //this->lcd_dots.push_back(bg_pixel);
+                // this->lcd_dots.push_back(bg_pixel);
 
                 // TODO: is there a better way to do this?
                 // fill up entire screen
@@ -555,7 +659,8 @@ void PPU::tick() {
                     uint16_t position_y =
                         (position.y * DrawUtils::SCALE) + position_y_offset;
 
-                    lcd_dots_image.setPixel({position_x, position_y}, bg_rgb);
+                    lcd_dots_image.setPixel({position_x, position_y},
+                                            result_pixel);
                 }
 
                 // TODO: optimize by only loading the palette when rom loads or
@@ -564,6 +669,7 @@ void PPU::tick() {
                 // TODO: need to find a way to clear while drawing the
                 // original pixels need a vector of dots to draw
             }
+
 
             // TODO: should i increment it before the check above
             this->ppu_fetcher.lcd_x_position++;
@@ -591,6 +697,10 @@ void PPU::tick() {
             // reset lcd x position
             // this->ppu_fetcher.lcd_x_position = 0;
             // this->ppu_fetcher.lcd_x_position = _get(SCX) % 8;
+
+            if (this->ppu_fetcher.window_fetch) {
+                this->ppu_fetcher.window_ly++;
+            }
 
             if (_get(LY) == 144) {
 
@@ -624,6 +734,8 @@ void PPU::tick() {
             _set(IF, _get(IF) | 2);
         }
 
+        this->ppu_fetcher.wy_condition = false;
+
         if (this->ppu_ticks == 456) {
 
             this->ppu_ticks = 0;
@@ -642,9 +754,10 @@ void PPU::tick() {
                 _set(STAT, _get(STAT) & ~4);
             }
 
-            if (_get(LY) == 153) {      // wait 10 more scanlines
-                _set(LY, 0);            // reset LY
-                //this->lcd_dots.clear(); // reset LCD
+            if (_get(LY) == 153) {               // wait 10 more scanlines
+                _set(LY, 0);                     // reset LY
+                this->ppu_fetcher.window_ly = 0; // reset window_ly
+                // this->lcd_dots.clear(); // reset LCD
                 this->current_mode = PPU::mode::OAM_Scan;
             }
         }

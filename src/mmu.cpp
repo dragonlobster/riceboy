@@ -288,10 +288,8 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
             return;
         }
 
-        this->cartridge->write_memory(address, value);
+        //this->cartridge->write_memory(address, value);
     }
-
-    // write to base memory if writing memory to mbc1 didn't occur
 
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 

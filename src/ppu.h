@@ -15,12 +15,14 @@ class Fetcher {
     const uint16_t SCX{0xff43};
     const uint16_t BGP{0xff47};
 
+
     Fetcher(MMU &gb_mmu_) : gb_mmu(gb_mmu_) {};
 
     // fetcher states
     uint16_t background_fetcher_ticks{0};
     uint16_t sprite_fetcher_ticks{0};
     uint16_t tile_index{0}; // incremented after every push to FIFO
+    bool window_fetch {false};
 
     void background_tick();
     void sprite_tick();
@@ -72,6 +74,12 @@ class Fetcher {
 
     // sprites to fetch based on X + 8 from OAM buffer
     std::vector<std::array<uint8_t, 4>> sprite_fetch_buffer{};
+
+    // window fetching condition
+    bool wy_condition{false};
+
+    // window ly position
+    uint8_t window_ly{0};
 
   private:
     // functions
@@ -154,8 +162,8 @@ class PPU {
     const std::array<uint8_t, 3> color_palette_dark_gray{93, 120, 46};
     const std::array<uint8_t, 3> color_palette_black{58, 81, 34};
 
-    // return dot color
-    sf::Color get_dot_color(uint8_t dot);
+    // return pixel color
+    sf::Color get_pixel_color(uint8_t pixel, uint8_t *palette = nullptr); // palette 0 OBP0, palette 1 OBP1
 
     /* functions */
 
