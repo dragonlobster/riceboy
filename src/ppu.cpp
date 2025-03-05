@@ -32,6 +32,9 @@ void Fetcher::reset() {
     // reset window fetch mode
     this->window_fetch = false;
 
+    // reset oam buffer counter
+    this->sprite_buffer_counter = 0;
+
     this->sprite_current_mode = Fetcher::mode::FetchTileNo;
     this->background_current_mode = Fetcher::mode::FetchTileNo;
     this->dummy_fetch = true;
@@ -58,33 +61,33 @@ void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     const bool x_pos_gt_0 = oam_entry[1] > 0;
     const bool LY_plus_16_gt_y_pos = _get(LY) + 16 >= oam_entry[0];
     // get the tall mode LCDC bit 2
-    const uint8_t sprite_height = (_get(LCDC) >> 2) & 1 ? 16 : 8;
+    const uint8_t sprite_height = ((_get(LCDC) >> 2) & 1) ? 16 : 8;
     // LY + 16 < y pos + sprite_height
     const bool sprite_height_condition =
         (_get(LY) + 16) < (oam_entry[0] + sprite_height);
 
     if (!x_pos_gt_0 || !LY_plus_16_gt_y_pos || !sprite_height ||
         !sprite_height_condition || ppu_fetcher.sprite_buffer.size() >= 10) {
-        // none of the conditions were met
+        // not all conditions were met
         return;
     }
 
     // calculate tile for tall mode
-    /*
     if ((_get(LCDC) >> 2) & 1) { // tall mode
         if ((_get(LY) + 16) < (oam_entry[0] >= 8 ? (oam_entry[0] - 8) : 0)) {
             oam_entry[2] = oam_entry[2] | 1;
         } else {
             oam_entry[2] = oam_entry[2] & 0xfe; // 1111 1110
         }
-    }*/
+    }
 
     // TODO: check suggested change
+    /*
     if ((_get(LCDC) >> 2) & 1) { // 8×16 mode
         // force bit 0 of tile to 0 for top half, 1 for bottom half
         bool bottom_half = (_get(LY) + 16 - oam_entry[0]) >= 8;
         oam_entry[2] = (oam_entry[2] & 0xfe) | (bottom_half ? 1 : 0);
-    }
+    }*/
 
     ppu_fetcher.sprite_buffer.push_back(oam_entry);
 }
@@ -680,7 +683,6 @@ void PPU::tick() {
                 // original pixels need a vector of dots to draw
             }
 
-
             // TODO: should i increment it before the check above
             this->ppu_fetcher.lcd_x_position++;
         }
@@ -751,19 +753,6 @@ void PPU::tick() {
             this->ppu_ticks = 0;
             _set(LY, _get(LY) + 1); // new scanline reached
 
-            // stat interrupt check
-            // TODO: check stat interrupt
-            if (_get(LY) == _get(LYC)) {
-                if ((_get(STAT) >> 6) & 1) {
-                    if (((_get(STAT) >> 2) & 1) == 0) {
-                        _set(IF, _get(IF) | 2);
-                        _set(STAT, _get(STAT) | 4);
-                    }
-                }
-            } else {
-                _set(STAT, _get(STAT) & ~4);
-            }
-
             if (_get(LY) == 153) {               // wait 10 more scanlines
                 _set(LY, 0);                     // reset LY
                 this->ppu_fetcher.window_ly = 0; // reset window_ly
@@ -773,5 +762,18 @@ void PPU::tick() {
         }
         break;
     }
+    }
+
+    // stat interrupt check
+    // TODO: check stat interrupt
+    if (_get(LY) == _get(LYC)) {
+        if ((_get(STAT) >> 6) & 1) {
+            if (((_get(STAT) >> 2) & 1) == 0) {
+                _set(IF, _get(IF) | 2);
+                _set(STAT, _get(STAT) | 4);
+            }
+        }
+    } else {
+        _set(STAT, _get(STAT) & ~4);
     }
 }
