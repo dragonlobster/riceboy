@@ -70,12 +70,20 @@ void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
     }
 
     // calculate tile for tall mode
+    /*
     if ((_get(LCDC) >> 2) & 1) { // tall mode
         if ((_get(LY) + 16) < (oam_entry[0] >= 8 ? (oam_entry[0] - 8) : 0)) {
             oam_entry[2] = oam_entry[2] | 1;
         } else {
             oam_entry[2] = oam_entry[2] & 0xfe; // 1111 1110
         }
+    }*/
+
+    // TODO: check suggested change
+    if ((_get(LCDC) >> 2) & 1) { // 8×16 mode
+        // force bit 0 of tile to 0 for top half, 1 for bottom half
+        bool bottom_half = (_get(LY) + 16 - oam_entry[0]) >= 8;
+        oam_entry[2] = (oam_entry[2] & 0xfe) | (bottom_half ? 1 : 0);
     }
 
     ppu_fetcher.sprite_buffer.push_back(oam_entry);
@@ -535,17 +543,6 @@ void PPU::tick() {
         break;
     }
     case mode::Drawing: {
-        // check for window fetch
-        if (((_get(LCDC) >> 5) & 1) &&
-            ppu_fetcher.lcd_x_position >= (_get(WX) - 1) &&
-            this->ppu_fetcher.wy_condition && !this->ppu_fetcher.window_fetch) {
-
-            this->ppu_fetcher.background_current_mode =
-                Fetcher::mode::FetchTileNo;
-            this->ppu_fetcher.tile_index = 0;
-            this->ppu_fetcher.background_fifo.clear();
-            this->ppu_fetcher.window_fetch = true;
-        }
 
         // fetcher background_tick
         this->ppu_fetcher.background_tick();
@@ -661,6 +658,19 @@ void PPU::tick() {
 
                     lcd_dots_image.setPixel({position_x, position_y},
                                             result_pixel);
+                }
+
+                // check for window fetch
+                if (((_get(LCDC) >> 5) & 1) &&
+                    ppu_fetcher.lcd_x_position >= (_get(WX) - 1) &&
+                    this->ppu_fetcher.wy_condition &&
+                    !this->ppu_fetcher.window_fetch) {
+
+                    this->ppu_fetcher.background_current_mode =
+                        Fetcher::mode::FetchTileNo;
+                    this->ppu_fetcher.tile_index = 0;
+                    this->ppu_fetcher.background_fifo.clear();
+                    this->ppu_fetcher.window_fetch = true;
                 }
 
                 // TODO: optimize by only loading the palette when rom loads or
