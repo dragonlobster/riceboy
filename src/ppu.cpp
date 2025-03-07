@@ -33,7 +33,7 @@ void Fetcher::reset() {
     this->window_fetch = false;
 
     // reset oam buffer counter
-    this->sprite_buffer_counter = 0;
+    //this->sprite_buffer_counter = 0;
 
     this->sprite_current_mode = Fetcher::mode::FetchTileNo;
     this->background_current_mode = Fetcher::mode::FetchTileNo;
@@ -756,6 +756,7 @@ void PPU::tick() {
             if (_get(LY) == 153) {               // wait 10 more scanlines
                 _set(LY, 0);                     // reset LY
                 this->ppu_fetcher.window_ly = 0; // reset window_ly
+                this->ppu_fetcher.sprite_buffer_counter = 0; 
                 // this->lcd_dots.clear(); // reset LCD
                 this->current_mode = PPU::mode::OAM_Scan;
             }
