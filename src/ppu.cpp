@@ -273,7 +273,6 @@ void Fetcher::sprite_tick() {
             this->temp_sprite_fifo[i] =
                 this->temp_sprite_fifo[i] | high_bit; // combine 2 bits together
         }
-
         this->sprite_current_mode = Fetcher::mode::PushToFIFO;
         break;
     }
@@ -374,7 +373,6 @@ void Fetcher::background_tick() {
         background_fetcher_ticks = 0;
 
         uint8_t low_byte{};
-
         uint16_t offset = this->window_fetch ? 2 * (this->window_ly % 8)
                                              : 2 * ((_get(LY) + _get(SCY)) % 8);
 

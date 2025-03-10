@@ -17,7 +17,6 @@ class PPU2 {
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
-    std::vector<uint8_t> sprite_fifo{};     // 2 bits
     uint8_t oam_search_counter{0};          // count oam searched
 
     uint8_t window_ly{0};  // window internal counter
@@ -26,12 +25,26 @@ class PPU2 {
     bool fetch_window{false};
     bool fetch_sprite{false};
 
+    // saved low byte and high byte for processing
+    uint8_t low_byte{};
+    uint8_t high_byte{};
+
+    // dummy fetch once per scanline
+    bool dummy_fetch{true};
+
     struct oam_entry {
         uint8_t x{};           // x position
         uint8_t y{};           // y position
-        uint8_t tile_number{}; // tile #
+        uint8_t tile_id{}; // tile #
         uint8_t flags{};       // sprite flags
     };
+
+    struct sprite_fifo_pixel {
+        uint8_t color_id{};
+        uint8_t flags{};
+    };
+
+    std::vector<sprite_fifo_pixel> sprite_fifo{};     // the whole pixel
 
     enum class ppu_mode { OAM_Scan, Drawing, HBlank, VBlank };
 
@@ -48,6 +61,7 @@ class PPU2 {
 
     std::vector<oam_entry> sprite_buffer{}; // sprite buffer
 
+    std::vector<oam_entry> sprites_to_fetch{};
     oam_entry sprite_to_fetch{};
 
     // lcd x position
