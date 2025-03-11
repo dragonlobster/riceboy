@@ -57,7 +57,8 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
     //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    riceboy->gb_cpu.prepare_rom(blargg[0]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
