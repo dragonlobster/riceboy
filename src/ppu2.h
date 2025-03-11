@@ -2,6 +2,7 @@
 
 #include "MMU.h"
 #include <SFML/Graphics.hpp>
+#include "DrawUtils.h"
 
 class PPU2 {
   public:
@@ -83,11 +84,19 @@ class PPU2 {
     uint16_t IF{0xff0f};
 
     // pixel drawing
-    sf::Image lcd_dots_image{};
-    sf::Texture lcd_dots_texture;
+    sf::Image lcd_frame_image{};
+    sf::Texture lcd_frame{};
+
+    sf::Color get_pixel_color(uint8_t pixel, uint8_t *palette = nullptr);
 
   private:
     // functions
     uint8_t _get(uint16_t address);
     void _set(uint16_t address, uint8_t value);
+
+    // palette
+    const std::array<uint8_t, 3> color_palette_white{181, 175, 66};
+    const std::array<uint8_t, 3> color_palette_light_gray{145, 155, 58};
+    const std::array<uint8_t, 3> color_palette_dark_gray{93, 120, 46};
+    const std::array<uint8_t, 3> color_palette_black{58, 81, 34};
 };

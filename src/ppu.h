@@ -171,6 +171,7 @@ class PPU {
     void add_to_sprite_buffer(
         std::array<uint8_t, 4> oam_entry); // each sprite is 4 bytes
 
+
   private:
     // color id
     std::array<uint8_t, 3> _get_color(uint8_t id);

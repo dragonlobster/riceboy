@@ -3,6 +3,7 @@
 #include "CPU.h"
 #include "MMU.h"
 #include "PPU2.h"
+#include "PPU.h"
 #include <SFML/Graphics.hpp>
 
 class Gameboy {
@@ -23,6 +24,7 @@ class Gameboy {
     // TODO: mmu, cpu, ppu
     MMU gb_mmu{};
     CPU gb_cpu = CPU(gb_mmu);
+    //PPU gb_ppu = PPU(gb_mmu, window);
     PPU2 gb_ppu = PPU2(gb_mmu, window);
 
     void tick();
