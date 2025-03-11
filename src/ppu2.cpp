@@ -391,6 +391,7 @@ void PPU2::tick() {
                     current_fetcher_mode = fetcher_mode::FetchTileNo;
                 }
             }
+
             break;
         }
         }
