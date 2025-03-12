@@ -408,6 +408,13 @@ void PPU2::tick() {
         // push pixels to LCD, 1 pixel per dot
         if (!background_fifo.empty()) {
 
+            // fine x (scx)
+            if (lcd_x == 0) {
+                for (unsigned int i = 0; i < _get(SCX) % 8; ++i) {
+                    background_fifo.pop_back();
+                }
+            }
+
             // get the background pixel
             uint8_t bg_pixel = background_fifo.back();
             background_fifo.pop_back();
