@@ -46,6 +46,7 @@ sf::Color PPU2::get_pixel_color(uint8_t pixel, uint8_t *palette) {
     return {color[0], color[1], color[2]};
 }
 
+
 void PPU2::tick() {
     ticks++;
     // 1 T-cycle
@@ -97,7 +98,6 @@ void PPU2::tick() {
             background_fifo.clear();
             sprite_fifo.clear();
             tile_index = 0;
-
             current_mode = ppu_mode::Drawing;
         }
 
@@ -106,9 +106,21 @@ void PPU2::tick() {
 
     case ppu_mode::Drawing: {
 
-        // assert that ticks this step takes is between 172 and 289
+        // assert that ticks this step takes is between 172+80 and 289+80
         // drawing mode 3
         // fetch tile no
+
+        // dummy fetch - after 6 cycles
+        if (dummy_fetch) {
+            // current_fetcher_mode = fetcher_mode::FetchTileNo;
+            assert(ticks >= 81 && ticks <= 87 &&
+                   "ticks not correct for dummy fetch!");
+            if (ticks == 87) { // 12 ticks for dummy fetching
+                current_fetcher_mode = fetcher_mode::FetchTileNo;
+                dummy_fetch = false;
+            }
+            return;
+        }
 
         // check for sprites right away
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
@@ -137,7 +149,7 @@ void PPU2::tick() {
 
         switch (current_fetcher_mode) {
         case fetcher_mode::FetchTileNo: {
-            if (ticks % 2 != 0)
+            if (ticks % 2 == 0)
                 return;
 
             if (fetch_sprite) {
@@ -160,6 +172,8 @@ void PPU2::tick() {
                     uint16_t scx_offset = (_get(SCX) % 256) / 8;
                     address = bgmap_start +
                               ((scy_offset + scx_offset + tile_index) & 0x3ff);
+
+					tile_id = _get(address);
                 }
 
                 else {
@@ -172,7 +186,7 @@ void PPU2::tick() {
                     address = bgmap_start + ((wy_offset + tile_index) & 0x3ff);
                 }
 
-                this->tile_id = this->gb_mmu.read_memory(address);
+                this->tile_id = _get(address);
             }
 
             current_fetcher_mode = fetcher_mode::FetchTileDataLow;
@@ -180,7 +194,7 @@ void PPU2::tick() {
         }
 
         case fetcher_mode::FetchTileDataLow: {
-            if (ticks % 2 != 0)
+            if (ticks % 2 == 0)
                 return;
 
             if (fetch_sprite) {
@@ -235,18 +249,20 @@ void PPU2::tick() {
                                       ? 2 * (this->window_ly % 8)
                                       : 2 * ((_get(LY) + _get(SCY)) % 8);
 
+                uint16_t address{};
+
                 // 8000 method or 8800 method to read
                 if (((_get(LCDC) >> 4) & 1) == 0) {
                     // 8800 method
-                    uint16_t address =
+                    address =
                         0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
-                    low_byte = this->gb_mmu.read_memory(address);
 
                 } else {
                     // 8000 method
-                    uint16_t address = 0x8000 + (tile_id * 16) + offset;
-                    low_byte = this->gb_mmu.read_memory(address);
+                    address = 0x8000 + (tile_id * 16) + offset;
                 }
+
+                low_byte = _get(address);
             }
 
             current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
@@ -254,7 +270,7 @@ void PPU2::tick() {
         }
 
         case fetcher_mode::FetchTileDataHigh: {
-            if (ticks % 2 != 0)
+            if (ticks % 2 == 0)
                 return;
 
             if (fetch_sprite) {
@@ -310,25 +326,18 @@ void PPU2::tick() {
                                       ? 2 * (this->window_ly % 8)
                                       : 2 * ((_get(LY) + _get(SCY)) % 8);
 
+                uint16_t address{};
+
                 // 8000 method or 8800 method to read
                 if ((_get(LCDC) >> 4 & 1) == 0) {
                     // 8800 method
-                    uint16_t address = 0x9000 +
-                                       (static_cast<int8_t>(tile_id) * 16) +
-                                       offset + 1;
-                    high_byte = this->gb_mmu.read_memory(address);
+                    address =
+                        0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
                 } else {
                     // 8000 method
-                    uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
-                    high_byte = this->gb_mmu.read_memory(address);
+                    address = 0x8000 + (tile_id * 16) + offset;
                 }
-
-                if (dummy_fetch) {
-                    current_fetcher_mode = fetcher_mode::FetchTileNo;
-                    fetch_window = false;
-                    dummy_fetch = false;
-                    break;
-                }
+                high_byte = _get(address + 1);
             }
 
             current_fetcher_mode = fetcher_mode::PushToFIFO;
@@ -424,27 +433,22 @@ void PPU2::tick() {
 
             assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
 
-            for (uint16_t y = 0; y < DrawUtils::SCALE; ++y) {
-                for (uint16_t x = 0; x < DrawUtils::SCALE; ++x) {
-                    uint16_t position_x = (lcd_x * DrawUtils::SCALE) + x;
-                    uint16_t position_y = (_get(LY) * DrawUtils::SCALE) + y;
+                for (uint16_t y = 0; y < DrawUtils::SCALE; ++y) {
+                    for (uint16_t x = 0; x < DrawUtils::SCALE; ++x) {
+                        uint16_t position_x = (lcd_x * DrawUtils::SCALE) + x;
+                        uint16_t position_y = (_get(LY) * DrawUtils::SCALE) + y;
 
-                    lcd_frame_image.setPixel({position_x, position_y},
-                                             final_pixel_color);
+                        lcd_frame_image.setPixel({position_x, position_y},
+                                                 final_pixel_color);
+                    }
                 }
-            }
 
             lcd_x++; // increment the lcd x position
         }
 
         if (lcd_x == 160) {
-            /*
-            assert(ticks >= 172 && ticks <= 289 &&
+            assert(ticks >= 172+80 && ticks <= 289+80 &&
                    "ticks in drawing mode should be between 172 and 289!!");
-                   */
-            if (ticks > 289) {
-                std::cout << ticks;
-            }
 
             current_mode = ppu_mode::HBlank;
         }
