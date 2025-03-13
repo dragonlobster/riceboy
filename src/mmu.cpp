@@ -13,7 +13,7 @@
 
 void MMU::handle_tma_write(uint8_t value) {
 
-    // tma address at the moment
+    // tma address at the moment is hardware_registers[0x06]
     hardware_registers[0x06] = value;
 
     if (lock_tima_write) {
@@ -50,7 +50,6 @@ void MMU::handle_tima_overflow() {
     assert(!lock_tima_write && "tima write should not be locked yet!");
 
     // reset tima overflow and tima overflow standby
-    // this->tima_overflow = false;
     this->tima_overflow_standby = false;
 }
 

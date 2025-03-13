@@ -21,6 +21,8 @@ class PPU2 {
     uint8_t oam_search_counter{0};          // count oam searched
 
     uint8_t window_ly{0};  // window internal counter
+    bool wy_condition{false}; // triggers window if wy == ly at some point in this frame
+
     uint8_t tile_index{0}; // saved tile index for fetcher
     uint8_t tile_id{0};    // saved tile_id for grabbing
     bool fetch_window{false};
@@ -88,6 +90,7 @@ class PPU2 {
     sf::Texture lcd_frame{};
 
     sf::Color get_pixel_color(uint8_t pixel, uint8_t *palette = nullptr);
+
 
   private:
     // functions

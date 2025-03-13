@@ -56,6 +56,11 @@ void PPU2::tick() {
     case ppu_mode::OAM_Scan: {
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
+
+        if (ticks == 1 && !wy_condition) {
+            wy_condition = _get(WY) == _get(LY);
+        }
+
         if ((ticks % 2 == 0)) { // 40 objects
 
             std::array<uint8_t, 4> oam_entry_array{};
@@ -123,12 +128,13 @@ void PPU2::tick() {
         }
 
         // check for sprites right away
+
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty()) { // check bit 1 for enable sprites
             for (unsigned int i = 0; i < sprite_buffer.size(); ++i) {
                 if (sprite_buffer[i].x <= lcd_x + 8) {
                     sprites_to_fetch.push_back(sprite_buffer[i]);
-                    // sprite_to_fetch = sprite_buffer[i];
+                    sprite_buffer.erase(sprite_buffer.begin() + i);
                 }
             }
         }
@@ -166,14 +172,30 @@ void PPU2::tick() {
                     if (((_get(LCDC) >> 3) & 1) == 1) {
                         bgmap_start = 0x9c00;
                     }
+
+                    /*
                     // fetch tile no.
                     uint16_t scy_offset =
                         32 * (((_get(LY) + _get(SCY)) % 256) / 8);
-                    uint16_t scx_offset = (_get(SCX) % 256) / 8;
-                    address = bgmap_start +
-                              ((scy_offset + scx_offset + tile_index) & 0x3ff);
 
+                    uint16_t scx_offset = (_get(SCX)) / 8;
+
+                    address = bgmap_start + tile_index + scy_offset;
+
+                    //address = bgmap_start + scy_offset + tile_index;
 					tile_id = _get(address);
+                    */
+
+
+                    uint16_t scy_offset =
+                        32 * (((_get(LY) + _get(SCY)) % 256) / 8);
+
+                    uint16_t scx_offset = (tile_index + _get(SCX) / 8) % 32;
+
+                    address = bgmap_start + ((scy_offset + scx_offset) & 0x3ff);
+
+                    tile_id = _get(address);
+
                 }
 
                 else {
@@ -183,6 +205,7 @@ void PPU2::tick() {
                     } // bgmap_start is either 0x9c00 or 0x9800
 
                     uint16_t wy_offset = 32 * (window_ly / 8);
+
                     address = bgmap_start + ((wy_offset + tile_index) & 0x3ff);
                 }
 
@@ -356,7 +379,7 @@ void PPU2::tick() {
                     unsigned int j = x_flip ? 7 - i : i;
 
                     uint8_t final_bit = ((low_byte >> j) & 1) |
-                                        (((high_byte >> j) << 1) & 0x02);
+                        (((high_byte >> j) << 1) & 0x02);
 
                     // check sprite x position to see if pixels should be loaded
                     // into fifo
@@ -366,8 +389,8 @@ void PPU2::tick() {
                         }
                     }
 
-                    sprite_fifo_pixel pixel = {final_bit,
-                                               sprite_to_fetch.flags};
+                    sprite_fifo_pixel pixel = { final_bit,
+                                               sprite_to_fetch.flags };
 
                     uint8_t y =
                         sprite_to_fetch.x < 8 ? i - (8 - sprite_to_fetch.x) : i;
@@ -380,7 +403,7 @@ void PPU2::tick() {
                     }
 
                     else {
-                        sprite_fifo[y] = pixel;
+                        sprite_fifo.push_back(pixel);
                     }
                 }
 
@@ -393,7 +416,7 @@ void PPU2::tick() {
                     // push to background fifo
                     for (unsigned int i = 0; i < 8; ++i) {
                         uint8_t final_bit = ((low_byte >> i) & 1) |
-                                            (((high_byte >> i) << 1) & 0x02);
+                            (((high_byte >> i) << 1) & 0x02);
                         background_fifo.push_back(final_bit);
                     }
                     tile_index++;
@@ -419,7 +442,8 @@ void PPU2::tick() {
             uint8_t bg_pixel = background_fifo.back();
             background_fifo.pop_back();
 
-            sf::Color final_pixel_color = get_pixel_color(bg_pixel);
+            sf::Color final_pixel_color =
+                _get(LCDC) & 1 ? get_pixel_color(bg_pixel) : get_pixel_color(0);
 
             if (!sprite_fifo.empty()) {
                 sprite_fifo_pixel sprite_pixel = sprite_fifo.back();
@@ -440,17 +464,24 @@ void PPU2::tick() {
 
             assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
 
-                for (uint16_t y = 0; y < DrawUtils::SCALE; ++y) {
-                    for (uint16_t x = 0; x < DrawUtils::SCALE; ++x) {
-                        uint16_t position_x = (lcd_x * DrawUtils::SCALE) + x;
-                        uint16_t position_y = (_get(LY) * DrawUtils::SCALE) + y;
+            for (uint16_t y = 0; y < DrawUtils::SCALE; ++y) {
+                for (uint16_t x = 0; x < DrawUtils::SCALE; ++x) {
+                    uint16_t position_x = (lcd_x * DrawUtils::SCALE) + x;
+                    uint16_t position_y = (_get(LY) * DrawUtils::SCALE) + y;
 
-                        lcd_frame_image.setPixel({position_x, position_y},
-                                                 final_pixel_color);
-                    }
+                    lcd_frame_image.setPixel({ position_x, position_y },
+                        final_pixel_color);
                 }
+            }
 
             lcd_x++; // increment the lcd x position
+
+            // check for window fetching after pixel was shifted out to LCD
+            if (!fetch_window && _get(LCDC) & 0x20 && (lcd_x >= (_get(WX) - 7)) && wy_condition) {
+                tile_index = 0;
+                background_fifo.clear();
+                fetch_window = true;
+            }
         }
 
         if (lcd_x == 160) {
@@ -469,6 +500,11 @@ void PPU2::tick() {
 
         // wait 456 T-cycles
         if (ticks == 456) {
+
+            if (fetch_window) {
+                window_ly++;
+            } // add window ly before resetting fetch window
+
             ticks = 0; // reset ticks
 
             // i think we can reset LCD x in HBlank
@@ -476,12 +512,10 @@ void PPU2::tick() {
             // dummy fetch too?
             dummy_fetch = true;
             fetch_window = false;
-
+            // can reset wy condition as well here, since we are moving on to the next LY
+            wy_condition = false;
 
             _set(LY, _get(LY) + 1); // new scanline reached
-            if (fetch_window) {
-                window_ly++;
-            }
 
             if (_get(LY) == 144) {
                 // hit VBlank for the first time
@@ -531,4 +565,17 @@ void PPU2::tick() {
     }
 
     }
+
+    // stat interrupt every tick
+    if (_get(LY) == _get(LYC)) {
+        if ((_get(STAT) >> 6) & 1) {
+            if (((_get(STAT) >> 2) & 1) == 0) {
+                _set(IF, _get(IF) | 2);
+                _set(STAT, _get(STAT) | 4);
+            }
+        }
+    } else {
+        _set(STAT, _get(STAT) & ~4); // sets coincidence bit to 0 explicitly
+    }
+
 }

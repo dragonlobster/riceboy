@@ -755,7 +755,6 @@ void PPU::tick() {
                 _set(LY, 0);                     // reset LY
                 this->ppu_fetcher.window_ly = 0; // reset window_ly
                 this->ppu_fetcher.sprite_buffer_counter = 0; 
-                // this->lcd_dots.clear(); // reset LCD
                 this->current_mode = PPU::mode::OAM_Scan;
             }
         }
@@ -775,4 +774,5 @@ void PPU::tick() {
     } else {
         _set(STAT, _get(STAT) & ~4);
     }
+
 }
