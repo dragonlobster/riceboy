@@ -173,20 +173,6 @@ void PPU2::tick() {
                         bgmap_start = 0x9c00;
                     }
 
-                    /*
-                    // fetch tile no.
-                    uint16_t scy_offset =
-                        32 * (((_get(LY) + _get(SCY)) % 256) / 8);
-
-                    uint16_t scx_offset = (_get(SCX)) / 8;
-
-                    address = bgmap_start + tile_index + scy_offset;
-
-                    //address = bgmap_start + scy_offset + tile_index;
-					tile_id = _get(address);
-                    */
-
-
                     uint16_t scy_offset =
                         32 * (((_get(LY) + _get(SCY)) % 256) / 8);
 
