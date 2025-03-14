@@ -31,6 +31,8 @@ class PPU2 {
     // saved low byte and high byte for processing
     uint8_t low_byte{};
     uint8_t high_byte{};
+    // save the high byte address from fetch low byte step
+    uint16_t high_byte_address{};
 
     // dummy fetch once per scanline
     bool dummy_fetch{true};
