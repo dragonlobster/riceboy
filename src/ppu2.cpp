@@ -55,11 +55,20 @@ void PPU2::tick() {
         wy_condition = _get(WY) == _get(LY);
     }
 
+    // set stat to mode
+    _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
+    last_mode = current_mode;
+
     // oam search mode 2
     switch (current_mode) {
     case ppu_mode::OAM_Scan: {
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
+
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
+            _set(IF, _get(IF) | 2);
+        }
 
         if ((ticks % 2 == 0)) { // 40 objects
 
@@ -345,7 +354,10 @@ void PPU2::tick() {
 
                 }
 
-                fetch_sprite = false;
+                if (sprites_to_fetch.empty()) {
+                    fetch_sprite = false;
+                }
+
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
             }
 
@@ -367,7 +379,7 @@ void PPU2::tick() {
         }
 
         // push pixels to LCD, 1 pixel per dot
-        if (!background_fifo.empty()) {
+        if (!background_fifo.empty() && !fetch_sprite) {
 
             // fine x (scx)
             if (lcd_x == 0) {
@@ -442,6 +454,11 @@ void PPU2::tick() {
     }
     case ppu_mode::HBlank: {
 
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+            _set(IF, _get(IF) | 2);
+        }
+
         // pause until 456 T-cycles have finished
 
         // wait 456 T-cycles
@@ -493,6 +510,11 @@ void PPU2::tick() {
     }
 
     case ppu_mode::VBlank: {
+
+        // set IF for interrupt
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+            _set(IF, _get(IF) | 2);
+        }
 
         if (ticks == 456) {
             ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks

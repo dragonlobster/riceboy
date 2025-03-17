@@ -92,6 +92,34 @@ void MMU::handle_tac_write(uint8_t value) {
     this->falling_edge();
 }
 
+void MMU::handle_dma_write(uint8_t value) { 
+    if (!dma_mode && !dma_write && !dma_delay) {
+        this->dma_ff46 = value;
+        this->dma_source_transfer_address = value << 8; // start transfer address at $00xx
+        this->dma_write = true;
+    }
+}
+
+void MMU::set_dma_delay() { 
+    this->dma_delay = true;
+    this->dma_write = false; // reset dma write
+}
+
+void MMU::set_oam_dma() { 
+    this->dma_delay = false; 
+    this->dma_mode = true;
+}
+
+void MMU::dma_transfer() {
+    uint16_t dest_address = 0xfe00 | (dma_source_transfer_address & 0x00ff);
+    this->write_memory(dest_address, this->read_memory(dma_source_transfer_address));
+    dma_source_transfer_address++;
+
+    assert(((dma_source_transfer_address & 0x00ff) <= 0x9f) && "dma transfer passed oam memory!");
+}
+
+
+
 void MMU::set_load_rom_complete() {
 
     if (IS_MBC1) {
@@ -162,6 +190,22 @@ MMU::section MMU::locate_section(const uint16_t address) {
     }
     return MMU::section::unknown;
 }
+
+uint8_t MMU::cpu_read_memory(uint16_t address) const { 
+
+    // not oam dma, or the memory location is in HRAM (zero page)
+    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page) {
+        return read_memory(address);
+    }
+
+    else {
+        uint16_t dma_address = 0xfe00 | (dma_source_transfer_address & 0xff); // take last 2 bytes of the current transfer address
+        return read_memory(dma_address);
+    }
+
+}
+
+
 
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {
@@ -287,6 +331,12 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
             return;
         }
 
+        // dma
+        if (address == 0xff46) {
+            handle_dma_write(value);
+            return;
+        }
+
         this->cartridge->write_memory(address, value);
     }
 
@@ -358,13 +408,17 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
             handle_tima_write(value);
         }
 
-        if (address == 0xff06) {
+        else if (address == 0xff06) {
             handle_tma_write(value);
-            return;
         }
 
         else if (address == 0xff07) {
             handle_tac_write(value);
+        }
+
+        // dma
+        else if (address == 0xff46) {
+            handle_dma_write(value);
         }
 
         else {

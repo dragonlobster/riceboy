@@ -130,7 +130,7 @@ uint8_t *CPU::_get_register(const registers r8) {
 }
 
 uint8_t CPU::_get(const uint16_t address) {
-    return this->gb_mmu->read_memory(address);
+    return this->gb_mmu->cpu_read_memory(address);
 }
 
 void CPU::_set(const uint16_t address, const uint8_t value) {
@@ -144,8 +144,7 @@ void CPU::add_a_hl() {
     // TODO: if capture (this) goes out of scope it could cause crashes
     auto _add_hl = [=]() {
         const uint16_t hl = this->_combine_2_8bits(this->H, this->L);
-        this->W = this->gb_mmu->read_memory(
-            hl); // assign value of HL to temp register W
+        this->W = _get(hl); // assign value of HL to temp register W
         // 1 M-cycle - add HL value to register A
         auto [result, z, n, h, c] = _addition_8bit(this->A, this->W);
 
@@ -182,7 +181,7 @@ void CPU::add_a_r8(const registers r8) {
 
 void CPU::add_or_sub_a_imm8(const bool add) {
     auto m1_add = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         auto [result, z, n, h, c] = this->_addition_8bit(this->A, imm8);
         this->A = result;
@@ -193,7 +192,7 @@ void CPU::add_or_sub_a_imm8(const bool add) {
     };
 
     auto m1_sub = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         auto [result, z, n, h, c] = this->_subtraction_8bit(this->A, imm8);
         this->A = result;
@@ -212,7 +211,7 @@ void CPU::add_or_sub_a_imm8(const bool add) {
 
 void CPU::adc_or_sbc_imm8(const bool add) {
     auto m1_adc = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         auto [result, z, n, h, c] =
             this->_addition_8bit(this->A, imm8, this->Cf);
@@ -224,7 +223,7 @@ void CPU::adc_or_sbc_imm8(const bool add) {
     };
 
     auto m1_sbc = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         auto [result, z, n, h, c] =
             this->_subtraction_8bit(this->A, imm8, this->Cf);
@@ -244,7 +243,7 @@ void CPU::adc_or_sbc_imm8(const bool add) {
 
 void CPU::and_xor_or_imm8(bitops op) {
     auto m1_and = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         this->A = this->A & imm8;
         this->Zf = this->A == 0;
@@ -254,7 +253,7 @@ void CPU::and_xor_or_imm8(bitops op) {
     };
 
     auto m1_or = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         this->A = this->A | imm8;
         this->Zf = this->A == 0;
@@ -264,7 +263,7 @@ void CPU::and_xor_or_imm8(bitops op) {
     };
 
     auto m1_xor = [=]() {
-        uint8_t imm8 = this->gb_mmu->read_memory(this->PC);
+        uint8_t imm8 = _get(this->PC);
         this->PC++;
         this->A = this->A ^ imm8;
         this->Zf = this->A == 0;
@@ -365,13 +364,13 @@ void CPU::call(const conditions condition) {
     // get least and most significant byte via program_counter next
     // M2
     auto get_lsb = [=]() {
-        this->W = this->gb_mmu->read_memory(this->PC);
+        this->W = _get(this->PC);
         this->PC++;
     };
 
     // M3
     auto get_msb = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->PC);
+        this->Z = _get(this->PC);
         this->PC++;
     };
 
@@ -445,7 +444,7 @@ void CPU::call(const conditions condition) {
 
 void CPU::cp_a_imm8() {
     auto read_imm8 = [=]() {
-        this->W = this->gb_mmu->read_memory(this->PC); // imm8 stored in W
+        this->W = _get(this->PC); // imm8 stored in W
         this->PC++;
 
         // sub_and_set_flags
@@ -476,7 +475,7 @@ void CPU::cp_a_r(const registers r, const bool hl) {
     } else {
         auto read_hl = [=]() {
             uint16_t hl = _combine_2_8bits(this->H, this->L);
-            this->W = this->gb_mmu->read_memory(hl); // memory[hl] stored in W
+            this->W = _get(hl); // memory[hl] stored in W
 
             // sub an set flags
             auto [result, z, n, h, c] =
@@ -497,7 +496,7 @@ void CPU::cp_a_r(const registers r, const bool hl) {
 void CPU::inc_or_dec_hl(const bool inc) {
     uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
-    auto m1 = [=]() { this->Z = this->gb_mmu->read_memory(address); };
+    auto m1 = [=]() { this->Z = _get(address); };
 
     auto m2_dec = [=]() {
         auto [result, z, n, h, c] = this->_subtraction_8bit(this->Z, 1);
@@ -576,12 +575,12 @@ void CPU::jp_hl() { this->PC = this->_combine_2_8bits(this->H, this->L); }
 void CPU::jp_imm16(const conditions condition) {
     // get least and most significant byte via program_counter next
     auto get_lsb = [=]() {
-        this->W = this->gb_mmu->read_memory(this->PC);
+        this->W = _get(this->PC);
         this->PC++;
     };
 
     auto get_msb = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->PC);
+        this->Z = _get(this->PC);
         this->PC++;
     };
 
@@ -627,7 +626,7 @@ void CPU::jp_imm16(const conditions condition) {
 void CPU::jr_s8(conditions condition) {
     // jump relative to signed 8 bit next in memory
     auto get_value = [=]() {
-        this->Z = this->gb_mmu->read_memory(this->PC);
+        this->Z = _get(this->PC);
         this->PC++;
     };
 
@@ -666,12 +665,12 @@ void CPU::jr_s8(conditions condition) {
 
 void CPU::ld_imm16_sp() {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(PC); // lsb
+        this->Z = _get(PC); // lsb
         PC++;
     };
 
     auto m2 = [=]() {
-        this->W = this->gb_mmu->read_memory(PC); // msb
+        this->W = _get(PC); // msb
         PC++;
     };
 
@@ -696,12 +695,12 @@ void CPU::ld_imm16_sp() {
 
 void CPU::ld_imm16_a(const bool to_a) {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(PC); // lsb
+        this->Z = _get(PC); // lsb
         PC++;
     };
 
     auto m2 = [=]() {
-        this->W = this->gb_mmu->read_memory(PC); // msb
+        this->W = _get(PC); // msb
         PC++;
     };
 
@@ -710,8 +709,7 @@ void CPU::ld_imm16_a(const bool to_a) {
         if (!to_a) {
             this->_set(address, this->A); // write A to address
         } else {
-            this->A = this->gb_mmu->read_memory(
-                address); // write value from address to A
+            this->A = _get(address); // write value from address to A
         }
     };
 
@@ -749,7 +747,7 @@ void CPU::ld_sp_hl() {
 void CPU::ld_r_imm8(const registers r) {
     auto m1 = [=]() {
         uint8_t *register_pointer = this->_get_register(r);
-        uint8_t value = this->gb_mmu->read_memory(this->PC);
+        uint8_t value = _get(this->PC);
         *register_pointer = value;
         this->PC++;
     };
@@ -759,9 +757,9 @@ void CPU::ld_r_imm8(const registers r) {
 
 void CPU::ld_rr_address(const registers r1, const registers r2, const bool sp) {
     auto m1 = [=]() {
-        this->Z = this->gb_mmu->read_memory(PC); // lsb
+        this->Z = _get(PC); // lsb
         this->PC++;
-        this->W = this->gb_mmu->read_memory(PC); // msb
+        this->W = _get(PC); // msb
         this->PC++;
     };
 
@@ -802,7 +800,7 @@ void CPU::ld_hl_a(const bool increment, const bool to_a) {
     auto m2 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
-        this->A = this->gb_mmu->read_memory(address);
+        this->A = _get(address);
 
         if (increment) {
             address++;
@@ -831,7 +829,7 @@ void CPU::ld_hl_r8(const registers r, const bool to_hl) {
     auto m2 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
         uint8_t *rp = this->_get_register(r);
-        uint8_t value = this->gb_mmu->read_memory(address);
+        uint8_t value = _get(address);
         *rp = value;
     };
 
@@ -1029,7 +1027,7 @@ void CPU::sla_r(const registers r, const bool hl) {
 
     auto m2_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z <<= 1;                      // left shift A by 1 bit
@@ -1088,7 +1086,7 @@ void CPU::rl_r(const registers r, const bool hl, const bool z_flag,
 
     auto m2_hl = [=]() {
         uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t msbit = (this->Z >> 7) & 1;      // save the "carry" bit
         uint8_t carry_flag = this->Cf;           // take current carry flag
@@ -1147,7 +1145,7 @@ void CPU::rlc_r(const registers r, const bool hl, const bool z_flag,
 
     auto m2_hl = [=]() {
         uint16_t address = _combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z = this->Z << 1;
@@ -1205,7 +1203,7 @@ void CPU::rr_r(const registers r, const bool hl, const bool z_flag,
 
     auto m2_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t lsbit = this->Z & 1;   // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
@@ -1263,7 +1261,7 @@ void CPU::rrc_r(const registers r, const bool hl, const bool z_flag,
 
     auto m2_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t lsbit = this->Z & 1; // save the "carry" bit
         this->Z = this->Z >> 1;
@@ -1312,7 +1310,7 @@ void CPU::sra_r(const registers r, const bool hl) {
 
     auto m2_hl = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
-        this->Z = this->gb_mmu->read_memory(address);
+        this->Z = _get(address);
 
         uint8_t msbit_retain = this->Z & 0x80;
         uint8_t lsbit = this->Z & 1;
@@ -1966,6 +1964,16 @@ void CPU::tick() {
         handle_interrupts();
     }
 
+    // handle DMA transfers on dma mode before executing instructions
+    if (this->gb_mmu->dma_mode) {
+
+        this->gb_mmu->dma_transfer();
+
+        if ((this->gb_mmu->dma_source_transfer_address & 0xff) == 0x9f) {
+            this->gb_mmu->dma_mode = false; // set dma mode to false after last write
+        }
+    }
+
     if (!this->halt) {
         // fetch opcode, then execute what you can this M-cycle
         const uint8_t opcode = this->_get(this->PC); // get current opcode
@@ -1988,7 +1996,18 @@ void CPU::tick() {
             this->ime = true;
             this->ei_delay = false;
         }
+
+        // TODO: check oam 
+        if (this->gb_mmu->dma_write) {
+            this->gb_mmu->set_dma_delay();
+        }
+
+        else if (this->gb_mmu->dma_delay) {
+            this->gb_mmu->set_oam_dma();
+        }
+
     }
+
 }
 
 void CPU::interrupt_tick() {
@@ -2000,9 +2019,9 @@ void CPU::interrupt_tick() {
     this->interrupt_ticks = 0;
     // operates in M-cycles
 
-    //if (M_operations.empty() && I_operations.empty()) {
-    //    this->handle_interrupts();
-    //}
+    // if (M_operations.empty() && I_operations.empty()) {
+    //     this->handle_interrupts();
+    // }
 }
 
 void CPU::timer_tick() {

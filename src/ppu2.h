@@ -51,7 +51,7 @@ class PPU2 {
 
     std::vector<sprite_fifo_pixel> sprite_fifo{};     // the whole pixel
 
-    enum class ppu_mode { OAM_Scan, Drawing, HBlank, VBlank };
+    enum class ppu_mode { OAM_Scan = 2, Drawing = 3, HBlank = 0, VBlank = 1 };
 
     enum class fetcher_mode {
         FetchTileNo,
@@ -61,6 +61,7 @@ class PPU2 {
     };
 
     ppu_mode current_mode{ppu_mode::OAM_Scan};
+    ppu_mode last_mode{ppu_mode::OAM_Scan};
 
     fetcher_mode current_fetcher_mode{fetcher_mode::FetchTileNo};
 

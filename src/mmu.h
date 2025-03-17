@@ -11,6 +11,7 @@
 class MMU {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
+    virtual uint8_t cpu_read_memory(uint16_t address) const;
 
     virtual void write_memory(uint16_t address, uint8_t value);
 
@@ -33,6 +34,7 @@ class MMU {
         interrupt_enable_flag = 0xffff,
         unknown = 1
     };
+    // zero page = high ram
 
     enum class cartridge_type : uint8_t {
         rom_only = 0,
@@ -88,6 +90,18 @@ class MMU {
     void handle_tac_write(uint8_t value);
     void handle_tima_write(uint8_t value);
     void handle_tma_write(uint8_t value);
+
+    // dma
+    uint8_t dma_ff46{0};
+    bool dma_mode{false};
+    bool dma_write{false}; // a dma write occured
+    bool dma_delay{false}; // set by cpu after dma write is checked by the cpu, used for 4 tick delay
+    uint16_t dma_source_transfer_address{0}; // address for DMA transfer
+    void set_dma_delay();
+    void set_oam_dma();
+    void handle_dma_write(uint8_t value);
+
+    void dma_transfer();
 
   private:
     // Interrupt enable flag - 0xFFFF
