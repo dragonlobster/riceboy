@@ -227,6 +227,10 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return this->tac_ff07;
         }
 
+        if (address == 0xff00) {
+            return 0xff; // joypad
+        }
+
         uint16_t result = this->cartridge->read_memory(address);
 
         if (result <= 0xff) { // make sure result fits in 8 bits
@@ -278,6 +282,8 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return this->tima_ff05;
         } else if (address == 0xff07) {
             return this->tac_ff07;
+        } else if (address == 0xff00) {
+            return 0xff; // joypad
         } else {
             return this->hardware_registers[address - base_address];
         }

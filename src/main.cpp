@@ -36,6 +36,7 @@ int main() {
         "BOOT/blargg/mem_timing/mem_timing.gb",
         "BOOT/blargg/mem_timing-2/mem_timing.gb",
         "BOOT/blargg/oam_bug/oam_bug.gb", // not implemented yet
+        "BOOT/blargg/oam_bug/rom_singles/1-lcd_sync.gb", // not implemented yet
         "BOOT/blargg/halt_bug.gb"};       // not implemented yet
 
     std::array<std::string, 13> mooneye_timing{
@@ -56,9 +57,9 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
+    //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
     //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
-    //riceboy->gb_cpu.prepare_rom(blargg[1]);
+    //riceboy->gb_cpu.prepare_rom(blargg[5]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
