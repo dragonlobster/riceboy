@@ -57,6 +57,11 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
+    std::array<std::string, 1> mooneye_ppu{
+        "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb"};
+
+
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[0]);
     //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
     //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
     //riceboy->gb_cpu.prepare_rom(blargg[5]);

@@ -1,4 +1,5 @@
 #include "ppu2.h"
+#include <algorithm>
 #include <iostream>
 
 uint8_t PPU2::_get(uint16_t address) {
@@ -89,19 +90,12 @@ void PPU2::tick() {
             };
 
             // add to sprite buffer on specific conditions
-            if (entry.x > 0 && (_get(LY) + 16) >= entry.y &&
+            if ((_get(LY) + 16) >= entry.y &&
                 (_get(LY) + 16) < entry.y + (_get(LCDC) & 0x04 ? 16 : 8) &&
                 sprite_buffer.size() < 10) {
 
                 sprite_buffer.push_back(entry);
             }
-
-            /*
-            if (sprite_buffer.size() > 1) {
-                std::sort(
-                    sprite_buffer.begin(), sprite_buffer.end(),
-                    [](const oam_entry &a, oam_entry &b) { return a.x < b.x; });
-            }*/
 
             oam_search_counter++;
         }
@@ -114,6 +108,16 @@ void PPU2::tick() {
             background_fifo.clear();
             sprite_fifo.clear();
             tile_index = 0;
+
+            // stable sort sprite buffer
+            if (sprite_buffer.size() > 1) {
+                std::stable_sort(
+                    sprite_buffer.begin(), sprite_buffer.end(),
+                    [](const oam_entry &a, const oam_entry &b) -> bool {
+                        return a.x < b.x; // lower x has priority
+                    });
+            }
+
             current_mode = ppu_mode::Drawing;
         }
 
@@ -139,14 +143,15 @@ void PPU2::tick() {
         }
 
         // check for sprites right away
-
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty()) { // check bit 1 for enable sprites
 
-            for (unsigned int i = 0; i < sprite_buffer.size(); ++i) {
+            for (unsigned int i = 0; i < sprite_buffer.size();) {
                 if (sprite_buffer[i].x <= lcd_x + 8) {
                     sprites_to_fetch.push_back(sprite_buffer[i]);
                     sprite_buffer.erase(sprite_buffer.begin() + i);
+                } else {
+                    ++i;
                 }
             }
         }
@@ -155,22 +160,14 @@ void PPU2::tick() {
             fetch_sprite = true;
             current_fetcher_mode =
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
-            sprite_to_fetch = sprites_to_fetch[0];
-
-            sprites_to_fetch.erase(sprites_to_fetch.begin());
+            sprite_to_fetch = sprites_to_fetch.back();
+            sprites_to_fetch.pop_back();
         }
-
-        /*
-        else if (fetch_sprite) {
-            current_fetcher_mode = fetcher_mode::FetchTileNo;
-            fetch_sprite = false; // reset fetch sprite of the sprites to fetch
-                                  // is empty now
-        }*/
 
         switch (current_fetcher_mode) {
         case fetcher_mode::FetchTileNo: {
             if (ticks % 2 == 0)
-                return;
+                break;
 
             if (fetch_sprite) {
                 // set tile id to sprite to fetch tile id
@@ -219,7 +216,7 @@ void PPU2::tick() {
 
         case fetcher_mode::FetchTileDataLow: {
             if (ticks % 2 == 0)
-                return;
+                break;
 
             if (fetch_sprite) {
                 assert(sprite_to_fetch.y >= 16 &&
@@ -237,11 +234,14 @@ void PPU2::tick() {
                         // top half
                         if (!y_flip) {
                             tile_id &= 0xfe; // set lsb to 0
-                            line_offset = (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
+                            line_offset =
+                                (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
                         } else {
                             tile_id |= 0x01; // set lsb to 1
                             line_offset =
-                            (8 - 1 - (_get(LY) - (sprite_to_fetch.y - 16))) * 2;
+                                (8 - 1 -
+                                 (_get(LY) - (sprite_to_fetch.y - 16))) *
+                                2;
                         }
                     }
 
@@ -249,11 +249,14 @@ void PPU2::tick() {
                         // bottom half
                         if (!y_flip) {
                             tile_id |= 0x01;
-                            line_offset = (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
+                            line_offset =
+                                (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
                         } else {
                             tile_id &= 0xfe;
                             line_offset =
-                            (8 - 1 - (_get(LY) - ((sprite_to_fetch.y - 16) + 7))) * 2;
+                                (8 - 1 -
+                                 (_get(LY) - ((sprite_to_fetch.y - 16) + 7))) *
+                                2;
                         }
                     }
 
@@ -305,13 +308,14 @@ void PPU2::tick() {
 
         case fetcher_mode::FetchTileDataHigh: {
             if (ticks % 2 == 0)
-                return;
+                break;
 
             high_byte = _get(high_byte_address);
 
             current_fetcher_mode = fetcher_mode::PushToFIFO;
             break;
         }
+
         case fetcher_mode::PushToFIFO: {
             if (fetch_sprite) {
 
@@ -320,38 +324,34 @@ void PPU2::tick() {
 
                 bool x_flip = sprite_to_fetch.flags & 0x20; // x flip
 
-                for (unsigned int i = 0; i < 8; ++i) {
+                for (unsigned int i = 0, fifo_index = 0; i < 8;
+                     ++i, ++fifo_index) {
+                    // check sprite x position to see if pixels should be loaded
+                    // into fifo
+                    if (sprite_to_fetch.x < 8) {
+                        if (i < 8 - sprite_to_fetch.x) {
+                            --fifo_index;
+                            continue;
+                        }
+                    }
 
                     unsigned int j = x_flip ? 7 - i : i;
 
                     uint8_t final_bit = ((low_byte >> j) & 1) |
                                         (((high_byte >> j) << 1) & 0x02);
 
-                    // check sprite x position to see if pixels should be loaded
-                    // into fifo
-                    if (sprite_to_fetch.x < 8) {
-                        if (i < 8 - sprite_to_fetch.x) {
-                            continue;
-                        }
-                    }
-
-                    sprite_fifo_pixel pixel = {final_bit,
+                    sprite_fifo_pixel pixel = {sprite_to_fetch.x, final_bit,
                                                sprite_to_fetch.flags};
 
-                    uint8_t y =
-                        sprite_to_fetch.x < 8 ? i - (8 - sprite_to_fetch.x) : i;
-
-                    if (y < sprite_fifo.size()) {
-                        if (sprite_fifo[y].color_id == 0) {
-                            // replace it
-                            sprite_fifo[y] = pixel;
+                    if (fifo_index < sprite_fifo.size()) {
+                        if (sprite_fifo[fifo_index].color_id == 0) {
+                            sprite_fifo[fifo_index] = pixel;
                         }
                     }
 
                     else {
                         sprite_fifo.push_back(pixel);
                     }
-
                 }
 
                 if (sprites_to_fetch.empty()) {
@@ -405,9 +405,10 @@ void PPU2::tick() {
                     get_pixel_color(sprite_pixel.color_id, &palette);
 
                 bool sprite_priority =
-                    !((sprite_pixel.flags >> 7) & 1) || !bg_pixel;
+                    sprite_pixel.color_id && _get(LCDC) & 0x02 &&
+                    (!((sprite_pixel.flags >> 7) & 1) || !bg_pixel);
 
-                if (sprite_pixel.color_id && sprite_priority) {
+                if (sprite_priority) {
                     final_pixel_color = sprite_pixel_color;
                 }
             }
@@ -438,20 +439,23 @@ void PPU2::tick() {
 
         if (lcd_x == 160) {
             /*
-            assert(ticks >= 172+80 && ticks <= 289+80 &&
+            assert(ticks >= 173+80 && ticks <= 293+80 &&
                    "ticks in drawing mode should be between 172 and 289!!");
                    */
 
             // TODO: ticks are around 389 - 413, figure out why
-            if (ticks > 369) {
+
+            if (ticks > 373) {
                 std::cout << ticks << '\n';
             }
+            // std::cout << ticks << '\n';
 
             current_mode = ppu_mode::HBlank;
         }
 
         break;
     }
+
     case ppu_mode::HBlank: {
 
         // set IF for interrupt

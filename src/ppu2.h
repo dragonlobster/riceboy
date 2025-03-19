@@ -45,6 +45,7 @@ class PPU2 {
     };
 
     struct sprite_fifo_pixel {
+        uint8_t x{};
         uint8_t color_id{};
         uint8_t flags{};
     };
