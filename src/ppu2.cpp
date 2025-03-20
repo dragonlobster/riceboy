@@ -22,7 +22,7 @@ PPU2::PPU2(MMU &gb_mmu_, sf::RenderWindow &window_)
 
 sf::Color PPU2::get_pixel_color(uint8_t pixel, uint8_t *palette) {
     // Get the appropriate palette register
-    uint8_t palette_value;
+    uint8_t palette_value{};
 
     if (!palette) {
         palette_value = _get(BGP); // Background palette
@@ -30,7 +30,8 @@ sf::Color PPU2::get_pixel_color(uint8_t pixel, uint8_t *palette) {
         // Assert valid sprite palette before using it
         assert(*palette == 0 ||
                *palette == 1 && "sprite palette is not 0 or 1!");
-        palette_value = *palette == 0 ? _get(0xFF48) : _get(0xFF49);
+        palette_value = *palette == 0 ? _get(0xff48) : _get(0xff49);
+        palette_value &= 0xfc; // 0 out the last 2 bits
     }
 
     // Extract the color ID for the pixel (each pixel uses 2 bits in the
@@ -116,6 +117,7 @@ void PPU2::tick() {
                     [](const oam_entry &a, const oam_entry &b) -> bool {
                         return a.x < b.x; // lower x has priority
                     });
+
             }
 
             current_mode = ppu_mode::Drawing;
@@ -156,12 +158,12 @@ void PPU2::tick() {
             }
         }
 
-        if (!sprites_to_fetch.empty()) {
+        if (!sprites_to_fetch.empty() && !sprite_to_fetch) { // check if we are already fetching a sprite
             fetch_sprite = true;
             current_fetcher_mode =
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
-            sprite_to_fetch = sprites_to_fetch.back();
-            sprites_to_fetch.pop_back();
+
+            sprite_to_fetch = &sprites_to_fetch[0];
         }
 
         switch (current_fetcher_mode) {
@@ -171,7 +173,7 @@ void PPU2::tick() {
 
             if (fetch_sprite) {
                 // set tile id to sprite to fetch tile id
-                this->tile_id = sprite_to_fetch.tile_id;
+                this->tile_id = (*sprite_to_fetch).tile_id;
             }
 
             else {
@@ -219,28 +221,28 @@ void PPU2::tick() {
                 break;
 
             if (fetch_sprite) {
-                assert(sprite_to_fetch.y >= 16 &&
+                assert((*sprite_to_fetch).y >= 16 &&
                        "sprite to fetch y position is abnormal!");
 
                 // TODO: fetch sprite
                 uint16_t sprite_address{};
                 uint16_t line_offset{};
 
-                bool y_flip = sprite_to_fetch.flags & 0x40; // bit 6 y-flip
+                bool y_flip = (*sprite_to_fetch).flags & 0x40; // bit 6 y-flip
 
                 if (_get(LCDC) & 0x04) {
                     // tall sprite mode
-                    if (_get(LY) <= (sprite_to_fetch.y - 16) + 7) {
+                    if (_get(LY) <= ((*sprite_to_fetch).y - 16) + 7) {
                         // top half
                         if (!y_flip) {
                             tile_id &= 0xfe; // set lsb to 0
                             line_offset =
-                                (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
+                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
                         } else {
                             tile_id |= 0x01; // set lsb to 1
                             line_offset =
                                 (8 - 1 -
-                                 (_get(LY) - (sprite_to_fetch.y - 16))) *
+                                 (_get(LY) - ((*sprite_to_fetch).y - 16))) *
                                 2;
                         }
                     }
@@ -250,12 +252,12 @@ void PPU2::tick() {
                         if (!y_flip) {
                             tile_id |= 0x01;
                             line_offset =
-                                (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
+                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
                         } else {
                             tile_id &= 0xfe;
                             line_offset =
                                 (8 - 1 -
-                                 (_get(LY) - ((sprite_to_fetch.y - 16) + 7))) *
+                                 (_get(LY) - (((*sprite_to_fetch).y - 16) + 7))) *
                                 2;
                         }
                     }
@@ -264,13 +266,13 @@ void PPU2::tick() {
 
                 else {
                     if (!y_flip) {
-                        line_offset = (_get(LY) - (sprite_to_fetch.y - 16)) * 2;
+                        line_offset = (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
                     }
 
                     else {
                         // get the flipped sprite data
                         line_offset =
-                            (8 - 1 - (_get(LY) - (sprite_to_fetch.y - 16))) * 2;
+                            (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) * 2;
                     }
                 }
 
@@ -319,17 +321,18 @@ void PPU2::tick() {
         case fetcher_mode::PushToFIFO: {
             if (fetch_sprite) {
 
-                assert(sprite_to_fetch.x <= lcd_x + 8 &&
+                assert((*sprite_to_fetch).x <= lcd_x + 8 &&
                        "sprite x position is not <= lcd_x + 8!");
 
-                bool x_flip = sprite_to_fetch.flags & 0x20; // x flip
+                bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
 
                 for (unsigned int i = 0, fifo_index = 0; i < 8;
                      ++i, ++fifo_index) {
                     // check sprite x position to see if pixels should be loaded
                     // into fifo
-                    if (sprite_to_fetch.x < 8) {
-                        if (i < 8 - sprite_to_fetch.x) {
+
+                    if ((*sprite_to_fetch).x < 8) {
+                        if (i < 8 - (*sprite_to_fetch).x) {
                             --fifo_index;
                             continue;
                         }
@@ -340,8 +343,8 @@ void PPU2::tick() {
                     uint8_t final_bit = ((low_byte >> j) & 1) |
                                         (((high_byte >> j) << 1) & 0x02);
 
-                    sprite_fifo_pixel pixel = {sprite_to_fetch.x, final_bit,
-                                               sprite_to_fetch.flags};
+                    sprite_fifo_pixel pixel = {(*sprite_to_fetch).x, final_bit,
+                                               (*sprite_to_fetch).flags};
 
                     if (fifo_index < sprite_fifo.size()) {
                         if (sprite_fifo[fifo_index].color_id == 0) {
@@ -349,11 +352,16 @@ void PPU2::tick() {
                         }
                     }
 
+                    // TODO: shift pixels down first before pushing new pixel CRITICAL BUG
                     else {
                         sprite_fifo.push_back(pixel);
                     }
+
                 }
 
+                // handle sprites to fetch array
+                sprite_to_fetch = nullptr;
+                sprites_to_fetch.erase(sprites_to_fetch.begin());
                 if (sprites_to_fetch.empty()) {
                     fetch_sprite = false;
                 }

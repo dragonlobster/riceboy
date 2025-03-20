@@ -69,7 +69,7 @@ class PPU2 {
     std::vector<oam_entry> sprite_buffer{}; // sprite buffer
 
     std::vector<oam_entry> sprites_to_fetch{};
-    oam_entry sprite_to_fetch{};
+    oam_entry *sprite_to_fetch{nullptr};
 
     // lcd x position
     uint8_t lcd_x{0};
