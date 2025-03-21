@@ -20,17 +20,17 @@ PPU2::PPU2(MMU &gb_mmu_, sf::RenderWindow &window_)
     this->lcd_frame_image = image; // image with pixels to display on the screen
 };
 
-sf::Color PPU2::get_pixel_color(uint8_t pixel, uint8_t *palette) {
+sf::Color PPU2::get_pixel_color(uint8_t pixel, uint8_t palette) {
     // Get the appropriate palette register
     uint8_t palette_value{};
 
-    if (!palette) {
+    if (palette == 2) {
         palette_value = _get(BGP); // Background palette
     } else {
         // Assert valid sprite palette before using it
-        assert(*palette == 0 ||
-               *palette == 1 && "sprite palette is not 0 or 1!");
-        palette_value = *palette == 0 ? _get(0xff48) : _get(0xff49);
+        assert(palette == 0 ||
+               palette == 1 && "sprite palette is not 0 or 1!");
+        palette_value = palette == 0 ? _get(0xff48) : _get(0xff49);
         palette_value &= 0xfc; // 0 out the last 2 bits
     }
 
@@ -117,7 +117,6 @@ void PPU2::tick() {
                     [](const oam_entry &a, const oam_entry &b) -> bool {
                         return a.x < b.x; // lower x has priority
                     });
-
             }
 
             current_mode = ppu_mode::Drawing;
@@ -158,7 +157,8 @@ void PPU2::tick() {
             }
         }
 
-        if (!sprites_to_fetch.empty() && !sprite_to_fetch) { // check if we are already fetching a sprite
+        if (!sprites_to_fetch.empty() &&
+            !sprite_to_fetch) { // check if we are already fetching a sprite
             fetch_sprite = true;
             current_fetcher_mode =
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
@@ -257,7 +257,8 @@ void PPU2::tick() {
                             tile_id &= 0xfe;
                             line_offset =
                                 (8 - 1 -
-                                 (_get(LY) - (((*sprite_to_fetch).y - 16) + 7))) *
+                                 (_get(LY) -
+                                  (((*sprite_to_fetch).y - 16) + 7))) *
                                 2;
                         }
                     }
@@ -266,13 +267,15 @@ void PPU2::tick() {
 
                 else {
                     if (!y_flip) {
-                        line_offset = (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+                        line_offset =
+                            (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
                     }
 
                     else {
                         // get the flipped sprite data
                         line_offset =
-                            (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) * 2;
+                            (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) *
+                            2;
                     }
                 }
 
@@ -326,6 +329,8 @@ void PPU2::tick() {
 
                 bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
 
+                std::vector<sprite_fifo_pixel> temp_sprite_fifo{};
+
                 for (unsigned int i = 0, fifo_index = 0; i < 8;
                      ++i, ++fifo_index) {
                     // check sprite x position to see if pixels should be loaded
@@ -352,12 +357,16 @@ void PPU2::tick() {
                         }
                     }
 
-                    // TODO: shift pixels down first before pushing new pixel CRITICAL BUG
+                    // TODO: shift pixels down first before pushing new pixel
+                    // CRITICAL BUG
                     else {
-                        sprite_fifo.push_back(pixel);
+                        temp_sprite_fifo.push_back(pixel);
                     }
-
                 }
+
+                sprite_fifo.insert(sprite_fifo.begin(),
+                                   temp_sprite_fifo.begin(),
+                                   temp_sprite_fifo.end());
 
                 // handle sprites to fetch array
                 sprite_to_fetch = nullptr;
@@ -410,7 +419,7 @@ void PPU2::tick() {
                 uint8_t palette = (sprite_pixel.flags >> 4) & 1;
 
                 sf::Color sprite_pixel_color =
-                    get_pixel_color(sprite_pixel.color_id, &palette);
+                    get_pixel_color(sprite_pixel.color_id, palette);
 
                 bool sprite_priority =
                     sprite_pixel.color_id && _get(LCDC) & 0x02 &&

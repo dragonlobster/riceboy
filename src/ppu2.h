@@ -93,7 +93,7 @@ class PPU2 {
     sf::Image lcd_frame_image{};
     sf::Texture lcd_frame{};
 
-    sf::Color get_pixel_color(uint8_t pixel, uint8_t *palette = nullptr);
+    sf::Color get_pixel_color(uint8_t pixel, uint8_t palette = 2); // 2 means get BGP (non sprite palette)
 
 
   private:
