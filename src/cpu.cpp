@@ -1992,7 +1992,7 @@ void CPU::tick() {
             this->ei_delay = false;
         }
 
-        // TODO: check oam 
+        // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
         if (this->gb_mmu->dma_write) {
             this->gb_mmu->set_dma_delay();
         }
