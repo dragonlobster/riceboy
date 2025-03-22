@@ -329,7 +329,10 @@ void PPU2::tick() {
 
                 bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
 
-                std::vector<sprite_fifo_pixel> temp_sprite_fifo{};
+                while (sprite_fifo.size() < 8) {
+                    sprite_fifo_pixel filler = {0, 0, 0};
+                    sprite_fifo.emplace(sprite_fifo.begin(), filler);
+                }
 
                 for (unsigned int i = 0, fifo_index = 0; i < 8;
                      ++i, ++fifo_index) {
@@ -351,22 +354,10 @@ void PPU2::tick() {
                     sprite_fifo_pixel pixel = {(*sprite_to_fetch).x, final_bit,
                                                (*sprite_to_fetch).flags};
 
-                    if (fifo_index < sprite_fifo.size()) {
-                        if (sprite_fifo[fifo_index].color_id == 0) {
-                            sprite_fifo[fifo_index] = pixel;
-                        }
-                    }
-
-                    // TODO: shift pixels down first before pushing new pixel
-                    // CRITICAL BUG
-                    else {
-                        temp_sprite_fifo.push_back(pixel);
+                    if (sprite_fifo[fifo_index].color_id == 0) {
+                        sprite_fifo[fifo_index] = pixel;
                     }
                 }
-
-                sprite_fifo.insert(sprite_fifo.begin(),
-                                   temp_sprite_fifo.begin(),
-                                   temp_sprite_fifo.end());
 
                 // handle sprites to fetch array
                 sprite_to_fetch = nullptr;
