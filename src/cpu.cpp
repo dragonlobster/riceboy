@@ -1966,12 +1966,7 @@ void CPU::tick() {
 
     // handle DMA transfers on dma mode before executing instructions
     if (this->gb_mmu->dma_mode) {
-
         this->gb_mmu->dma_transfer();
-
-        if ((this->gb_mmu->dma_source_transfer_address & 0xff) == 0x9f) {
-            this->gb_mmu->dma_mode = false; // set dma mode to false after last write
-        }
     }
 
     if (!this->halt) {

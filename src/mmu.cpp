@@ -112,10 +112,19 @@ void MMU::set_oam_dma() {
 
 void MMU::dma_transfer() {
     uint16_t dest_address = 0xfe00 | (dma_source_transfer_address & 0x00ff);
-    this->write_memory(dest_address, this->read_memory(dma_source_transfer_address));
-    dma_source_transfer_address++;
+    this->write_memory(dest_address,
+                       this->read_memory(dma_source_transfer_address));
 
-    assert(((dma_source_transfer_address & 0x00ff) <= 0x9f) && "dma transfer passed oam memory!");
+    if ((dma_source_transfer_address & 0xff) == 0x9f) {
+        dma_mode = false;
+    }
+
+    else {
+        dma_source_transfer_address++;
+    }
+
+    assert(((dma_source_transfer_address & 0x00ff) <= 0x9f) &&
+           "dma transfer passed oam memory!");
 }
 
 
