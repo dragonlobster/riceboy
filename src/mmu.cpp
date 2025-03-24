@@ -107,6 +107,7 @@ void MMU::set_dma_delay() {
 
 void MMU::set_oam_dma() { 
     this->dma_delay = false; 
+    this->dma_write = false; // reset dma write, all writes are ignored at this point anyway
     this->dma_mode = true;
 }
 
@@ -126,7 +127,6 @@ void MMU::dma_transfer() {
     assert(((dma_source_transfer_address & 0x00ff) <= 0x9f) &&
            "dma transfer passed oam memory!");
 }
-
 
 
 void MMU::set_load_rom_complete() {
@@ -202,8 +202,8 @@ MMU::section MMU::locate_section(const uint16_t address) {
 
 uint8_t MMU::cpu_read_memory(uint16_t address) const { 
 
-    // not oam dma, or the memory location is in HRAM (zero page)
-    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page) {
+    // oam dma not active, or the memory location is in HRAM (zero page)
+    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page || locate_section(address) == MMU::section::hardware_registers) {
         return read_memory(address);
     }
 
@@ -321,9 +321,17 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
 void MMU::cpu_write_memory(uint16_t address, uint8_t value) { 
     // not oam dma
-    if (!this->dma_mode) {
+    /*1
+    if (!this->dma_mode || ) {
         return write_memory(address, value);
-    }
+    }*/
+
+    // oam dma not active, or the memory location is in HRAM (zero page)
+    /*
+    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page || locate_section(address) == MMU::section::hardware_registers) {
+        write_memory(address, value);
+    }*/
+    write_memory(address, value);
 }
 
 void MMU::write_memory(uint16_t address, uint8_t value) {

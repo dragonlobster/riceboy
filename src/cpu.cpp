@@ -1992,13 +1992,15 @@ void CPU::tick() {
             this->gb_mmu->dma_transfer();
         }
 
+        /*
         else if (this->gb_mmu->dma_delay) {
             this->gb_mmu->set_oam_dma();
-        }
+        }*/
 
         // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
         else if (this->gb_mmu->dma_write) {
-            this->gb_mmu->set_dma_delay();
+            this->gb_mmu->set_oam_dma();
+            //this->gb_mmu->set_dma_delay();
         }
 
     }

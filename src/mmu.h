@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <memory>
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
