@@ -95,14 +95,14 @@ void MMU::handle_tac_write(uint8_t value) {
 void MMU::handle_dma_write(uint8_t value) { 
     if (!dma_mode && !dma_write && !dma_delay) {
         this->dma_ff46 = value;
-        this->dma_source_transfer_address = value << 8; // start transfer address at $00xx
+        this->dma_source_transfer_address = value << 8; // start transfer address at $XX00
         this->dma_write = true;
     }
 }
 
 void MMU::set_dma_delay() { 
     this->dma_delay = true;
-    this->dma_write = false; // reset dma write
+    this->dma_write = false; // reset dma write, all writes are ignored at this point anyway
 }
 
 void MMU::set_oam_dma() { 
@@ -208,8 +208,10 @@ uint8_t MMU::cpu_read_memory(uint16_t address) const {
     }
 
     else {
-        uint16_t dma_address = 0xfe00 | (dma_source_transfer_address & 0xff); // take last 2 bytes of the current transfer address
-        return read_memory(dma_address);
+        /*
+        uint16_t dma_address = 0xfe00 | ((dma_source_transfer_address) & 0xff); // take last 2 bytes of the current transfer address
+        */
+        return read_memory(dma_source_transfer_address);
     }
 
 }
@@ -234,6 +236,10 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
         if (address == 0xff07) {
             return this->tac_ff07;
+        }
+
+        if (address == 0xff46) {
+            return this->dma_ff46;
         }
 
         if (address == 0xff00) {
@@ -293,6 +299,8 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return this->tac_ff07;
         } else if (address == 0xff00) {
             return 0xff; // joypad
+        } else if (address == 0xff46) {
+            return this->dma_ff46;
         } else {
             return this->hardware_registers[address - base_address];
         }
@@ -308,6 +316,13 @@ uint8_t MMU::read_memory(uint16_t address) const {
                   << "hex: 0x" << std::hex << static_cast<unsigned int>(address)
                   << std::endl;
         return 0;
+    }
+}
+
+void MMU::cpu_write_memory(uint16_t address, uint8_t value) { 
+    // not oam dma
+    if (!this->dma_mode) {
+        return write_memory(address, value);
     }
 }
 

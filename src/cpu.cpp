@@ -134,7 +134,7 @@ uint8_t CPU::_get(const uint16_t address) {
 }
 
 void CPU::_set(const uint16_t address, const uint8_t value) {
-    this->gb_mmu->write_memory(address, value);
+    this->gb_mmu->cpu_write_memory(address, value);
 }
 
 // abstracted M-operations
@@ -1964,11 +1964,6 @@ void CPU::tick() {
         handle_interrupts();
     }
 
-    // handle DMA transfers on dma mode before executing instructions
-    if (this->gb_mmu->dma_mode) {
-        this->gb_mmu->dma_transfer();
-    }
-
     if (!this->halt) {
         // fetch opcode, then execute what you can this M-cycle
         const uint8_t opcode = this->_get(this->PC); // get current opcode
@@ -1992,13 +1987,18 @@ void CPU::tick() {
             this->ei_delay = false;
         }
 
-        // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
-        if (this->gb_mmu->dma_write) {
-            this->gb_mmu->set_dma_delay();
+        // handle DMA transfers on dma mode before executing instructions
+        if (this->gb_mmu->dma_mode) {
+            this->gb_mmu->dma_transfer();
         }
 
         else if (this->gb_mmu->dma_delay) {
             this->gb_mmu->set_oam_dma();
+        }
+
+        // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
+        else if (this->gb_mmu->dma_write) {
+            this->gb_mmu->set_dma_delay();
         }
 
     }

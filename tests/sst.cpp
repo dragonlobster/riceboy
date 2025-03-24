@@ -15,7 +15,7 @@ class sst_mmu : public MMU {
         return memory[address];
     };
 
-    void write_memory(uint16_t address, uint8_t value) override {
+    void cpu_write_memory(uint16_t address, uint8_t value) override {
         memory[address] = value;
     };
 };

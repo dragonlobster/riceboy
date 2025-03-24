@@ -14,6 +14,7 @@ class MMU {
     virtual uint8_t cpu_read_memory(uint16_t address) const;
 
     virtual void write_memory(uint16_t address, uint8_t value);
+    virtual void cpu_write_memory(uint16_t address, uint8_t value);
 
     enum class section : uint16_t {
         restart_and_interrupt_vectors = 0,       // 0x00ff
