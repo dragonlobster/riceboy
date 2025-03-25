@@ -57,17 +57,26 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    std::array<std::string, 3> mooneye_ppu{
+    std::array<std::string, 5> mooneye_ppu{
         "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb"
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/sources-dmgABCmgbS.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb",
     };
 
+    std::array<std::string, 1> mooneye_cpu{
+        "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"
+    };
 
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[2]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
+
     //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
-    //riceboy->gb_cpu.prepare_rom(blargg[5]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
+    //riceboy->gb_cpu.prepare_rom(blargg[4]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
     // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),

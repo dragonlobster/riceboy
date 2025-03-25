@@ -11,11 +11,11 @@ class sst_mmu : public MMU {
   public:
     uint8_t memory[0xffff]{};
 
-    uint8_t cpu_read_memory(uint16_t address) const override {
+    uint8_t bus_read_memory(uint16_t address) const override {
         return memory[address];
     };
 
-    void cpu_write_memory(uint16_t address, uint8_t value) override {
+    void bus_write_memory(uint16_t address, uint8_t value) override {
         memory[address] = value;
     };
 };

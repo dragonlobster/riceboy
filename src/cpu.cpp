@@ -130,11 +130,11 @@ uint8_t *CPU::_get_register(const registers r8) {
 }
 
 uint8_t CPU::_get(const uint16_t address) {
-    return this->gb_mmu->cpu_read_memory(address);
+    return this->gb_mmu->bus_read_memory(address);
 }
 
 void CPU::_set(const uint16_t address, const uint8_t value) {
-    this->gb_mmu->cpu_write_memory(address, value);
+    this->gb_mmu->bus_write_memory(address, value);
 }
 
 // abstracted M-operations
@@ -1992,15 +1992,14 @@ void CPU::tick() {
             this->gb_mmu->dma_transfer();
         }
 
-        /*
         else if (this->gb_mmu->dma_delay) {
             this->gb_mmu->set_oam_dma();
-        }*/
+        }
 
         // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
         else if (this->gb_mmu->dma_write) {
-            this->gb_mmu->set_oam_dma();
-            //this->gb_mmu->set_dma_delay();
+            //this->gb_mmu->set_oam_dma();
+            this->gb_mmu->set_dma_delay();
         }
 
     }

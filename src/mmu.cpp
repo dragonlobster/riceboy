@@ -19,7 +19,6 @@ void MMU::handle_tma_write(uint8_t value) {
     if (lock_tima_write) {
         this->tima_ff05 = value;
     }
-
 }
 
 void MMU::handle_tima_write(uint8_t value) {
@@ -43,7 +42,7 @@ void MMU::handle_tima_overflow() {
 
     // set tima to tma
     uint8_t tma = read_memory(0xff06);
-    //write_memory(0xff05, tma);
+    // write_memory(0xff05, tma);
     this->tima_ff05 = tma;
     this->tima_overflow = false;
 
@@ -92,22 +91,38 @@ void MMU::handle_tac_write(uint8_t value) {
     this->falling_edge();
 }
 
-void MMU::handle_dma_write(uint8_t value) { 
+void MMU::handle_dma_write(uint8_t value) {
+    this->dma_ff46 = value;
+
     if (!dma_mode && !dma_write && !dma_delay) {
-        this->dma_ff46 = value;
-        this->dma_source_transfer_address = value << 8; // start transfer address at $XX00
+        // uses echo ram if source is 0xff or 0xfe, but i don't have echo ram so
+        // i use wram instead (which echo ram is a mirror of)
+
+        this->dma_source_transfer_address =
+            value >= 0xe0 ? (value - 0x20) << 8 : value << 8;
+
+        this->dma_bus_source = (locate_section(dma_source_transfer_address) ==
+                                    section::character_ram ||
+                                locate_section(dma_source_transfer_address) ==
+                                    section::bg_map_data_1 ||
+                                locate_section(dma_source_transfer_address) ==
+                                    section::bg_map_data_2)
+                                   ? bus::vram
+                                   : bus::main;
         this->dma_write = true;
     }
 }
 
-void MMU::set_dma_delay() { 
+void MMU::set_dma_delay() {
     this->dma_delay = true;
-    this->dma_write = false; // reset dma write, all writes are ignored at this point anyway
+    this->dma_write =
+        false; // reset dma write, all writes are ignored at this point anyway
 }
 
-void MMU::set_oam_dma() { 
-    this->dma_delay = false; 
-    this->dma_write = false; // reset dma write, all writes are ignored at this point anyway
+void MMU::set_oam_dma() {
+    this->dma_delay = false;
+    // this->dma_write = false; // reset dma write, all writes are ignored at
+    // this point anyway
     this->dma_mode = true;
 }
 
@@ -127,7 +142,6 @@ void MMU::dma_transfer() {
     assert(((dma_source_transfer_address & 0x00ff) <= 0x9f) &&
            "dma transfer passed oam memory!");
 }
-
 
 void MMU::set_load_rom_complete() {
 
@@ -200,23 +214,43 @@ MMU::section MMU::locate_section(const uint16_t address) {
     return MMU::section::unknown;
 }
 
-uint8_t MMU::cpu_read_memory(uint16_t address) const { 
+uint8_t MMU::bus_read_memory(uint16_t address) const {
+    if (this->dma_mode) {
 
-    // oam dma not active, or the memory location is in HRAM (zero page)
-    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page || locate_section(address) == MMU::section::hardware_registers) {
-        return read_memory(address);
+        if (locate_section(address) == section::oam_ram) {
+            // oam is locked
+            return read_memory(dma_source_transfer_address);
+        }
+
+        else if (dma_bus_source == bus::vram) {
+            // vram is locked if the dma source is in vram
+            if (locate_section(address) == section::character_ram ||
+                locate_section(address) == section::bg_map_data_1 ||
+                locate_section(address) == section::bg_map_data_2) {
+                return read_memory(dma_source_transfer_address);
+            }
+        }
+
+        else if (dma_bus_source == bus::main) {
+            // rom: 0 - 7fff (restart, cartridge_roms)
+            // wram - c000 - dfff (internal ram banks)
+            // sram - caertridge ram
+            if (locate_section(address) ==
+                    section::restart_and_interrupt_vectors ||
+                locate_section(address) == section::cartridge_header_area ||
+                locate_section(address) == section::cartridge_rom_bank_0 ||
+                locate_section(address) ==
+                    section::cartridge_rom_switchable_banks ||
+                locate_section(address) == section::internal_ram_bank_0 ||
+                locate_section(address) == section::internal_ram_bank_1_to_7 ||
+                locate_section(address) == section::cartridge_ram) {
+                return read_memory(dma_source_transfer_address);
+            }
+        }
     }
 
-    else {
-        /*
-        uint16_t dma_address = 0xfe00 | ((dma_source_transfer_address) & 0xff); // take last 2 bytes of the current transfer address
-        */
-        return read_memory(dma_source_transfer_address);
-    }
-
+    return read_memory(address);
 }
-
-
 
 // TODO: make more elegant by segregating each address space
 uint8_t MMU::read_memory(uint16_t address) const {
@@ -319,18 +353,41 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
-void MMU::cpu_write_memory(uint16_t address, uint8_t value) { 
-    // not oam dma
-    /*1
-    if (!this->dma_mode || ) {
-        return write_memory(address, value);
-    }*/
+void MMU::bus_write_memory(uint16_t address, uint8_t value) {
+    if (this->dma_mode) {
 
-    // oam dma not active, or the memory location is in HRAM (zero page)
-    /*
-    if (!this->dma_mode || locate_section(address) == MMU::section::zero_page || locate_section(address) == MMU::section::hardware_registers) {
-        write_memory(address, value);
-    }*/
+        if (locate_section(address) == section::oam_ram) {
+            // oam is locked
+            write_memory(dma_source_transfer_address, value);
+        }
+
+        else if (dma_bus_source == bus::vram) {
+            // vram is locked if the dma source is in vram
+            if (locate_section(address) == section::character_ram ||
+                locate_section(address) == section::bg_map_data_1 ||
+                locate_section(address) == section::bg_map_data_2) {
+                write_memory(dma_source_transfer_address, value);
+            }
+        }
+
+        else if (dma_bus_source == bus::main) {
+            // rom: 0 - 7fff (restart, cartridge_roms)
+            // wram - c000 - dfff (internal ram banks)
+            // sram - caertridge ram
+            if (locate_section(address) ==
+                    section::restart_and_interrupt_vectors ||
+                locate_section(address) == section::cartridge_header_area ||
+                locate_section(address) == section::cartridge_rom_bank_0 ||
+                locate_section(address) ==
+                    section::cartridge_rom_switchable_banks ||
+                locate_section(address) == section::internal_ram_bank_0 ||
+                locate_section(address) == section::internal_ram_bank_1_to_7 ||
+                locate_section(address) == section::cartridge_ram) {
+                write_memory(dma_source_transfer_address, value);
+            }
+        }
+    }
+
     write_memory(address, value);
 }
 

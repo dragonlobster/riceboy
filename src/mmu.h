@@ -12,10 +12,10 @@
 class MMU {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
-    virtual uint8_t cpu_read_memory(uint16_t address) const;
+    virtual uint8_t bus_read_memory(uint16_t address) const;
 
     virtual void write_memory(uint16_t address, uint8_t value);
-    virtual void cpu_write_memory(uint16_t address, uint8_t value);
+    virtual void bus_write_memory(uint16_t address, uint8_t value);
 
     enum class section : uint16_t {
         restart_and_interrupt_vectors = 0,       // 0x00ff
@@ -37,6 +37,8 @@ class MMU {
         unknown = 1
     };
     // zero page = high ram
+
+    // vram - 8000 - 9fff
 
     enum class cartridge_type : uint8_t {
         rom_only = 0,
@@ -69,6 +71,12 @@ class MMU {
         huc1_ram_battery = 0xff
     };
 
+    enum class bus : uint8_t {
+        // 2 buses for dmg
+        main,
+        vram
+    };
+
     static MMU::section locate_section(const uint16_t address);
 
     cartridge_type _cartridge_type{};
@@ -99,6 +107,7 @@ class MMU {
     bool dma_write{false}; // a dma write occured
     bool dma_delay{false}; // set by cpu after dma write is checked by the cpu, used for 4 tick delay
     uint16_t dma_source_transfer_address{0}; // address for DMA transfer
+    bus dma_bus_source{};
     void set_dma_delay();
     void set_oam_dma();
     void handle_dma_write(uint8_t value);

@@ -160,6 +160,8 @@ void PPU2::tick() {
         if (!sprites_to_fetch.empty() &&
             !sprite_to_fetch) { // check if we are already fetching a sprite
             fetch_sprite = true;
+
+            // NOTE: this fixed a bug where my first column of tiles was missing
             current_fetcher_mode =
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
 
