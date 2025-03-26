@@ -425,15 +425,11 @@ void PPU2::tick() {
 
             assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
 
-            for (uint16_t y = 0; y < DrawUtils::SCALE; ++y) {
-                for (uint16_t x = 0; x < DrawUtils::SCALE; ++x) {
-                    uint16_t position_x = (lcd_x * DrawUtils::SCALE) + x;
-                    uint16_t position_y = (_get(LY) * DrawUtils::SCALE) + y;
+            uint16_t position_x = (lcd_x);
+            uint16_t position_y = (_get(LY));
 
-                    lcd_frame_image.setPixel({position_x, position_y},
-                                             final_pixel_color);
-                }
-            }
+            lcd_frame_image.setPixel({position_x, position_y},
+                                     final_pixel_color);
 
             lcd_x++; // increment the lcd x position
 
@@ -502,6 +498,8 @@ void PPU2::tick() {
                 assert(success && "LCD dots texture error loading from image");
 
                 sf::Sprite frame(lcd_frame);
+
+                frame.setScale({DrawUtils::SCALE, DrawUtils::SCALE});
 
                 window.clear(sf::Color::White);
                 window.draw(frame);

@@ -129,7 +129,23 @@ int CPU::handle_opcode(const uint8_t opcode) {
         if (z == 6 && y == 6) {
             // HALT
             // TODO: halt bug
-            this->halt = true;
+            if (this->ime) {
+                this->halt = true;
+            }
+            else {
+                // if there is no interrupt, halt is entered
+                // ie & if & 0x1f
+                if (!(_get(0xffff) & _get(0xff0f) & 0x1f)) {
+                    this->halt = true;
+                } 
+                
+                else {
+                    // halt bug
+                    this->PC--; // decrement the PC on halt bug; the PC failed to increment
+                }
+
+            }
+
         } else {
             if (r_table[y] == registers::NA) {
                 ld_hl_r8(r_table[z], true);

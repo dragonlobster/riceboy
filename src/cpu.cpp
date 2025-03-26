@@ -1951,20 +1951,21 @@ void CPU::tick() {
         this->gb_mmu->set_load_rom_complete();
     }
 
+    // the CPU instructions for setting TIMA to TMA has been completed, we can
+    // unlock writing to TIMA now
     if (this->gb_mmu->lock_tima_write) {
         this->gb_mmu->lock_tima_write = false;
     }
 
     if (this->gb_mmu->tima_overflow_standby) {
         this->gb_mmu->handle_tima_overflow();
-        this->gb_mmu->lock_tima_write = true;
     }
 
     if (M_operations.empty()) {
         handle_interrupts();
     }
 
-    if (!this->halt) {
+    //if (!this->halt) {
         // fetch opcode, then execute what you can this M-cycle
         const uint8_t opcode = this->_get(this->PC); // get current opcode
 
@@ -1978,7 +1979,9 @@ void CPU::tick() {
         }
 
         else if (!I_operations.empty()) {
-            // execute interrupt opertaions
+            // check if IE still has interrupts
+
+            // execute interrupt operations
             this->execute_I_operations();
         }
 
@@ -1986,24 +1989,25 @@ void CPU::tick() {
             this->ime = true;
             this->ei_delay = false;
         }
+    //}
 
-        // handle DMA transfers on dma mode before executing instructions
-        if (this->gb_mmu->dma_mode) {
-            this->gb_mmu->dma_transfer();
-        }
+    // dma should not be related to halt
 
-        else if (this->gb_mmu->dma_delay) {
-            this->gb_mmu->set_oam_dma();
-        }
-
-        // check oam dma every tick (mmu can't follow ticks so we use cpu for this)
-        else if (this->gb_mmu->dma_write) {
-            //this->gb_mmu->set_oam_dma();
-            this->gb_mmu->set_dma_delay();
-        }
-
+    // handle DMA transfers on dma mode after executing instructions
+    if (this->gb_mmu->dma_mode) {
+        this->gb_mmu->dma_transfer();
     }
 
+    else if (this->gb_mmu->dma_delay) {
+        this->gb_mmu->set_oam_dma();
+    }
+
+    // check oam dma every tick (mmu can't follow ticks so we use cpu for
+    // this)
+    else if (this->gb_mmu->dma_write) {
+        // this->gb_mmu->set_oam_dma();
+        this->gb_mmu->set_dma_delay();
+    }
 }
 
 void CPU::interrupt_tick() {
@@ -2028,29 +2032,15 @@ void CPU::timer_tick() {
     }
     timer_ticks = 0;
 
-    // handles the tima overflow case one cycle later
+    // handles the tima overflow case one cycle later (tima overflows at 255+1)
     if (this->gb_mmu->tima_overflow) {
         this->gb_mmu->tima_overflow_standby = true;
     }
 }
 
-void CPU::handle_interrupts() {
-
-    if (!this->I_operations.empty()) {
-        return;
-    }
-
-    // takes 5 M-Cycles
+std::tuple<CPU::interrupts, CPU::if_mask> CPU::check_current_interrupt() {
     uint8_t _ie = this->_get(0xffff);
     uint8_t _if = this->_get(0xff0f);
-
-    if ((_ie & _if) && this->halt) {
-        this->halt = false;
-    }
-
-    if (!this->ime || !_ie || !_if) { // no interrupts
-        return;
-    }
 
     uint8_t ie_joypad = (_ie >> 4) & 1;
     uint8_t ie_serial = (_ie >> 3) & 1;
@@ -2064,60 +2054,94 @@ void CPU::handle_interrupts() {
     uint8_t if_lcd = (_if >> 1) & 1;
     uint8_t if_vblank = _if & 1;
 
-    if (!(ie_joypad && if_joypad) && !(ie_serial && if_serial) &&
-        !(ie_timer && if_timer) && !(ie_lcd && if_lcd) &&
-        !(ie_vblank && if_vblank)) {
+    interrupts interrupt{interrupts::none};
+    if_mask mask{if_mask::none};
+
+    if (ie_vblank && if_vblank) {
+        // vblank interrupt
+        interrupt = interrupts::vblank;
+        mask = if_mask::vblank;
+    } else if (ie_lcd && if_lcd) {
+        // lcd interrupt
+        interrupt = interrupts::lcd;
+        mask = if_mask::lcd;
+    } else if (ie_timer && if_timer) {
+        // timer interrupt
+        interrupt = interrupts::timer;
+        mask = if_mask::timer;
+    } else if (ie_serial && if_serial) {
+        // serial interrupt
+        interrupt = interrupts::serial;
+        mask = if_mask::serial;
+    } else if (ie_joypad && if_joypad) {
+        // joypad interrupt
+        interrupt = interrupts::joypad;
+        mask = if_mask::joypad;
+    }
+
+    return {interrupt, mask};
+}
+
+void CPU::handle_interrupts() {
+    // takes 5 M-Cycles
+
+    // NOTE: This runs before CPU write to the interrupt (so it is based on
+    // previous M cycle write)
+    auto [i, m] = check_current_interrupt(); // interrupt, mask
+    this->current_interrupt = i;
+    this->current_if_mask = m;
+
+    if (!this->I_operations.empty()) {
         return;
     }
 
-    auto m1 = [=]() {}; // NOP
-    auto m2 = [=]() {}; // NOP
+    uint8_t _ie = this->_get(0xffff);
+    uint8_t _if = this->_get(0xff0f);
+
+    if ((_ie & _if) && this->halt) {
+        this->halt = false;
+    }
+
+    if (!this->ime || !_ie || !_if) { // no interrupts and I operations is empty
+        return;
+    }
+
+    if (this->current_interrupt == interrupts::none) {
+        // no interrupts, and I operations was empty
+        // if I operations was not empty, then we would have returned early to
+        // continue servicing our interrupt with new vectors
+        assert(m == if_mask::none && "if mask is not set properly!!");
+        return;
+    }
+
+    auto m1 = [=]() {};              // NOP
+    auto m2 = [=]() { this->SP--; }; // pre-decrement SP
 
     auto m3 = [=]() {
-        assert(((ie_joypad && if_joypad) || (ie_serial && if_serial) ||
-                (ie_timer && if_timer) || (ie_lcd && if_lcd) ||
-                (ie_vblank && if_vblank)) &&
-               "IF and IE same bits are not set");
-        this->SP--;
+        // write pc high to stack (upper byte push)
+
         this->_set(this->SP, this->PC >> 8);
         this->SP--;
-        this->_set(this->SP, this->PC & 0xff);
     };
 
     auto m4 = [=]() {
-        assert(((ie_joypad && if_joypad) || (ie_serial && if_serial) ||
-                (ie_timer && if_timer) || (ie_lcd && if_lcd) ||
-                (ie_vblank && if_vblank)) &&
-               "IF and IE same bits are not set");
+        // write pc low to stack (lower byte push)
 
-        // reset IF
-        if (ie_vblank && if_vblank) {
-            // vblank interrupt
-            this->PC = 0x40;
-            this->_set(0xff0f, _if & 0xfe); // mask 1111 1110
-        } else if (ie_lcd && if_lcd) {
-            // vblank interrupt
-            this->PC = 0x48;
-            this->_set(0xff0f, _if & 0xfd); // mask 1111 1101
-        } else if (ie_timer && if_timer) {
-            // vblank interrupt
-            this->PC = 0x50;
-            this->_set(0xff0f, _if & 0xfb); // mask 1111 1011
-        } else if (ie_serial && if_serial) {
-            // vblank interrupt
-            this->PC = 0x58;
-            this->_set(0xff0f, _if & 0xf7); // mask 1111 0111
-        } else if (ie_joypad && if_joypad) {
-            // vblank interrupt
-            this->PC = 0x60;
-            this->_set(0xff0f, _if & 0xef); // mask 1110 1111
-        }
+        // NOTE: if IE was pushed this cycle, it's too late. the reason is
+        // because this whole function (handle interrupts) occurs BEFORE cpu
+        // execution, so we are always looking at the IE value BEFORE the
+        // current M-cycle
+
+        this->_set(this->SP, this->PC & 0xff);
+
+        this->PC = static_cast<uint16_t>(current_interrupt);
+        this->_set(0xff0f, _if & static_cast<uint8_t>(current_if_mask));
     };
 
     auto m5 = [=]() {
         this->ime = false;
-        uint8_t _ie_2 = this->_get(0xffff);
-        uint8_t _if_2 = this->_get(0xff0f);
+        this->current_interrupt = interrupts::none;
+        this->current_if_mask = if_mask::none;
     };
 
     this->I_operations.push_back(m5);

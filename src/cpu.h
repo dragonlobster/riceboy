@@ -51,7 +51,7 @@ class CPU {
     bool halt{false};
 
     std::vector<std::function<void()>> M_operations{};
-    
+
     // for interrupt operations
     std::vector<std::function<void()>> I_operations{}; // interrupt operations
 
@@ -103,7 +103,31 @@ class CPU {
 
     enum class bitops { AND, XOR, OR };
 
+    enum class interrupts {
+        none = 0,
+        vblank = 0x40,
+        lcd = 0x48,
+        timer = 0x50,
+        serial = 0x58,
+        joypad = 0x60
+    };
+
+    enum class if_mask {
+        none = 0xff, // should be 0xff so IF stays unmodified
+        vblank = 0xfe, // 1111 1110
+        lcd = 0xfd, // 1111 1101
+        timer = 0xfb, // 1111 1011
+        serial = 0xf7, // 1111 0111
+        joypad = 0xef // 1110 1111
+    };
+
+    std::tuple<interrupts, if_mask> check_current_interrupt(); // set current interrupt based on the new IE / IF
+
   private:
+    // interrupts
+    interrupts current_interrupt{interrupts::none};
+    if_mask current_if_mask{if_mask::none};
+
     // background_tick counter
     uint16_t ticks{0};
     uint16_t interrupt_ticks{0};
@@ -154,14 +178,16 @@ class CPU {
     void ret(conditions condition, bool ime_condition = false); // return
 
     void rl_r(const registers r, const bool hl = false,
-              const bool z_flag = false, const bool one_cycle = false); // rotate left accumulator
+              const bool z_flag = false,
+              const bool one_cycle = false); // rotate left accumulator
     void rlc_r(const registers r, const bool hl = false,
                const bool z_flag = false, const bool one_cycle = false);
     void rr_r(const registers r, const bool hl = false,
-              const bool z_flag = false, const bool one_cycle = false); // rotate right accumulator
+              const bool z_flag = false,
+              const bool one_cycle = false); // rotate right accumulator
     void rrc_r(const registers r, const bool hl = false,
-               const bool z_flag = false, const bool one_cycle = false); // rotate right accumulator
-
+               const bool z_flag = false,
+               const bool one_cycle = false); // rotate right accumulator
 
     void sla_r(const registers r,
                const bool hl = false); // rotate left accumulator

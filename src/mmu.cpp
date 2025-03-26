@@ -9,14 +9,13 @@
      _cartridge_type == MMU::cartridge_type::mbc1_ram ||                       \
      _cartridge_type == MMU::cartridge_type::mbc1_ram_battery)
 
-// TODO: simplify entire MMU by using a single array as the main memory
-
 void MMU::handle_tma_write(uint8_t value) {
 
     // tma address at the moment is hardware_registers[0x06]
     hardware_registers[0x06] = value;
 
     if (lock_tima_write) {
+        // if TMA was written during lock tima write (which means overflow case was just handled), the new TMA should be written to TIMA
         this->tima_ff05 = value;
     }
 }
@@ -26,6 +25,7 @@ void MMU::handle_tima_write(uint8_t value) {
     if (this->lock_tima_write) {
         assert(!this->tima_overflow &&
                "tima overflow should be false on lock tima write!");
+        // tima write is locked because we just handled an overflow case, it will stay as the value of TMA instead
         return;
     }
 
@@ -34,6 +34,8 @@ void MMU::handle_tima_write(uint8_t value) {
 }
 
 void MMU::handle_tima_overflow() {
+
+    // during tima overflow, after 1 M-cycle delay (standby), tima because tma and a timer interrupt bit in IF is set. 
 
     assert(this->tima_overflow_standby && "tima overflown was not requested!");
 
@@ -48,11 +50,15 @@ void MMU::handle_tima_overflow() {
 
     assert(!lock_tima_write && "tima write should not be locked yet!");
 
-    // reset tima overflow and tima overflow standby
+    // we need to lock tima write because during this cycle, any writes to TIMA should be ignored
+    lock_tima_write = true;
+
+    // reset tima overflow standby
     this->tima_overflow_standby = false;
 }
 
 void MMU::falling_edge() {
+    // falling edge should be run on: write to div, write to tac, and increment div TIMA increments in the case of a falling edge occuring
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
     uint8_t tac_freq_bit = tac_ff07 & 3;
 
@@ -75,6 +81,7 @@ void MMU::falling_edge() {
         this->tima_ff05++;
 
         if (tima_ff05 == 0) {
+            // tima overflowed (pass 255 wrapped to 0)
             this->tima_overflow = true;
         }
     }
@@ -82,11 +89,13 @@ void MMU::falling_edge() {
 }
 
 void MMU::handle_div_write() {
+    // div writes automatically sets DIV to 0
     this->div_ff04 = 0;
     falling_edge();
 }
 
 void MMU::handle_tac_write(uint8_t value) {
+    // we only care about the last 3 bits of tac at all times
     this->tac_ff07 = value | 0xf8;
     this->falling_edge();
 }
@@ -324,6 +333,8 @@ uint8_t MMU::read_memory(uint16_t address) const {
 
     case MMU::section::oam_ram : return this->oam_ram[address - base_address];
 
+    case MMU::section::unusuable_memory: return 0; // DMG returns 0x00;
+
     case MMU::section::hardware_registers:
         if (address == 0xff04) {
             return (this->div_ff04 & 0xff00) >> 8;
@@ -439,19 +450,28 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
 
     switch (locate_section(address)) {
     case MMU::section::restart_and_interrupt_vectors:
-        this->restart_and_interrupt_vectors[address] = value;
+        if (!this->load_rom_complete) {
+            this->restart_and_interrupt_vectors[address] = value;
+        }
         break;
 
     case MMU::section::cartridge_header_area:
-        this->cartridge_header_area[address - base_address] = value;
+        if (!this->load_rom_complete) {
+            this->cartridge_header_area[address - base_address] = value;
+        }
         break;
 
     case MMU::section::cartridge_rom_bank_0:
-        this->cartridge_rom_bank_0[address - base_address] = value;
+        if (!this->load_rom_complete) {
+            this->cartridge_rom_bank_0[address - base_address] = value;
+        }
         break;
 
     case MMU::section::cartridge_rom_switchable_banks:
-        this->cartridge_rom_switchable_banks[address - base_address] = value;
+        if (!this->load_rom_complete) {
+            this->cartridge_rom_switchable_banks[address - base_address] =
+                value;
+        }
         break;
 
     case MMU::section::character_ram:
