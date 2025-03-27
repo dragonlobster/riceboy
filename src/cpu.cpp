@@ -1808,7 +1808,14 @@ void CPU::ei_or_di(const bool ei) {
 }
 
 uint8_t CPU::identify_opcode(const uint8_t opcode) {
-    this->PC++;            // increment program counter
+    if (!this->halt_bug) {
+        this->PC++; // increment program counter, fails to increment if halt bug
+                    // is active
+    }
+    else if (this->halt_bug) {
+        this->halt_bug = false; // reset halt bug
+    }
+
     handle_opcode(opcode); // handle the opcode
     if (!this->M_operations.empty()) {
         this->fetch_opcode = false; // going past fetch opcode,
@@ -1961,13 +1968,31 @@ void CPU::tick() {
         this->gb_mmu->handle_tima_overflow();
     }
 
+    // TODO: DMA happen before or after interrupt checking (does it matter)? and does it happen during halt
+    // handle DMA transfers on dma mode before exeucting instructions
+    if (this->gb_mmu->dma_delay) {
+        this->gb_mmu->set_oam_dma();
+    }
+
+    else if (this->gb_mmu->dma_mode) {
+        this->gb_mmu->dma_transfer();
+    }
+
     if (M_operations.empty()) {
         handle_interrupts();
     }
 
-    //if (!this->halt) {
+    // set IME before executing instructions
+    const uint8_t opcode = this->_get(this->PC); // get current opcode
+
+    // ime should be set before execution of next opcode
+    if (ei_delay && opcode != 0xfb) {
+        this->ime = true;
+        this->ei_delay = false;
+    }
+
+    if (!this->halt) {
         // fetch opcode, then execute what you can this M-cycle
-        const uint8_t opcode = this->_get(this->PC); // get current opcode
 
         if (this->fetch_opcode) {
             identify_opcode(opcode);
@@ -1984,30 +2009,8 @@ void CPU::tick() {
             // execute interrupt operations
             this->execute_I_operations();
         }
-
-        if (ei_delay && opcode != 0xfb && M_operations.empty()) {
-            this->ime = true;
-            this->ei_delay = false;
-        }
-    //}
-
-    // dma should not be related to halt
-
-    // handle DMA transfers on dma mode after executing instructions
-    if (this->gb_mmu->dma_mode) {
-        this->gb_mmu->dma_transfer();
     }
 
-    else if (this->gb_mmu->dma_delay) {
-        this->gb_mmu->set_oam_dma();
-    }
-
-    // check oam dma every tick (mmu can't follow ticks so we use cpu for
-    // this)
-    else if (this->gb_mmu->dma_write) {
-        // this->gb_mmu->set_oam_dma();
-        this->gb_mmu->set_dma_delay();
-    }
 }
 
 void CPU::interrupt_tick() {
@@ -2085,6 +2088,14 @@ std::tuple<CPU::interrupts, CPU::if_mask> CPU::check_current_interrupt() {
 void CPU::handle_interrupts() {
     // takes 5 M-Cycles
 
+    // exit halt if _ie & _if
+    uint8_t _ie = this->_get(0xffff);
+    uint8_t _if = this->_get(0xff0f);
+
+    if ((_ie & _if & 0x1f) && this->halt) {
+        this->halt = false;
+    }
+
     // NOTE: This runs before CPU write to the interrupt (so it is based on
     // previous M cycle write)
     auto [i, m] = check_current_interrupt(); // interrupt, mask
@@ -2093,13 +2104,6 @@ void CPU::handle_interrupts() {
 
     if (!this->I_operations.empty()) {
         return;
-    }
-
-    uint8_t _ie = this->_get(0xffff);
-    uint8_t _if = this->_get(0xff0f);
-
-    if ((_ie & _if) && this->halt) {
-        this->halt = false;
     }
 
     if (!this->ime || !_ie || !_if) { // no interrupts and I operations is empty

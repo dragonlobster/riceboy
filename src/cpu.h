@@ -49,6 +49,7 @@ class CPU {
 
     // HALT flag
     bool halt{false};
+    bool halt_bug{false}; // indicates halt bug was activated, which means PC should fail to increment after the next instruction (or you can just decrement it directly)
 
     std::vector<std::function<void()>> M_operations{};
 

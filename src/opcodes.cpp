@@ -131,19 +131,17 @@ int CPU::handle_opcode(const uint8_t opcode) {
             // TODO: halt bug
             if (this->ime) {
                 this->halt = true;
-            }
-            else {
+            } else {
                 // if there is no interrupt, halt is entered
                 // ie & if & 0x1f
                 if (!(_get(0xffff) & _get(0xff0f) & 0x1f)) {
                     this->halt = true;
-                } 
-                
-                else {
-                    // halt bug
-                    this->PC--; // decrement the PC on halt bug; the PC failed to increment
                 }
 
+                else {
+                    // halt bug
+                    this->halt_bug = true;
+                }
             }
 
         } else {

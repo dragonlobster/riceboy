@@ -15,7 +15,8 @@ void MMU::handle_tma_write(uint8_t value) {
     hardware_registers[0x06] = value;
 
     if (lock_tima_write) {
-        // if TMA was written during lock tima write (which means overflow case was just handled), the new TMA should be written to TIMA
+        // if TMA was written during lock tima write (which means overflow case
+        // was just handled), the new TMA should be written to TIMA
         this->tima_ff05 = value;
     }
 }
@@ -25,7 +26,8 @@ void MMU::handle_tima_write(uint8_t value) {
     if (this->lock_tima_write) {
         assert(!this->tima_overflow &&
                "tima overflow should be false on lock tima write!");
-        // tima write is locked because we just handled an overflow case, it will stay as the value of TMA instead
+        // tima write is locked because we just handled an overflow case, it
+        // will stay as the value of TMA instead
         return;
     }
 
@@ -35,7 +37,8 @@ void MMU::handle_tima_write(uint8_t value) {
 
 void MMU::handle_tima_overflow() {
 
-    // during tima overflow, after 1 M-cycle delay (standby), tima because tma and a timer interrupt bit in IF is set. 
+    // during tima overflow, after 1 M-cycle delay (standby), tima because tma
+    // and a timer interrupt bit in IF is set.
 
     assert(this->tima_overflow_standby && "tima overflown was not requested!");
 
@@ -50,7 +53,8 @@ void MMU::handle_tima_overflow() {
 
     assert(!lock_tima_write && "tima write should not be locked yet!");
 
-    // we need to lock tima write because during this cycle, any writes to TIMA should be ignored
+    // we need to lock tima write because during this cycle, any writes to TIMA
+    // should be ignored
     lock_tima_write = true;
 
     // reset tima overflow standby
@@ -58,7 +62,8 @@ void MMU::handle_tima_overflow() {
 }
 
 void MMU::falling_edge() {
-    // falling edge should be run on: write to div, write to tac, and increment div TIMA increments in the case of a falling edge occuring
+    // falling edge should be run on: write to div, write to tac, and increment
+    // div TIMA increments in the case of a falling edge occuring
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
     uint8_t tac_freq_bit = tac_ff07 & 3;
 
@@ -103,7 +108,7 @@ void MMU::handle_tac_write(uint8_t value) {
 void MMU::handle_dma_write(uint8_t value) {
     this->dma_ff46 = value;
 
-    if (!dma_mode && !dma_write && !dma_delay) {
+    if (!dma_mode && !dma_delay) {
         // uses echo ram if source is 0xff or 0xfe, but i don't have echo ram so
         // i use wram instead (which echo ram is a mirror of)
 
@@ -118,14 +123,8 @@ void MMU::handle_dma_write(uint8_t value) {
                                     section::bg_map_data_2)
                                    ? bus::vram
                                    : bus::main;
-        this->dma_write = true;
+        this->dma_delay = true;
     }
-}
-
-void MMU::set_dma_delay() {
-    this->dma_delay = true;
-    this->dma_write =
-        false; // reset dma write, all writes are ignored at this point anyway
 }
 
 void MMU::set_oam_dma() {
@@ -136,6 +135,7 @@ void MMU::set_oam_dma() {
 }
 
 void MMU::dma_transfer() {
+    assert(dma_mode && "not in dma mode now!");
     uint16_t dest_address = 0xfe00 | (dma_source_transfer_address & 0x00ff);
     this->write_memory(dest_address,
                        this->read_memory(dma_source_transfer_address));
@@ -289,6 +289,16 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return 0xff; // joypad
         }
 
+        if (address == 0xff0f) {
+            return this->hardware_registers[0x0f] | 0xe0;
+            // mask top 3 bits for IF (they are unused)
+        }
+
+        if (address == 0xffff) {
+            return this->interrupt_enable_flag | 0xe0;
+            // mask top 3 bits for IE (they are unused)
+        }
+
         uint16_t result = this->cartridge->read_memory(address);
 
         if (result <= 0xff) { // make sure result fits in 8 bits
@@ -329,9 +339,9 @@ uint8_t MMU::read_memory(uint16_t address) const {
     case MMU::section::internal_ram_bank_1_to_7:
         return this->internal_ram_bank_1_to_7[address - base_address];
 
-    case MMU::section::echo_ram: return this->echo_ram[address - base_address];
+    case MMU::section::echo_ram        : return this->echo_ram[address - base_address];
 
-    case MMU::section::oam_ram : return this->oam_ram[address - base_address];
+    case MMU::section::oam_ram         : return this->oam_ram[address - base_address];
 
     case MMU::section::unusuable_memory: return 0; // DMG returns 0x00;
 
@@ -346,6 +356,9 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return 0xff; // joypad
         } else if (address == 0xff46) {
             return this->dma_ff46;
+        } else if (address == 0xff0f) {
+            return this->hardware_registers[0x0f] | 0xe0;
+            // mask top 3 bits with 1s for IF (they are unused)
         } else {
             return this->hardware_registers[address - base_address];
         }
@@ -354,7 +367,8 @@ uint8_t MMU::read_memory(uint16_t address) const {
         return this->zero_page[address - base_address];
 
     case MMU::section::interrupt_enable_flag:
-        return this->interrupt_enable_flag;
+        return this->interrupt_enable_flag | 0xe0;
+        // mask top 3 bits with 1s for IE (they are unused)
 
     default:
         std::cout << "(read) memory not implemented: "

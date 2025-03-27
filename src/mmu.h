@@ -104,11 +104,10 @@ class MMU {
     // dma
     uint8_t dma_ff46{0};
     bool dma_mode{false};
-    bool dma_write{false}; // a dma write occured
-    bool dma_delay{false}; // set by cpu after dma write is checked by the cpu, used for 4 tick delay
+    bool dma_delay{false}; // delay dma start by one cycle
+
     uint16_t dma_source_transfer_address{0}; // address for DMA transfer
     bus dma_bus_source{};
-    void set_dma_delay();
     void set_oam_dma();
     void handle_dma_write(uint8_t value);
 

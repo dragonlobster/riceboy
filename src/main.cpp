@@ -71,12 +71,12 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"
     };
 
-    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
     //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
 
     //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    //riceboy->gb_cpu.prepare_rom(mooneye_timing[1]);
-    riceboy->gb_cpu.prepare_rom(blargg[1]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
+    //riceboy->gb_cpu.prepare_rom(blargg[6]);
     //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     //riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
