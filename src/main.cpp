@@ -71,6 +71,7 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"
     };
 
+    // why does mooneye sources-dmgABCmgbS.gb flash before pass
     riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
     //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
 
