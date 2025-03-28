@@ -71,13 +71,11 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"
     };
 
-    // why does mooneye sources-dmgABCmgbS.gb flash before pass
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
+    // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably related to PPU somehow)
 
-    //riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
+    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
     //riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
-    //riceboy->gb_cpu.prepare_rom(blargg[6]);
+    riceboy->gb_cpu.prepare_rom(blargg[4]);
     //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     //riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
@@ -89,7 +87,7 @@ int main() {
     // double last_frame_time{0};
 
     // frame clock (avoiding setFrameRateLimit imprecision)
-    sf::Clock frame_clock;
+    sf::Clock frame_clock{};
 
     while (window.isOpen()) {
 
@@ -109,7 +107,6 @@ int main() {
             for (unsigned int i = 0; i < 70224; ++i) {
                 riceboy->tick();
             }
-            // std::cout << "hello" << frame_time << '\n';
             frame_time -= target_frame_time;
         }
         // 70224

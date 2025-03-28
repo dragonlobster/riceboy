@@ -376,7 +376,7 @@ void CPU::call(const conditions condition) {
 
     // M4
     auto decrement_sp = [=]() {
-        this->SP = SP - 1; // decrement stack pointer
+        this->SP--; // decrement stack pointer
     };
 
     // M5
@@ -554,16 +554,28 @@ void CPU::inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
 
             uint16_t current_value = _combine_2_8bits(*r1_pointer, *r2_pointer);
 
+            // oam bug oam corruption bug write on r16 == bc, or de and the
+            // value is within oam
+            if ((r1 == registers::B && r2 == registers::C) ||
+                (r1 == registers::D || r2 == registers::E) ||
+                (r1 == registers::H || r2 == registers::L)) {
+                if (this->gb_mmu->locate_section(current_value) ==
+                    MMU::section::oam_ram) {
+                    this->gb_mmu->oam_bug_write();
+                }
+            }
+
             if (inc) {
                 current_value++;
             } else if (!inc) {
                 current_value--;
             }
 
-            auto [r1, r2] = _split_16bit(current_value);
-            *r1_pointer = r1;
-            *r2_pointer = r2;
-            std::cout << "";
+            auto [r1_value, r2_value] = _split_16bit(current_value);
+            *r1_pointer = r1_value;
+            *r2_pointer = r2_value;
+
+
         }
     };
 
@@ -785,7 +797,14 @@ void CPU::ld_hl_a(const bool increment, const bool to_a) {
     auto m1 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
 
+
+        // oam bug oam corruption bug write on increment or decrement, i think its already handled by set
         this->_set(address, this->A);
+
+        /*
+        if (this->gb_mmu->locate_section(address) == MMU::section::oam_ram) {
+            this->gb_mmu->oam_bug_write();
+        }*/
 
         if (increment) {
             address++;
@@ -799,6 +818,11 @@ void CPU::ld_hl_a(const bool increment, const bool to_a) {
 
     auto m2 = [=]() {
         uint16_t address = this->_combine_2_8bits(this->H, this->L);
+
+        // oam bug oam corruption bug read inc (corruption happens before get address)
+        if (this->gb_mmu->locate_section(address) == MMU::section::oam_ram) {
+            this->gb_mmu->oam_bug_read_inc();
+        }
 
         this->A = _get(address);
 

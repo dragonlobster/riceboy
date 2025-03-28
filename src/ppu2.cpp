@@ -99,16 +99,28 @@ void PPU2::tick() {
             }
 
             oam_search_counter++;
+            this->gb_mmu.ppu_current_oam_row = (oam_search_counter & ~1) * 4; // function calculation for the start row OAM address of the current row, each row has 2 sprites (4 bytes each so 8 bytes total for 1 row) and a total of 20 rows (0-19)
+
+            // i can increment here because the CPU will tick first (thus current oam row will point to the current tick's oam access row by the ppu)
         }
 
         if (ticks == 80) {
             assert(oam_search_counter == 40 && "oam search counter is not 40!");
+            assert(this->gb_mmu.ppu_current_oam_row == 0xa0 && "ppu current oam row is not 20! ending at 0xa0 (row 152+1 start!)");
+
             oam_search_counter = 0; // reset oam search counter
+            this->gb_mmu.ppu_current_oam_row = 0; // reset current oam row scan
 
             // reset fifos and tile index
             background_fifo.clear();
             sprite_fifo.clear();
             tile_index = 0;
+
+            // TODO: do we really clear the sprite buffer if DMA is active right now? or if it was ever active during mode 2?:
+            if (this->gb_mmu.dma_mode) {
+                // all sprites on the line are hidden if DMA is active during mode 2
+                sprite_buffer.clear();
+            }
 
             // stable sort sprite buffer
             if (sprite_buffer.size() > 1) {
@@ -131,12 +143,12 @@ void PPU2::tick() {
         // drawing mode 3
         // fetch tile no
 
-        // dummy fetch - after 6 cycles
+        // dummy fetch - after 6 cycles (tick 81 being the first)
         if (dummy_fetch) {
             // current_fetcher_mode = fetcher_mode::FetchTileNo;
-            assert(ticks >= 81 && ticks <= 87 &&
+            assert(ticks >= 81 && ticks <= 86 &&
                    "ticks not correct for dummy fetch!");
-            if (ticks == 87) { // 12 ticks for dummy fetching
+            if (ticks == 86) { // 6 ticks for dummy fetching
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
                 dummy_fetch = false;
             }
@@ -170,7 +182,7 @@ void PPU2::tick() {
 
         switch (current_fetcher_mode) {
         case fetcher_mode::FetchTileNo: {
-            if (ticks % 2 == 0)
+            if (ticks % 2 != 0)
                 break;
 
             if (fetch_sprite) {
@@ -219,7 +231,7 @@ void PPU2::tick() {
         }
 
         case fetcher_mode::FetchTileDataLow: {
-            if (ticks % 2 == 0)
+            if (ticks % 2 != 0)
                 break;
 
             if (fetch_sprite) {
@@ -314,7 +326,7 @@ void PPU2::tick() {
         }
 
         case fetcher_mode::FetchTileDataHigh: {
-            if (ticks % 2 == 0)
+            if (ticks % 2 != 0)
                 break;
 
             high_byte = _get(high_byte_address);
@@ -445,7 +457,7 @@ void PPU2::tick() {
 
         if (lcd_x == 160) {
             /*
-            assert(ticks >= 173+80 && ticks <= 293+80 &&
+            assert(ticks >= 172+80 && ticks <= 293+80 &&
                    "ticks in drawing mode should be between 172 and 289!!");
                    */
 

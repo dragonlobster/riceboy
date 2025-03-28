@@ -11,7 +11,7 @@ class sst_mmu : public MMU {
   public:
     uint8_t memory[0xffff]{};
 
-    uint8_t bus_read_memory(uint16_t address) const override {
+    uint8_t bus_read_memory(uint16_t address) override {
         return memory[address];
     };
 

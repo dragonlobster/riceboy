@@ -12,7 +12,7 @@
 class MMU {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
-    virtual uint8_t bus_read_memory(uint16_t address) const;
+    virtual uint8_t bus_read_memory(uint16_t address); // corruption bug could modify memory (not const)
 
     virtual void write_memory(uint16_t address, uint8_t value);
     virtual void bus_write_memory(uint16_t address, uint8_t value);
@@ -39,7 +39,6 @@ class MMU {
     // zero page = high ram
 
     // vram - 8000 - 9fff
-
     enum class cartridge_type : uint8_t {
         rom_only = 0,
         mbc1 = 1,
@@ -112,6 +111,15 @@ class MMU {
     void handle_dma_write(uint8_t value);
 
     void dma_transfer();
+
+    // oam corruption bug related functions
+    void oam_bug_read();
+    void oam_bug_write();
+
+    void oam_bug_read_inc(); // when read and increase occur in the same cycle
+
+    // used for oam corruption bug (ppu current oam row accessed in mode 2)
+    uint8_t ppu_current_oam_row{0};
 
   private:
     // Interrupt enable flag - 0xFFFF

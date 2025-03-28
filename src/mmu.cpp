@@ -223,7 +223,64 @@ MMU::section MMU::locate_section(const uint16_t address) {
     return MMU::section::unknown;
 }
 
-uint8_t MMU::bus_read_memory(uint16_t address) const {
+void MMU::oam_bug_read() {
+    // if address is in oam and the sprite is not first or second object the
+    // bug is triggered for write oam row == 0 could also mean ppu is not in
+    // mode 2
+    // write_memory(address, value);
+
+    // range for ppu current oam row is 0x08 -> 0x98 (20 rows inclusive)
+    // a word is 2 bytes, so first "word" is the first 2 bytes (16 bit)
+
+    // Apply OAM corruption formula to first word (first 2 bytes)
+    for (int i = 0; i < 2; i++) {
+        uint8_t a = oam_ram[this->ppu_current_oam_row + i];
+        uint8_t b = oam_ram[this->ppu_current_oam_row - 8 + i];
+        uint8_t c = oam_ram[this->ppu_current_oam_row - 4 + i];
+        oam_ram[this->ppu_current_oam_row + i] = b | (a & c);
+    }
+
+    // Copy last 6 bytes from previous row (last 3 words)
+    std::copy(&oam_ram[this->ppu_current_oam_row + 2],
+           &oam_ram[this->ppu_current_oam_row - 6], 6);
+}
+
+void MMU::oam_bug_read_inc() {
+    // won't occur if the accessed row is one of the first four, or the last row
+
+    // if it's the first 4 rows (0x0, 0x8, 0x10, 0x18) or the last row (0x98)
+    // just return
+    if (ppu_current_oam_row < 0x20 || ppu_current_oam_row == 0x98) {
+        return;
+    }
+
+    // magic formula (b & (a | c | d)) | (a & c & d)
+
+    uint8_t a1 = oam_ram[ppu_current_oam_row - 0x10];
+    uint8_t b1 = oam_ram[ppu_current_oam_row - 0x08];
+    uint8_t c1 = oam_ram[ppu_current_oam_row];
+    uint8_t d1 = oam_ram[ppu_current_oam_row - 0x04];
+
+    uint8_t a2 = oam_ram[ppu_current_oam_row - 0x0f];
+    uint8_t b2 = oam_ram[ppu_current_oam_row - 0x07];
+    uint8_t c2 = oam_ram[ppu_current_oam_row + 0x01];
+    uint8_t d2 = oam_ram[ppu_current_oam_row - 0x03];
+
+    // First corruption: apply glitch formula to two bytes
+    oam_ram[ppu_current_oam_row - 0x8] = (b1 & (a1 | c1 | d1)) | (a1 & c1 & d1);
+
+    oam_ram[ppu_current_oam_row - 0x7] = (b2 & (a2 | c2 | d2)) | (a2 & c2 & d2);
+
+    // Second corruption: cascading copy to multiple places
+    for (unsigned i = 0; i < 8; i++) {
+        // This chained assignment copies the value to TWO locations
+        oam_ram[ppu_current_oam_row + i] =
+            oam_ram[ppu_current_oam_row - 0x10 + i] =
+                oam_ram[ppu_current_oam_row - 0x08 + i];
+    }
+}
+
+uint8_t MMU::bus_read_memory(uint16_t address) {
     if (this->dma_mode) {
 
         if (locate_section(address) == section::oam_ram) {
@@ -256,6 +313,15 @@ uint8_t MMU::bus_read_memory(uint16_t address) const {
                 return read_memory(dma_source_transfer_address);
             }
         }
+    }
+
+    // OAM BUG read corruption
+    if (locate_section(address) == section::oam_ram &&
+        this->ppu_current_oam_row > 0) {
+
+        oam_bug_read();
+
+        return 0xff; // bug returns 0xff i think
     }
 
     return read_memory(address);
@@ -306,7 +372,8 @@ uint8_t MMU::read_memory(uint16_t address) const {
         }
     }
 
-    // read from mmu's base arrays if the read function in mbc1 resulted in 0
+    // read from mmu's base arrays if the read function in mbc1 resulted in
+    // 0
 
     switch (locate_section(address)) {
     case MMU::section::restart_and_interrupt_vectors:
@@ -378,6 +445,28 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
+void MMU::oam_bug_write() {
+    // if address is in oam and the sprite is not first or second object the
+    // bug is triggered for write oam row == 0 could also mean ppu is not in
+    // mode 2
+    // write_memory(address, value);
+
+    // range for ppu current oam row is 0x08 -> 0x98 (20 rows inclusive)
+    // a word is 2 bytes, so first "word" is the first 2 bytes (16 bit)
+
+    // Apply OAM corruption formula to first word (first 2 bytes)
+    for (int i = 0; i < 2; i++) {
+        uint8_t a = oam_ram[this->ppu_current_oam_row + i];
+        uint8_t b = oam_ram[this->ppu_current_oam_row - 8 + i];
+        uint8_t c = oam_ram[this->ppu_current_oam_row - 4 + i];
+        oam_ram[this->ppu_current_oam_row + i] = ((a ^ c) & (b ^ c)) ^ c;
+    }
+
+    // Copy last 6 bytes from previous row (last 3 words)
+    std::copy(&oam_ram[this->ppu_current_oam_row + 2],
+           &oam_ram[this->ppu_current_oam_row - 6], 6);
+}
+
 void MMU::bus_write_memory(uint16_t address, uint8_t value) {
     if (this->dma_mode) {
 
@@ -413,7 +502,15 @@ void MMU::bus_write_memory(uint16_t address, uint8_t value) {
         }
     }
 
-    write_memory(address, value);
+    // OAM BUG write corruption
+    else if (locate_section(address) == section::oam_ram &&
+             this->ppu_current_oam_row > 0) {
+        oam_bug_write();
+    }
+
+    else {
+        write_memory(address, value);
+    }
 }
 
 void MMU::write_memory(uint16_t address, uint8_t value) {
