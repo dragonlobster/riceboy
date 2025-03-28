@@ -223,7 +223,11 @@ MMU::section MMU::locate_section(const uint16_t address) {
     return MMU::section::unknown;
 }
 
-void MMU::oam_bug_read() {
+void MMU::oam_bug_read(uint16_t address) {
+
+    if (locate_section(address) != section::oam_ram) {
+        return;
+    }
     // if address is in oam and the sprite is not first or second object the
     // bug is triggered for write oam row == 0 could also mean ppu is not in
     // mode 2
@@ -245,7 +249,10 @@ void MMU::oam_bug_read() {
            &oam_ram[this->ppu_current_oam_row - 6], 6);
 }
 
-void MMU::oam_bug_read_inc() {
+void MMU::oam_bug_read_inc(uint16_t address) {
+    if (locate_section(address) != section::oam_ram) {
+        return;
+    }
     // won't occur if the accessed row is one of the first four, or the last row
 
     // if it's the first 4 rows (0x0, 0x8, 0x10, 0x18) or the last row (0x98)
@@ -319,9 +326,9 @@ uint8_t MMU::bus_read_memory(uint16_t address) {
     if (locate_section(address) == section::oam_ram &&
         this->ppu_current_oam_row > 0) {
 
-        oam_bug_read();
+        oam_bug_read(address);
 
-        return 0xff; // bug returns 0xff i think
+        return 0xff; // bug returns 0xff i think?
     }
 
     return read_memory(address);
@@ -445,7 +452,12 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
-void MMU::oam_bug_write() {
+void MMU::oam_bug_write(uint16_t address) {
+
+    if (locate_section(address) != section::oam_ram &&
+        this->ppu_current_oam_row == 0) {
+        return;
+    }
     // if address is in oam and the sprite is not first or second object the
     // bug is triggered for write oam row == 0 could also mean ppu is not in
     // mode 2
@@ -505,7 +517,7 @@ void MMU::bus_write_memory(uint16_t address, uint8_t value) {
     // OAM BUG write corruption
     else if (locate_section(address) == section::oam_ram &&
              this->ppu_current_oam_row > 0) {
-        oam_bug_write();
+        oam_bug_write(address);
     }
 
     else {

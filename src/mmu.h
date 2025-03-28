@@ -113,10 +113,9 @@ class MMU {
     void dma_transfer();
 
     // oam corruption bug related functions
-    void oam_bug_read();
-    void oam_bug_write();
-
-    void oam_bug_read_inc(); // when read and increase occur in the same cycle
+    void oam_bug_read(uint16_t address);
+    void oam_bug_write(uint16_t address);
+    void oam_bug_read_inc(uint16_t address); // when read and increase occur in the same cycle
 
     // used for oam corruption bug (ppu current oam row accessed in mode 2)
     uint8_t ppu_current_oam_row{0};
