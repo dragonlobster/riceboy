@@ -1,6 +1,6 @@
-#include "DrawUtils.h"
-#include "Gameboy.h"
-#include "HandleInput.h"
+#include "draw.h"
+#include "gameboy.h"
+#include "handleinput.h"
 #include "vendor/tinyfiledialogs.h"
 #include <SFML/Graphics.hpp>
 
@@ -12,14 +12,13 @@ int main() {
     // const char* ROM = tinyfd_openFileDialog("Open a Gameboy ROM", NULL, 1,
     // lFilterPatterns, "*.gb", 0); if (!ROM) { exit(0); }
     sf::RenderWindow window(
-        sf::VideoMode({160 * DrawUtils::SCALE, 144 * DrawUtils::SCALE}),
-        "RiceBoy");
+        sf::VideoMode({160 * draw::SCALE, 144 * draw::SCALE}), "RiceBoy");
 
     // window.setFramerateLimit(60);
     window.setVerticalSyncEnabled(true);
 
     // initialize gameboy on heap
-    std::unique_ptr<Gameboy> riceboy = std::make_unique<Gameboy>(window);
+    std::unique_ptr<gameboy> riceboy = std::make_unique<gameboy>(window);
 
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
@@ -35,9 +34,10 @@ int main() {
         // need CGB)
         "BOOT/blargg/mem_timing/mem_timing.gb",
         "BOOT/blargg/mem_timing-2/mem_timing.gb",
-        "BOOT/blargg/oam_bug/oam_bug.gb", // oam corruption bug not implemented yet
+        "BOOT/blargg/oam_bug/oam_bug.gb", // oam corruption bug not implemented
+                                          // yet
         "BOOT/blargg/oam_bug/rom_singles/1-lcd_sync.gb", // not implemented yet
-        "BOOT/blargg/halt_bug.gb"};       // not implemented yet
+        "BOOT/blargg/halt_bug.gb"};                      // not implemented yet
 
     std::array<std::string, 13> mooneye_timing{
         "BOOT/mooneye-gb_hwtests/acceptance/timer/div_write.gb",
@@ -68,19 +68,19 @@ int main() {
     };
 
     std::array<std::string, 1> mooneye_cpu{
-        "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"
-    };
+        "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"};
 
-    // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably related to PPU somehow)
+    // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably
+    // related to ppu somehow)
 
-    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
-    riceboy->gb_cpu.prepare_rom(blargg[4]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
+    riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
+    // riceboy->gb_cpu.prepare_rom(blargg[4]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
     // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
-    // DrawUtils::SCALE, Chip8::DISPLAY_HEIGHT * DrawUtils::SCALE }),
+    // draw::SCALE, Chip8::DISPLAY_HEIGHT * draw::SCALE }),
     // "RiceBoy");
 
     // double accumulator{0};

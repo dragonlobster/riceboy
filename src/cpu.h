@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MMU.h"
+#include "mmu.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -9,13 +9,13 @@
 #include <tuple>
 #include <vector>
 
-class CPU {
+class cpu {
     // TODO: make private
 
   public:
     // pointer to mmu
-    CPU(MMU &mmu); // pass by reference
-    MMU *gb_mmu{}; // the central mmu
+    cpu(mmu &mmu); // pass by reference
+    mmu *gb_mmu{}; // the central mmu
 
     // main 8-bit registers
     uint8_t A{0};
@@ -49,7 +49,9 @@ class CPU {
 
     // HALT flag
     bool halt{false};
-    bool halt_bug{false}; // indicates halt bug was activated, which means PC should fail to increment after the next instruction (or you can just decrement it directly)
+    bool halt_bug{false}; // indicates halt bug was activated, which means PC
+                          // should fail to increment after the next instruction
+                          // (or you can just decrement it directly)
 
     std::vector<std::function<void()>> M_operations{};
 
@@ -114,15 +116,16 @@ class CPU {
     };
 
     enum class if_mask {
-        none = 0xff, // should be 0xff so IF stays unmodified
+        none = 0xff,   // should be 0xff so IF stays unmodified
         vblank = 0xfe, // 1111 1110
-        lcd = 0xfd, // 1111 1101
-        timer = 0xfb, // 1111 1011
+        lcd = 0xfd,    // 1111 1101
+        timer = 0xfb,  // 1111 1011
         serial = 0xf7, // 1111 0111
-        joypad = 0xef // 1110 1111
+        joypad = 0xef  // 1110 1111
     };
 
-    std::tuple<interrupts, if_mask> check_current_interrupt(); // set current interrupt based on the new IE / IF
+    std::tuple<interrupts, if_mask>
+    check_current_interrupt(); // set current interrupt based on the new IE / IF
 
   private:
     // interrupts

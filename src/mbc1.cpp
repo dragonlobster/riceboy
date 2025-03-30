@@ -1,10 +1,10 @@
-#include "MBC1.h"
+#include "mbc1.h"
 #include <cassert>
 #include <iostream>
 
 // TODO: implement MBCM1 (multicart)
 
-uint16_t MBC1::read_memory(uint16_t address) {
+uint16_t mbc1::read_memory(uint16_t address) {
     if (address <= 0x3fff) {
         // mode 0 - only access to normal address range
         // mode 1 - can access banks 1, 20, 40, 60 (stored in *0x4000) depending
@@ -88,7 +88,7 @@ uint16_t MBC1::read_memory(uint16_t address) {
     return 0xfff;
 }
 
-void MBC1::write_memory(uint16_t address, uint8_t value) {
+void mbc1::write_memory(uint16_t address, uint8_t value) {
 
     if (!this->load_rom_complete) {
         this->rom.push_back(value);
@@ -178,7 +178,7 @@ void MBC1::write_memory(uint16_t address, uint8_t value) {
     }
 }
 
-void MBC1::set_load_rom_complete() {
+void mbc1::set_load_rom_complete() {
     this->load_rom_complete = true;
 
     // set rom size

@@ -2,7 +2,7 @@
 
 #include <SFML/Graphics.hpp>
 
-class DrawUtils {
+class draw {
   public:
     static const int SCALE{2};
     static sf::RectangleShape add_pixel(sf::Vector2f position, std::uint8_t red,

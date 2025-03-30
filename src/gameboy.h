@@ -1,17 +1,15 @@
 #pragma once
 
-#include "CPU.h"
-#include "MMU.h"
-#include "PPU2.h"
-#include "PPU.h"
+#include "cpu.h"
+#include "mmu.h"
+#include "ppu.h"
 #include <SFML/Graphics.hpp>
 
-class Gameboy {
+class gameboy {
 
   public:
-
     sf::RenderWindow &window; // the sfml window (need to draw)
-    Gameboy(sf::RenderWindow &window_) : window(window_) {};
+    gameboy(sf::RenderWindow &window_) : window(window_) {};
 
     // dimensions
     static constexpr unsigned int WIDTH{160};
@@ -22,10 +20,10 @@ class Gameboy {
     // 4194304 T-cycles per second (background_tick cycles)
 
     // TODO: mmu, cpu, ppu
-    MMU gb_mmu{};
-    CPU gb_cpu = CPU(gb_mmu);
-    //PPU gb_ppu = PPU(gb_mmu, window);
-    PPU2 gb_ppu = PPU2(gb_mmu, window);
+    mmu gb_mmu{};
+    cpu gb_cpu = cpu(gb_mmu);
+    // ppu gb_ppu = ppu(gb_mmu, window);
+    ppu gb_ppu = ppu(gb_mmu, window);
 
     void tick();
 

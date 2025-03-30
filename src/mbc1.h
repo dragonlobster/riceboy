@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Cartridge.h"
+#include "cartridge.h"
 #include <array>
 #include <vector>
 
-class MBC1 : public Cartridge {
+class mbc1 : public cartridge {
   public:
     virtual uint16_t read_memory(uint16_t address); // 16 bit to return > 8 bit for unprocessed ranges
     virtual void write_memory(uint16_t address, uint8_t value);

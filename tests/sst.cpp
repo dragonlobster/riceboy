@@ -1,13 +1,13 @@
 #include "../src/cpu.h"
 #include "../src/mmu.h"
+#include "opcodes.h" // import all opcodes
 #include <array>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
-#include "opcodes.h" // import all opcodes
 using json = nlohmann::json;
 
-class sst_mmu : public MMU {
+class sst_mmu : public mmu {
   public:
     uint8_t memory[0xffff]{};
 
@@ -22,7 +22,7 @@ class sst_mmu : public MMU {
 
 sst_mmu test_mmu{};
 
-CPU test_cpu = CPU(test_mmu);
+cpu test_cpu = cpu(test_mmu);
 
 namespace sst {
 struct cpu_state {
@@ -85,7 +85,7 @@ void from_json(const json &j, sst &sst) {
 
 } // namespace sst
 
-void test_setup(CPU &test_cpu, sst::cpu_state &initial) {
+void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
     test_cpu.PC = initial.pc;
     test_cpu.SP = initial.sp;
     test_cpu.A = initial.a;
@@ -113,7 +113,7 @@ void test_setup(CPU &test_cpu, sst::cpu_state &initial) {
     // TODO: what is ime?
 }
 
-void compare_final(CPU &test_cpu, sst::cpu_state &final) {
+void compare_final(cpu &test_cpu, sst::cpu_state &final) {
     EXPECT_EQ(test_cpu.PC, final.pc);
     EXPECT_EQ(test_cpu.SP, final.sp);
     EXPECT_EQ(test_cpu.A, final.a);
@@ -164,7 +164,7 @@ class OpcodeTest : public testing::TestWithParam<uint8_t> {
 
 class CBOpcodeTest : public OpcodeTest {
   public:
-      void SetUp() override {
+    void SetUp() override {
         std::stringstream ss;
         uint8_t value = GetParam();
         ss << std::hex << std::setfill('0') << std::setw(2)
@@ -178,7 +178,6 @@ class CBOpcodeTest : public OpcodeTest {
 
         this->value = value;
         this->data = json::parse(f);
-
     }
 };
 
@@ -214,7 +213,6 @@ TEST_P(CBOpcodeTest, opcode_cb) {
     }
 }
 
-
 std::string opcode_param_to_string(
     const testing::TestParamInfo<OpcodeTest::ParamType> &info) {
     std::stringstream ss;
@@ -223,6 +221,8 @@ std::string opcode_param_to_string(
     return ss.str();
 }
 
-INSTANTIATE_TEST_SUITE_P(CPU, OpcodeTest, testing::ValuesIn(opcodes), opcode_param_to_string);
+INSTANTIATE_TEST_SUITE_P(cpu, OpcodeTest, testing::ValuesIn(opcodes),
+                         opcode_param_to_string);
 
-INSTANTIATE_TEST_SUITE_P(CPU, CBOpcodeTest, testing::ValuesIn(cb_opcodes), opcode_param_to_string);
+INSTANTIATE_TEST_SUITE_P(cpu, CBOpcodeTest, testing::ValuesIn(cb_opcodes),
+                         opcode_param_to_string);

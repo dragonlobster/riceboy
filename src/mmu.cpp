@@ -1,15 +1,15 @@
-#include "MMU.h"
+#include "mmu.h"
 #include <array>
 #include <cassert>
 #include <iostream>
 
 // TODO: use constexpr function instead?
 #define IS_MBC1                                                                \
-    (_cartridge_type == MMU::cartridge_type::mbc1 ||                           \
-     _cartridge_type == MMU::cartridge_type::mbc1_ram ||                       \
-     _cartridge_type == MMU::cartridge_type::mbc1_ram_battery)
+    (_cartridge_type == mmu::cartridge_type::mbc1 ||                           \
+     _cartridge_type == mmu::cartridge_type::mbc1_ram ||                       \
+     _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
-void MMU::handle_tma_write(uint8_t value) {
+void mmu::handle_tma_write(uint8_t value) {
 
     // tma address at the moment is hardware_registers[0x06]
     hardware_registers[0x06] = value;
@@ -21,7 +21,7 @@ void MMU::handle_tma_write(uint8_t value) {
     }
 }
 
-void MMU::handle_tima_write(uint8_t value) {
+void mmu::handle_tima_write(uint8_t value) {
 
     if (this->lock_tima_write) {
         assert(!this->tima_overflow &&
@@ -35,7 +35,7 @@ void MMU::handle_tima_write(uint8_t value) {
     this->tima_overflow = false;
 }
 
-void MMU::handle_tima_overflow() {
+void mmu::handle_tima_overflow() {
 
     // during tima overflow, after 1 M-cycle delay (standby), tima because tma
     // and a timer interrupt bit in IF is set.
@@ -61,7 +61,7 @@ void MMU::handle_tima_overflow() {
     this->tima_overflow_standby = false;
 }
 
-void MMU::falling_edge() {
+void mmu::falling_edge() {
     // falling edge should be run on: write to div, write to tac, and increment
     // div TIMA increments in the case of a falling edge occuring
     uint8_t timer_enable_bit = (this->tac_ff07 & 4) >> 2;
@@ -93,19 +93,19 @@ void MMU::falling_edge() {
     this->last_div_state = div_state;
 }
 
-void MMU::handle_div_write() {
+void mmu::handle_div_write() {
     // div writes automatically sets DIV to 0
     this->div_ff04 = 0;
     falling_edge();
 }
 
-void MMU::handle_tac_write(uint8_t value) {
+void mmu::handle_tac_write(uint8_t value) {
     // we only care about the last 3 bits of tac at all times
     this->tac_ff07 = value | 0xf8;
     this->falling_edge();
 }
 
-void MMU::handle_dma_write(uint8_t value) {
+void mmu::handle_dma_write(uint8_t value) {
     this->dma_ff46 = value;
 
     if (!dma_mode && !dma_delay) {
@@ -127,14 +127,14 @@ void MMU::handle_dma_write(uint8_t value) {
     }
 }
 
-void MMU::set_oam_dma() {
+void mmu::set_oam_dma() {
     this->dma_delay = false;
     // this->dma_write = false; // reset dma write, all writes are ignored at
     // this point anyway
     this->dma_mode = true;
 }
 
-void MMU::dma_transfer() {
+void mmu::dma_transfer() {
     assert(dma_mode && "not in dma mode now!");
     uint16_t dest_address = 0xfe00 | (dma_source_transfer_address & 0x00ff);
     this->write_memory(dest_address,
@@ -152,7 +152,7 @@ void MMU::dma_transfer() {
            "dma transfer passed oam memory!");
 }
 
-void MMU::set_load_rom_complete() {
+void mmu::set_load_rom_complete() {
 
     if (IS_MBC1) {
         assert(this->cartridge.get() != nullptr &&
@@ -163,17 +163,17 @@ void MMU::set_load_rom_complete() {
     this->load_rom_complete = true;
 }
 
-void MMU::set_cartridge_type(uint8_t type) {
+void mmu::set_cartridge_type(uint8_t type) {
 
-    this->_cartridge_type = static_cast<MMU::cartridge_type>(type);
+    this->_cartridge_type = static_cast<mmu::cartridge_type>(type);
 
     if (IS_MBC1) {
-        this->cartridge = std::make_unique<MBC1>();
+        this->cartridge = std::make_unique<mbc1>();
     }
 }
 
 // direct increment div ff04 to here, read ff04 also to read div
-void MMU::increment_div(uint16_t value, bool check_falling_edge) {
+void mmu::increment_div(uint16_t value, bool check_falling_edge) {
     // if (!this->div_write_ran && !this->tac_write_ran) {
     //}
     if (check_falling_edge) {
@@ -186,44 +186,44 @@ void MMU::increment_div(uint16_t value, bool check_falling_edge) {
     }
 }
 
-MMU::section MMU::locate_section(const uint16_t address) {
+mmu::section mmu::locate_section(const uint16_t address) {
     if (address <= 0x00ff) {
-        return MMU::section::restart_and_interrupt_vectors;
+        return mmu::section::restart_and_interrupt_vectors;
     } else if (address >= 0x0100 && address <= 0x014f) {
-        return MMU::section::cartridge_header_area;
+        return mmu::section::cartridge_header_area;
     } else if (address >= 0x0150 && address <= 0x3fff) {
-        return MMU::section::cartridge_rom_bank_0;
+        return mmu::section::cartridge_rom_bank_0;
     } else if (address >= 0x4000 && address <= 0x7fff) {
-        return MMU::section::cartridge_rom_switchable_banks;
+        return mmu::section::cartridge_rom_switchable_banks;
     } else if (address >= 0x8000 && address <= 0x97ff) {
-        return MMU::section::character_ram;
+        return mmu::section::character_ram;
     } else if (address >= 0x9800 && address <= 0x9bff) {
-        return MMU::section::bg_map_data_1;
+        return mmu::section::bg_map_data_1;
     } else if (address >= 0x9c00 && address <= 0x9fff) {
-        return MMU::section::bg_map_data_2;
+        return mmu::section::bg_map_data_2;
     } else if (address >= 0xa000 && address <= 0xbfff) {
-        return MMU::section::cartridge_ram;
+        return mmu::section::cartridge_ram;
     } else if (address >= 0xc000 && address <= 0xcfff) {
-        return MMU::section::internal_ram_bank_0;
+        return mmu::section::internal_ram_bank_0;
     } else if (address >= 0xd000 && address <= 0xdfff) {
-        return MMU::section::internal_ram_bank_1_to_7;
+        return mmu::section::internal_ram_bank_1_to_7;
     } else if (address >= 0xe000 && address <= 0xfdff) {
-        return MMU::section::echo_ram;
+        return mmu::section::echo_ram;
     } else if (address >= 0xfe00 && address <= 0xfe9f) {
-        return MMU::section::oam_ram;
+        return mmu::section::oam_ram;
     } else if (address >= 0xfea0 && address <= 0xfeff) {
-        return MMU::section::unusuable_memory;
+        return mmu::section::unusuable_memory;
     } else if (address >= 0xff00 && address <= 0xff7f) {
-        return MMU::section::hardware_registers;
+        return mmu::section::hardware_registers;
     } else if (address >= 0xff80 && address <= 0xfffe) {
-        return MMU::section::zero_page;
+        return mmu::section::zero_page;
     } else if (address == 0xffff) {
-        return MMU::section::interrupt_enable_flag;
+        return mmu::section::interrupt_enable_flag;
     }
-    return MMU::section::unknown;
+    return mmu::section::unknown;
 }
 
-void MMU::oam_bug_read(uint16_t address) {
+void mmu::oam_bug_read(uint16_t address) {
 
     if (locate_section(address) != section::oam_ram) {
         return;
@@ -245,11 +245,11 @@ void MMU::oam_bug_read(uint16_t address) {
     }
 
     // Copy last 6 bytes from previous row (last 3 words)
-    std::copy(&oam_ram[this->ppu_current_oam_row + 2],
+    memcpy(&oam_ram[this->ppu_current_oam_row + 2],
            &oam_ram[this->ppu_current_oam_row - 6], 6);
 }
 
-void MMU::oam_bug_read_inc(uint16_t address) {
+void mmu::oam_bug_read_inc(uint16_t address) {
     if (locate_section(address) != section::oam_ram) {
         return;
     }
@@ -287,7 +287,7 @@ void MMU::oam_bug_read_inc(uint16_t address) {
     }
 }
 
-uint8_t MMU::bus_read_memory(uint16_t address) {
+uint8_t mmu::bus_read_memory(uint16_t address) {
     if (this->dma_mode) {
 
         if (locate_section(address) == section::oam_ram) {
@@ -335,7 +335,7 @@ uint8_t MMU::bus_read_memory(uint16_t address) {
 }
 
 // TODO: make more elegant by segregating each address space
-uint8_t MMU::read_memory(uint16_t address) const {
+uint8_t mmu::read_memory(uint16_t address) const {
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
     if (IS_MBC1) {
@@ -383,43 +383,43 @@ uint8_t MMU::read_memory(uint16_t address) const {
     // 0
 
     switch (locate_section(address)) {
-    case MMU::section::restart_and_interrupt_vectors:
+    case mmu::section::restart_and_interrupt_vectors:
         return this->restart_and_interrupt_vectors[address - base_address];
 
-    case MMU::section::cartridge_header_area:
+    case mmu::section::cartridge_header_area:
         return this->cartridge_header_area[address - base_address];
 
-    case MMU::section::cartridge_rom_bank_0:
+    case mmu::section::cartridge_rom_bank_0:
         return this->cartridge_rom_bank_0[address - base_address];
 
-    case MMU::section::cartridge_rom_switchable_banks:
+    case mmu::section::cartridge_rom_switchable_banks:
         return this->cartridge_rom_switchable_banks[address - base_address];
 
-    case MMU::section::character_ram:
+    case mmu::section::character_ram:
         return this->character_ram[address - base_address];
 
-    case MMU::section::bg_map_data_1:
+    case mmu::section::bg_map_data_1:
         return this->bg_map_data_1[address - base_address];
 
-    case MMU::section::bg_map_data_2:
+    case mmu::section::bg_map_data_2:
         return this->bg_map_data_2[address - base_address];
 
-    case MMU::section::cartridge_ram:
+    case mmu::section::cartridge_ram:
         return this->cartridge_ram[address - base_address];
 
-    case MMU::section::internal_ram_bank_0:
+    case mmu::section::internal_ram_bank_0:
         return this->internal_ram_bank_0[address - base_address];
 
-    case MMU::section::internal_ram_bank_1_to_7:
+    case mmu::section::internal_ram_bank_1_to_7:
         return this->internal_ram_bank_1_to_7[address - base_address];
 
-    case MMU::section::echo_ram        : return this->echo_ram[address - base_address];
+    case mmu::section::echo_ram        : return this->echo_ram[address - base_address];
 
-    case MMU::section::oam_ram         : return this->oam_ram[address - base_address];
+    case mmu::section::oam_ram         : return this->oam_ram[address - base_address];
 
-    case MMU::section::unusuable_memory: return 0; // DMG returns 0x00;
+    case mmu::section::unusuable_memory: return 0; // DMG returns 0x00;
 
-    case MMU::section::hardware_registers:
+    case mmu::section::hardware_registers:
         if (address == 0xff04) {
             return (this->div_ff04 & 0xff00) >> 8;
         } else if (address == 0xff05) {
@@ -437,10 +437,10 @@ uint8_t MMU::read_memory(uint16_t address) const {
             return this->hardware_registers[address - base_address];
         }
 
-    case MMU::section::zero_page:
+    case mmu::section::zero_page:
         return this->zero_page[address - base_address];
 
-    case MMU::section::interrupt_enable_flag:
+    case mmu::section::interrupt_enable_flag:
         return this->interrupt_enable_flag | 0xe0;
         // mask top 3 bits with 1s for IE (they are unused)
 
@@ -452,7 +452,7 @@ uint8_t MMU::read_memory(uint16_t address) const {
     }
 }
 
-void MMU::oam_bug_write(uint16_t address) {
+void mmu::oam_bug_write(uint16_t address) {
 
     if (locate_section(address) != section::oam_ram &&
         this->ppu_current_oam_row == 0) {
@@ -475,11 +475,11 @@ void MMU::oam_bug_write(uint16_t address) {
     }
 
     // Copy last 6 bytes from previous row (last 3 words)
-    std::copy(&oam_ram[this->ppu_current_oam_row + 2],
+    memcpy(&oam_ram[this->ppu_current_oam_row + 2],
            &oam_ram[this->ppu_current_oam_row - 6], 6);
 }
 
-void MMU::bus_write_memory(uint16_t address, uint8_t value) {
+void mmu::bus_write_memory(uint16_t address, uint8_t value) {
     if (this->dma_mode) {
 
         if (locate_section(address) == section::oam_ram) {
@@ -525,7 +525,7 @@ void MMU::bus_write_memory(uint16_t address, uint8_t value) {
     }
 }
 
-void MMU::write_memory(uint16_t address, uint8_t value) {
+void mmu::write_memory(uint16_t address, uint8_t value) {
 
     if (!this->load_rom_complete && (IS_MBC1)) { // TODO: not rom_only
 
@@ -572,72 +572,72 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
     uint16_t base_address = static_cast<uint16_t>(locate_section(address));
 
     switch (locate_section(address)) {
-    case MMU::section::restart_and_interrupt_vectors:
+    case mmu::section::restart_and_interrupt_vectors:
         if (!this->load_rom_complete) {
             this->restart_and_interrupt_vectors[address] = value;
         }
         break;
 
-    case MMU::section::cartridge_header_area:
+    case mmu::section::cartridge_header_area:
         if (!this->load_rom_complete) {
             this->cartridge_header_area[address - base_address] = value;
         }
         break;
 
-    case MMU::section::cartridge_rom_bank_0:
+    case mmu::section::cartridge_rom_bank_0:
         if (!this->load_rom_complete) {
             this->cartridge_rom_bank_0[address - base_address] = value;
         }
         break;
 
-    case MMU::section::cartridge_rom_switchable_banks:
+    case mmu::section::cartridge_rom_switchable_banks:
         if (!this->load_rom_complete) {
             this->cartridge_rom_switchable_banks[address - base_address] =
                 value;
         }
         break;
 
-    case MMU::section::character_ram:
+    case mmu::section::character_ram:
         this->character_ram[address - base_address] = value;
         break;
 
-    case MMU::section::bg_map_data_1:
+    case mmu::section::bg_map_data_1:
         this->bg_map_data_1[address - base_address] = value;
         break;
 
-    case MMU::section::bg_map_data_2:
+    case mmu::section::bg_map_data_2:
         this->bg_map_data_2[address - base_address] = value;
         break;
 
-    case MMU::section::cartridge_ram:
+    case mmu::section::cartridge_ram:
         this->cartridge_ram[address - base_address] = value;
         break;
 
-    case MMU::section::internal_ram_bank_0:
+    case mmu::section::internal_ram_bank_0:
         this->internal_ram_bank_0[address - base_address] = value;
         break;
 
-    case MMU::section::internal_ram_bank_1_to_7:
+    case mmu::section::internal_ram_bank_1_to_7:
         this->internal_ram_bank_1_to_7[address - base_address] = value;
         break;
 
-    case MMU::section::echo_ram:
+    case mmu::section::echo_ram:
         if (!load_rom_complete) {
             this->echo_ram[address - base_address] = value;
         }
         break;
 
-    case MMU::section::unusuable_memory:
+    case mmu::section::unusuable_memory:
         if (!load_rom_complete) {
             this->unusable_memory[address - base_address] = value;
         }
         break;
 
-    case MMU::section::oam_ram:
+    case mmu::section::oam_ram:
         this->oam_ram[address - base_address] = value;
         break;
 
-    case MMU::section::hardware_registers:
+    case mmu::section::hardware_registers:
         if (address == 0xff04) {
             handle_div_write();
         }
@@ -664,11 +664,11 @@ void MMU::write_memory(uint16_t address, uint8_t value) {
         }
         break;
 
-    case MMU::section::zero_page:
+    case mmu::section::zero_page:
         this->zero_page[address - base_address] = value;
         break;
 
-    case MMU::section::interrupt_enable_flag:
+    case mmu::section::interrupt_enable_flag:
         this->interrupt_enable_flag = value;
         break;
 

@@ -1,769 +1,576 @@
-#include "PPU.h"
-#include "DrawUtils.h"
+#include "ppu.h"
+#include <algorithm>
 #include <iostream>
 
-uint8_t PPU::_get(uint16_t address) {
+uint8_t ppu::_get(uint16_t address) {
     return this->gb_mmu.read_memory(address);
 }
-void PPU::_set(uint16_t address, uint8_t value) {
+void ppu::_set(uint16_t address, uint8_t value) {
     this->gb_mmu.write_memory(address, value);
-}
-uint8_t Fetcher::_get(uint16_t address) {
-    return this->gb_mmu.read_memory(address);
-}
-void Fetcher::_set(uint16_t address, uint8_t value) {
-    this->gb_mmu.write_memory(address, value);
-}
-
-void Fetcher::reset() {
-    // prepare for drawing
-    // clear fifo
-    this->background_fifo.clear();
-    this->sprite_fifo.clear();
-
-    // reset tile index
-    this->tile_index = 0;
-    // this->ppu_fetcher.tile_index = _get(SCX) / 8;
-
-    // reset lcd x position
-    this->lcd_x_position = -1 * (_get(SCX) % 8);
-    // this->lcd_x_position = 0;
-
-    // reset window fetch mode
-    this->window_fetch = false;
-
-    // reset oam buffer counter
-    //this->sprite_buffer_counter = 0;
-
-    this->sprite_current_mode = Fetcher::mode::FetchTileNo;
-    this->background_current_mode = Fetcher::mode::FetchTileNo;
-    this->dummy_fetch = true;
 }
 
 // ppu constructor
-PPU::PPU(MMU &gb_mmu_, sf::RenderWindow &window_)
+ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
     : gb_mmu(gb_mmu_), window(window_) {
 
     // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
     _set(STAT, 0x80);
 
     sf::Image image({window.getSize().x, window.getSize().y}, sf::Color::White);
-    this->lcd_dots_image = image;
-}; // pass mmu by reference
+    this->lcd_frame_image = image; // image with pixels to display on the screen
+};
 
-// TODO: move fetcher to another file
+sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
+    // Get the appropriate palette register
+    uint8_t palette_value{};
 
-// determine if sprite should be added to sprite buffer
-// TODO: need to change this to get all 4 bytes of the OAM sprite metadata
-void PPU::add_to_sprite_buffer(std::array<uint8_t, 4> oam_entry) {
-    // byte 0 = y position, byte 1 = x position, byte 2 = tile number, byte 3 =
-    // sprite flags
-    const bool x_pos_gt_0 = oam_entry[1] > 0;
-    const bool LY_plus_16_gt_y_pos = _get(LY) + 16 >= oam_entry[0];
-    // get the tall mode LCDC bit 2
-    const uint8_t sprite_height = ((_get(LCDC) >> 2) & 1) ? 16 : 8;
-    // LY + 16 < y pos + sprite_height
-    const bool sprite_height_condition =
-        (_get(LY) + 16) < (oam_entry[0] + sprite_height);
-
-    if (!x_pos_gt_0 || !LY_plus_16_gt_y_pos || !sprite_height ||
-        !sprite_height_condition || ppu_fetcher.sprite_buffer.size() >= 10) {
-        // not all conditions were met
-        return;
+    if (palette == 2) {
+        palette_value = _get(BGP); // Background palette
+    } else {
+        // Assert valid sprite palette before using it
+        assert(palette == 0 || palette == 1 && "sprite palette is not 0 or 1!");
+        palette_value = palette == 0 ? _get(0xff48) : _get(0xff49);
+        palette_value &= 0xfc; // 0 out the last 2 bits
     }
 
-    // calculate tile for tall mode
-    if ((_get(LCDC) >> 2) & 1) { // tall mode
-        if ((_get(LY) + 16) < (oam_entry[0] >= 8 ? (oam_entry[0] - 8) : 0)) {
-            oam_entry[2] = oam_entry[2] | 1;
-        } else {
-            oam_entry[2] = oam_entry[2] & 0xfe; // 1111 1110
-        }
-    }
+    // Extract the color ID for the pixel (each pixel uses 2 bits in the
+    // palette)
+    uint8_t color_id = (palette_value >> (2 * (pixel & 0x03))) & 0x03;
 
-    // TODO: check suggested change
-    /*
-    if ((_get(LCDC) >> 2) & 1) { // 8×16 mode
-        // force bit 0 of tile to 0 for top half, 1 for bottom half
-        bool bottom_half = (_get(LY) + 16 - oam_entry[0]) >= 8;
-        oam_entry[2] = (oam_entry[2] & 0xfe) | (bottom_half ? 1 : 0);
-    }*/
+    // Map the color ID directly to the appropriate color palette
+    const std::array<std::array<uint8_t, 3>, 4> color_map = {
+        color_palette_white, color_palette_light_gray, color_palette_dark_gray,
+        color_palette_black};
 
-    ppu_fetcher.sprite_buffer.push_back(oam_entry);
+    // Get the RGB values and return as sf::Color
+    const auto &color = color_map[color_id];
+    return {color[0], color[1], color[2]};
 }
 
-std::array<uint8_t, 3> PPU::_get_color(uint8_t id) {
-    switch (id) {
-    case 0 : return color_palette_white; break;
-    case 1 : return color_palette_light_gray; break;
-    case 2 : return color_palette_dark_gray; break;
-    case 3 : return color_palette_black; break;
-    default: return color_palette_white; break;
+void ppu::tick() {
+    ticks++;
+    // 1 T-cycle
+
+    // wy == ly every tick
+    if (!wy_condition) {
+        wy_condition = _get(WY) == _get(LY);
     }
-}
-
-sf::Color PPU::get_pixel_color(uint8_t pixel, uint8_t *palette) {
-    uint8_t id_0{};
-    uint8_t id_1{};
-    uint8_t id_2{};
-    uint8_t id_3{};
-
-    std::array<uint8_t, 3> color_0{};
-    std::array<uint8_t, 3> color_1{};
-    std::array<uint8_t, 3> color_2{};
-    std::array<uint8_t, 3> color_3{};
-
-    if (!palette) {
-        // TODO: maybe i only need to do this once per rom load
-        id_0 = _get(BGP) & 0x03;      // id 0 0x03 masks last 2 bits
-        id_1 = _get(BGP) >> 2 & 0x03; // id 1
-        id_2 = _get(BGP) >> 4 & 0x03; // id 2
-        id_3 = _get(BGP) >> 6 & 0x03; // id 3
-        // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
-
-        color_0 = _get_color(id_0);
-        color_1 = _get_color(id_1);
-        color_2 = _get_color(id_2);
-        color_3 = _get_color(id_3);
-    }
-
-    else {
-        assert(*palette == 0 ||
-               *palette == 1 && "sprite palette is not 0 or 1!");
-
-        uint8_t obp = *palette ? _get(0xff49) : _get(0xff48);
-
-        id_0 = obp & 0x03; // id 0 0x03 masks last 2 bits (ignored in sprites)
-        id_1 = obp >> 2 & 0x03; // id 1
-        id_2 = obp >> 4 & 0x03; // id 2
-        id_3 = obp >> 6 & 0x03; // id 3
-        // 0 = white, 1 = light gray, 2 = dark gray, 3 = black
-
-        color_0 = _get_color(id_0);
-        color_1 = _get_color(id_1);
-        color_2 = _get_color(id_2);
-        color_3 = _get_color(id_3);
-    }
-
-    uint8_t r = color_palette_white[0];
-    uint8_t g = color_palette_white[1];
-    uint8_t b = color_palette_white[2];
-
-    switch (pixel) {
-    case 0:
-        r = color_0[0];
-        g = color_0[1];
-        b = color_0[2];
-        break;
-    case 1:
-        r = color_1[0];
-        g = color_1[1];
-        b = color_1[2];
-        break;
-    case 2:
-        r = color_2[0];
-        g = color_2[1];
-        b = color_2[2];
-        break;
-    case 3:
-        r = color_3[0];
-        g = color_3[1];
-        b = color_3[2];
-        break;
-    }
-    return {r, g, b};
-}
-
-void Fetcher::sprite_tick() {
-
-    // TODO: check sprite fetch buffer
-    // if there are, pause the background fifo
-
-    this->sprite_fetcher_ticks++;
-
-    switch (sprite_current_mode) {
-    case Fetcher::mode::Paused     : this->sprite_fetcher_ticks = 0; break;
-    case Fetcher::mode::FetchTileNo: {
-        // 1 or 2 ticks?
-        // this->sprite_fetcher_ticks = 0;
-        if (sprite_fetcher_ticks < 2) {
-            return;
-        }
-
-        this->sprite_tile = sprite_fetch_buffer.back(); // 2 is tile id
-        // TODO: get the sprites from lowest x to highest x
-
-        this->sprite_current_mode = Fetcher::mode::FetchTileDataLow;
-
-        break;
-    }
-
-    case Fetcher::mode::FetchTileDataLow: {
-        if (sprite_fetcher_ticks < 2) {
-            return;
-        }
-
-        sprite_fetcher_ticks = 0;
-        uint8_t low_byte{};
-        uint16_t sprite_address{};
-        // 8000 method
-
-        /*
-        uint16_t address = 0x8000 + (sprite_tile[2] * 16); // is there offset?
-        low_byte = this->gb_mmu.read_memory(address);
-        */
-
-        uint16_t tile_offset = 16 * sprite_tile[2];
-        // TODO: how to handle sprite_tile[0] < 16 ?
-        uint16_t y_pos_diff =
-            _get(LY) - (sprite_tile[0] >= 16 ? (sprite_tile[0] - 16) : 0);
-
-        if ((sprite_tile[3] >> 6) & 1) {
-            // y flip
-            uint8_t line = ((_get(LCDC) >> 2) & 1) ? 30 : 14;
-            sprite_address = 0x8000 + (tile_offset + (line - 2 * y_pos_diff));
-        } else {
-            sprite_address = 0x8000 + (tile_offset + (2 * y_pos_diff));
-        }
-
-        low_byte = _get(sprite_address);
-
-        for (unsigned int i = 0; i < 8; ++i) {
-            this->temp_sprite_fifo[i] = (low_byte >> i) & 1;
-        }
-
-        this->sprite_current_mode = Fetcher::mode::FetchTileDataHigh;
-        break;
-    }
-
-    case Fetcher::mode::FetchTileDataHigh: {
-        if (sprite_fetcher_ticks < 2) {
-            return;
-        }
-
-        sprite_fetcher_ticks = 0;
-        uint8_t high_byte{};
-        uint16_t sprite_address{};
-        // 8000 method
-
-        /*
-        uint16_t address = 0x8000 + (sprite_tile[2] * 16); // is there offset?
-        low_byte = this->gb_mmu.read_memory(address);
-        */
-
-        uint16_t tile_offset = 16 * sprite_tile[2];
-        // TODO: how to handle sprite_tile[0] < 16 ?
-        uint16_t y_pos_diff =
-            _get(LY) - (sprite_tile[0] >= 16 ? (sprite_tile[0] - 16) : 0);
-
-        if ((sprite_tile[3] >> 6) & 1) { // y flip
-            // y flip
-            uint8_t line = ((_get(LCDC) >> 2) & 1) ? 30 : 14;
-            sprite_address = 0x8000 + (tile_offset + (line - 2 * y_pos_diff));
-        } else {
-            sprite_address = 0x8000 + (tile_offset + (2 * y_pos_diff));
-        }
-
-        high_byte = _get(sprite_address + 1);
-
-        for (unsigned int i = 0; i < 8; ++i) {
-            uint8_t high_bit = ((high_byte >> i) << 1) &
-                               2; // use second position for the high bits
-
-            this->temp_sprite_fifo[i] =
-                this->temp_sprite_fifo[i] | high_bit; // combine 2 bits together
-        }
-        this->sprite_current_mode = Fetcher::mode::PushToFIFO;
-        break;
-    }
-
-    case Fetcher::mode::PushToFIFO: {
-        if (sprite_fetcher_ticks < 2) {
-            return;
-        }
-
-        bool hflip = (this->sprite_tile[3] >> 5) & 1;
-
-        for (unsigned int i = 0; i < 8; ++i) {
-
-            // 0 1 2 3 4 5 6 7
-            // 7 6 5 4 3 2 1 0
-            unsigned int j = hflip ? 7 - i : i;
-
-            this->sprite_fifo.push_back(this->temp_sprite_fifo[j]);
-            this->sprite_attr_fifo.push_back(this->sprite_tile[3]);
-        }
-
-        // pop the sprite fetch buffer here
-        sprite_fetch_buffer.pop_back();
-
-        if (this->sprite_fetch_buffer.empty()) {
-            this->background_current_mode = Fetcher::mode::FetchTileNo;
-            this->sprite_current_mode = Fetcher::mode::Paused;
-            return;
-        }
-
-        assert(this->background_current_mode == Fetcher::mode::Paused &&
-               "Background Fetcher should be paused right now!!");
-
-        this->sprite_current_mode = Fetcher::mode::FetchTileNo;
-
-        break;
-    }
-    }
-}
-
-void Fetcher::background_tick() {
-    // TODO: modularize stuff here
-    // fetcher
-    this->background_fetcher_ticks++;
-
-    switch (background_current_mode) {
-    case Fetcher::mode::Paused     : this->background_fetcher_ticks = 0; break;
-    case Fetcher::mode::FetchTileNo: {
-
-        // 2 ticks
-        if (background_fetcher_ticks < 2) {
-            return;
-        }
-        background_fetcher_ticks = 0;
-
-        uint16_t address{};
-
-        // check bit 3 of LCDC to see which background map to use
-        uint16_t bgmap_start = 0x9800;
-        uint16_t bgmap_end = 0x9bff;
-
-        if (!this->window_fetch) {
-            if (((_get(LCDC) >> 3) & 1) == 1) {
-                bgmap_start = 0x9c00;
-                bgmap_end = 0x9fff;
-            }
-
-            // fetch tile no.
-            // TODO: check scx offset
-            uint16_t scy_offset = 32 * (((_get(LY) + _get(SCY)) % 256) / 8);
-            uint16_t scx_offset = (_get(SCX) % 256) / 8;
-            address =
-                bgmap_start + ((scy_offset + scx_offset + tile_index) & 0x3ff);
-        }
-
-        else {
-            // window fetch
-            if (((_get(LCDC) >> 6) & 1) == 1) {
-                bgmap_start = 0x9c00;
-                bgmap_end = 0x9fff;
-            }
-
-            uint16_t wy_offset = 32 * (window_ly / 8);
-
-            address = bgmap_start + ((wy_offset + tile_index) & 0x3ff);
-        }
-
-        // TODO: here
-        this->tile_id = this->gb_mmu.read_memory(address);
-        this->background_current_mode = Fetcher::mode::FetchTileDataLow;
-        break;
-    }
-    case Fetcher::mode::FetchTileDataLow: {
-        // 2 ticks
-        if (background_fetcher_ticks < 2) {
-            return;
-        }
-        background_fetcher_ticks = 0;
-
-        uint8_t low_byte{};
-        uint16_t offset = this->window_fetch ? 2 * (this->window_ly % 8)
-                                             : 2 * ((_get(LY) + _get(SCY)) % 8);
-
-        // 8000 method or 8800 method to read
-        if (((_get(LCDC) >> 4) & 1) == 0) {
-            // 8800 method
-            uint16_t address =
-                0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
-            low_byte = this->gb_mmu.read_memory(address);
-
-        } else {
-            // 8000 method
-            uint16_t address = 0x8000 + (tile_id * 16) + offset;
-            low_byte = this->gb_mmu.read_memory(address);
-        }
-
-        for (unsigned int i = 0; i < 8; ++i) {
-            this->temp_background_fifo[i] = (low_byte >> i) & 1;
-        }
-
-        // bool eightk_method{true};
-        this->background_current_mode = Fetcher::mode::FetchTileDataHigh;
-        break;
-    }
-
-    case Fetcher::mode::FetchTileDataHigh: {
-        // 2 ticks
-        if (background_fetcher_ticks < 2) {
-            return;
-        }
-        background_fetcher_ticks = 0;
-
-        uint16_t offset = this->window_fetch ? 2 * (this->window_ly % 8)
-                                             : 2 * ((_get(LY) + _get(SCY)) % 8);
-
-        uint8_t high_byte{};
-
-        // 8000 method or 8800 method to read
-        if ((_get(LCDC) >> 4 & 1) != 1) {
-            // 8800 method
-            uint16_t address =
-                0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset + 1;
-            high_byte = this->gb_mmu.read_memory(address);
-        } else {
-            // 8000 method
-            uint16_t address = 0x8000 + (tile_id * 16) + offset + 1;
-            high_byte = this->gb_mmu.read_memory(address);
-        }
-        for (unsigned int i = 0; i < 8; ++i) {
-            uint8_t high_bit = ((high_byte >> i) << 1) &
-                               2; // use second position for the high bits
-            this->temp_background_fifo[i] = this->temp_background_fifo[i] |
-                                            high_bit; // combine 2 bits together
-        }
-
-        if (dummy_fetch) {
-            this->background_current_mode = Fetcher::mode::FetchTileNo;
-            dummy_fetch = false;
-            break; // dont set mode to pushtofifo
-        }
-
-        /*
-        // 6 cycles passed - deal with sprite (sprite fetch tile no)
-        // note: DMG LCDC bit 1 disables obj fetcher entirely, CGB doesn't
-
-        // TODO: need to extend by 1 background_tick (oam fetch takes 2 ticks)
-        if (_get(LCDC) & 2 &&
-            !background_fifo.empty()) { // sprite drawing enabled
-            for (int i = 0; i < sprite_buffer.size(); ++i) {
-                if (sprite_buffer[i][1] <=
-                    tile_index + 8) { // x position <= internal x (dot or
-                                      // tile_index?) + 8
-                    this->sprite_fetch_buffer.push_back(sprite_buffer[i]);
-                }
-            }
-            // if not empty, fetch sprites
-            if (!sprite_fetch_buffer.empty()) {
-                this->background_current_mode =
-        Fetcher::mode::SpriteFetchTileNo2; break;
-            }
-        }
-        */
-
-        this->background_current_mode = Fetcher::mode::PushToFIFO;
-        break;
-    }
-
-    case Fetcher::mode::PushToFIFO: {
-        // 2 ticks
-        if (background_fetcher_ticks < 2) {
-            return;
-        }
-        background_fetcher_ticks = 0;
-
-        // only runs if background fifo is empty, otherwise it repeats
-        if (background_fifo.empty()) {
-            for (int i = 0; i < 8; ++i) {
-                this->background_fifo.push_back(this->temp_background_fifo[i]);
-            }
-
-            this->tile_index++; // tile index
-            this->background_current_mode = Fetcher::mode::FetchTileNo;
-        }
-
-        break;
-    }
-    }
-}
-
-// 1 background_tick = 1 T-Cycle
-void PPU::tick() {
-
-    this->ppu_ticks++;
 
     // set stat to mode
     _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
     last_mode = current_mode;
 
-    switch (this->current_mode) {
-    case mode::OAM_Scan: {
+    // oam search mode 2
+    switch (current_mode) {
+    case ppu_mode::OAM_Scan: {
 
-        if (!this->ppu_fetcher.wy_condition) {
-            this->ppu_fetcher.wy_condition = _get(WY) == _get(LY);
-        }
+        assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
         // set IF for interrupt
         if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 
-        if (this->ppu_ticks % 2 == 0 &&
-            ppu_fetcher.sprite_buffer_counter < 40) { // 40 oam entries
-            // oam scan 1 entry (4 bytes) every 2 ticks
-            // bytes from fe00 to fe9f
-            // sprite fetcher
-            std::array<uint8_t, 4> oam_entry{};
-            for (unsigned int i = 0; i < oam_entry.size(); ++i) {
-                oam_entry[i] = this->gb_mmu.read_memory(
-                    ppu_fetcher.OAM_START_ADDRESS +
-                    4 * ppu_fetcher.sprite_buffer_counter + i);
-            }
-            add_to_sprite_buffer(
-                oam_entry); // attempt to add it to the sprite_buffer
+        if ((ticks % 2 == 0)) { // 40 objects
 
-            if (this->ppu_fetcher.sprite_buffer.size() == 10) {
-                // TODO: sort the sprite buffer by x from low to high
-                std::stable_sort(this->ppu_fetcher.sprite_buffer.begin(),
-                                 this->ppu_fetcher.sprite_buffer.end(),
-                                 [](const std::array<uint8_t, 4> &a,
-                                    const std::array<uint8_t, 4> &b) {
-                                     return a[1] < b[1];
-                                 });
+            std::array<uint8_t, 4> oam_entry_array{};
+            for (unsigned int i = 0; i < 4; ++i) {
+                // 4 bytes per entry
+
+                uint16_t address = 0xfe00 + (oam_search_counter * 4) + i;
+
+                oam_entry_array[i] = _get(address);
             }
 
-            ppu_fetcher.sprite_buffer_counter++; // each oam entry is 4 bytes
+            oam_entry entry = {
+                oam_entry_array[1], // x position
+                oam_entry_array[0], // y position
+                oam_entry_array[2], // tile #
+                oam_entry_array[3]  // flags
+            };
+
+            // add to sprite buffer on specific conditions
+            if ((_get(LY) + 16) >= entry.y &&
+                (_get(LY) + 16) < entry.y + (_get(LCDC) & 0x04 ? 16 : 8) &&
+                sprite_buffer.size() < 10) {
+
+                sprite_buffer.push_back(entry);
+            }
+
+            oam_search_counter++;
+            this->gb_mmu.ppu_current_oam_row =
+                (oam_search_counter & ~1) *
+                4; // function calculation for the start row OAM address of the
+                   // current row, each row has 2 sprites (4 bytes each so 8
+                   // bytes total for 1 row) and a total of 20 rows (0-19)
+
+            // i can increment here because the cpu will tick first (thus
+            // current oam row will point to the current tick's oam access row
+            // by the ppu)
         }
 
-        // oam scan ended
-        else if (this->ppu_ticks == 80) {
-            // TODO: start the fetcher based on LY
-            assert(ppu_fetcher.sprite_buffer_counter == 40 &&
-                   "OAM counter is not 40!");
+        if (ticks == 80) {
+            assert(oam_search_counter == 40 && "oam search counter is not 40!");
+            assert(this->gb_mmu.ppu_current_oam_row == 0xa0 &&
+                   "ppu current oam row is not 20! ending at 0xa0 (row 152+1 "
+                   "start!)");
 
-            // reset the ppu fetcher mode
-            this->ppu_fetcher.reset();
+            oam_search_counter = 0;               // reset oam search counter
+            this->gb_mmu.ppu_current_oam_row = 0; // reset current oam row scan
 
-            this->current_mode = mode::Drawing;
+            // reset fifos and tile index
+            background_fifo.clear();
+            sprite_fifo.clear();
+            tile_index = 0;
+
+            // TODO: do we really clear the sprite buffer if DMA is active right
+            // now? or if it was ever active during mode 2?:
+            if (this->gb_mmu.dma_mode) {
+                // all sprites on the line are hidden if DMA is active during
+                // mode 2
+                sprite_buffer.clear();
+            }
+
+            // stable sort sprite buffer
+            if (sprite_buffer.size() > 1) {
+                std::stable_sort(
+                    sprite_buffer.begin(), sprite_buffer.end(),
+                    [](const oam_entry &a, const oam_entry &b) -> bool {
+                        return a.x < b.x; // lower x has priority
+                    });
+            }
+
+            current_mode = ppu_mode::Drawing;
         }
+
         break;
     }
-    case mode::Drawing: {
 
-        // fetcher background_tick
-        this->ppu_fetcher.background_tick();
+    case ppu_mode::Drawing: {
 
-        if (!this->ppu_fetcher.background_fifo.empty()) {
+        // assert that ticks this step takes is between 172+80 and 289+80
+        // drawing mode 3
+        // fetch tile no
 
-            if (this->ppu_fetcher.lcd_x_position < 0) {
-                this->ppu_fetcher.background_fifo.pop_back();
+        // dummy fetch - after 6 cycles (tick 81 being the first)
+        if (dummy_fetch) {
+            // current_fetcher_mode = fetcher_mode::FetchTileNo;
+            assert(ticks >= 81 && ticks <= 86 &&
+                   "ticks not correct for dummy fetch!");
+            if (ticks == 86) { // 6 ticks for dummy fetching
+                current_fetcher_mode = fetcher_mode::FetchTileNo;
+                dummy_fetch = false;
+            }
+            return;
+        }
+
+        // check for sprites right away
+        if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
+            sprites_to_fetch.empty()) { // check bit 1 for enable sprites
+
+            for (unsigned int i = 0; i < sprite_buffer.size();) {
+                if (sprite_buffer[i].x <= lcd_x + 8) {
+                    sprites_to_fetch.push_back(sprite_buffer[i]);
+                    sprite_buffer.erase(sprite_buffer.begin() + i);
+                } else {
+                    ++i;
+                }
+            }
+        }
+
+        if (!sprites_to_fetch.empty() &&
+            !sprite_to_fetch) { // check if we are already fetching a sprite
+            fetch_sprite = true;
+
+            // NOTE: this fixed a bug where my first column of tiles was missing
+            current_fetcher_mode =
+                fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
+
+            sprite_to_fetch = &sprites_to_fetch[0];
+        }
+
+        switch (current_fetcher_mode) {
+        case fetcher_mode::FetchTileNo: {
+            if (ticks % 2 != 0)
+                break;
+
+            if (fetch_sprite) {
+                // set tile id to sprite to fetch tile id
+                this->tile_id = (*sprite_to_fetch).tile_id;
             }
 
             else {
-                assert(this->ppu_fetcher.lcd_x_position <= 160 &&
-                       "LCD X Position exceeded the screen width!");
+                uint16_t address{};
+                // check to see which map to use
+                uint16_t bgmap_start = 0x9800;
 
-                assert(this->ppu_fetcher.lcd_x_position >= 0 &&
-                       "LCD X Position is negative!");
-
-                // sprite fetching: check if mode is in Push to FIFO, LCDC bit 1
-                // (sprites enabled)
-                bool lcdc_sprites_enabled = (_get(LCDC) >> 1) & 1;
-
-                if (lcdc_sprites_enabled &&
-                    !this->ppu_fetcher.sprite_buffer.empty() &&
-                    this->ppu_fetcher.sprite_fetch_buffer.empty() &&
-                    this->ppu_fetcher.sprite_current_mode !=
-                        Fetcher::mode::Paused) { // should only run once per
-                                                 // scanline, either sprite
-                                                 // fetch buffer is empty or
-                                                 // it's paused because it ran
-                                                 // this scanline already
-
-                    for (unsigned int i = 0;
-                         i < this->ppu_fetcher.sprite_buffer.size(); ++i) {
-                        if (this->ppu_fetcher.sprite_buffer[i][1] <=
-                            (this->ppu_fetcher.lcd_x_position + 8)) {
-
-                            this->ppu_fetcher.sprite_fetch_buffer.push_back(
-                                this->ppu_fetcher.sprite_buffer[i]);
-                        }
-                    }
-                }
-
-                if (!this->ppu_fetcher.sprite_fetch_buffer.empty() &&
-                    lcdc_sprites_enabled) {
-
-                    if (this->ppu_fetcher.background_current_mode !=
-                            Fetcher::mode::PushToFIFO &&
-                        this->ppu_fetcher.background_current_mode !=
-                            Fetcher::mode::Paused) {
-                        this->ppu_fetcher.background_fifo.clear();
-                        return;
+                if (!fetch_window) {
+                    if (((_get(LCDC) >> 3) & 1) == 1) {
+                        bgmap_start = 0x9c00;
                     }
 
-                    this->ppu_fetcher.background_current_mode =
-                        Fetcher::mode::Paused; // pause the background
-                                               // fetcher
-                    this->ppu_fetcher.sprite_tick();
-                    return;
+                    uint16_t scy_offset =
+                        32 * (((_get(LY) + _get(SCY)) % 256) / 8);
+
+                    uint16_t scx_offset = (tile_index + _get(SCX) / 8) % 32;
+
+                    address = bgmap_start + ((scy_offset + scx_offset) & 0x3ff);
+
+                    tile_id = _get(address);
+
                 }
 
-                uint8_t position_x = ppu_fetcher.lcd_x_position;
-                sf::Vector2u position = {position_x, _get(LY)};
+                else {
+                    // window fetch
+                    if (_get(LCDC) & 0x40) { // 6th bit
+                        bgmap_start = 0x9c00;
+                    } // bgmap_start is either 0x9c00 or 0x9800
 
-                uint8_t bg_pixel = this->ppu_fetcher.background_fifo.back();
-                this->ppu_fetcher.background_fifo.pop_back();
+                    uint16_t wy_offset = 32 * (window_ly / 8);
+                    uint16_t wx_offset = tile_index;
 
-                sf::Color result_pixel = get_pixel_color(bg_pixel);
-
-                if (!this->ppu_fetcher.sprite_fifo.empty()) {
-                    assert(
-                        this->ppu_fetcher.sprite_fifo.size() ==
-                            this->ppu_fetcher.sprite_attr_fifo.size() &&
-                        "sprite fifo and sprite attr fifo not the same size!");
-
-                    uint8_t sprite_pixel = this->ppu_fetcher.sprite_fifo.back();
-                    this->ppu_fetcher.sprite_fifo.pop_back();
-
-                    uint8_t sprite_attr =
-                        this->ppu_fetcher.sprite_attr_fifo.back();
-                    this->ppu_fetcher.sprite_attr_fifo.pop_back();
-
-                    if (sprite_pixel != 0) {
-
-                        uint8_t sprite_palette =
-                            (sprite_attr >> 4) & 1; // palette is bit 4
-
-                        if (((sprite_attr >> 7) & 1) && bg_pixel != 0) {
-                            // sprite not always on top of bg, result pixel
-                            // stays the same
-                        } else {
-                            result_pixel =
-                                get_pixel_color(sprite_pixel, &sprite_palette);
-                        }
-                    }
+                    address = bgmap_start + ((wy_offset + wx_offset) & 0x3ff);
                 }
 
-                // TODO: add sprite pixel and rgb
-
-                // this->lcd_dots.push_back(bg_pixel);
-
-                // TODO: is there a better way to do this?
-                // fill up entire screen
-                uint16_t position_y_offset = 0;
-                for (uint16_t i = 0; i < DrawUtils::SCALE * DrawUtils::SCALE;
-                     ++i) {
-                    uint16_t position_x = (i % DrawUtils::SCALE) +
-                                          (position.x * DrawUtils::SCALE);
-                    if (i % DrawUtils::SCALE == 0 && i != 0) {
-                        position_y_offset++;
-                    }
-                    uint16_t position_y =
-                        (position.y * DrawUtils::SCALE) + position_y_offset;
-
-                    lcd_dots_image.setPixel({position_x, position_y},
-                                            result_pixel);
-                }
-
-                // check for window fetch
-                if (((_get(LCDC) >> 5) & 1) &&
-                    ppu_fetcher.lcd_x_position >= (_get(WX) - 1) &&
-                    this->ppu_fetcher.wy_condition &&
-                    !this->ppu_fetcher.window_fetch) {
-
-                    this->ppu_fetcher.background_current_mode =
-                        Fetcher::mode::FetchTileNo;
-                    this->ppu_fetcher.tile_index = 0;
-                    this->ppu_fetcher.background_fifo.clear();
-                    this->ppu_fetcher.window_fetch = true;
-                }
-
-                // TODO: optimize by only loading the palette when rom loads or
-                // something
-
-                // TODO: need to find a way to clear while drawing the
-                // original pixels need a vector of dots to draw
+                this->tile_id = _get(address);
             }
 
-            // TODO: should i increment it before the check above
-            this->ppu_fetcher.lcd_x_position++;
+            current_fetcher_mode = fetcher_mode::FetchTileDataLow;
+            break;
         }
 
-        if (ppu_fetcher.lcd_x_position == 160) {
-            // finished
-            this->current_mode = mode::HBlank;
+        case fetcher_mode::FetchTileDataLow: {
+            if (ticks % 2 != 0)
+                break;
+
+            if (fetch_sprite) {
+                assert((*sprite_to_fetch).y >= 16 &&
+                       "sprite to fetch y position is abnormal!");
+
+                // TODO: fetch sprite
+                uint16_t sprite_address{};
+                uint16_t line_offset{};
+
+                bool y_flip = (*sprite_to_fetch).flags & 0x40; // bit 6 y-flip
+
+                if (_get(LCDC) & 0x04) {
+                    // tall sprite mode
+                    if (_get(LY) <= ((*sprite_to_fetch).y - 16) + 7) {
+                        // top half
+                        if (!y_flip) {
+                            tile_id &= 0xfe; // set lsb to 0
+                            line_offset =
+                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+                        } else {
+                            tile_id |= 0x01; // set lsb to 1
+                            line_offset =
+                                (8 - 1 -
+                                 (_get(LY) - ((*sprite_to_fetch).y - 16))) *
+                                2;
+                        }
+                    }
+
+                    else {
+                        // bottom half
+                        if (!y_flip) {
+                            tile_id |= 0x01;
+                            line_offset =
+                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+                        } else {
+                            tile_id &= 0xfe;
+                            line_offset =
+                                (8 - 1 -
+                                 (_get(LY) -
+                                  (((*sprite_to_fetch).y - 16) + 7))) *
+                                2;
+                        }
+                    }
+
+                }
+
+                else {
+                    if (!y_flip) {
+                        line_offset =
+                            (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+                    }
+
+                    else {
+                        // get the flipped sprite data
+                        line_offset =
+                            (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) *
+                            2;
+                    }
+                }
+
+                sprite_address = 0x8000 + (16 * tile_id) + line_offset;
+
+                low_byte = _get(sprite_address);
+                high_byte_address = sprite_address + 1;
+            }
+
+            else { // bg/window
+                uint16_t offset = fetch_window
+                                      ? 2 * (this->window_ly % 8)
+                                      : 2 * ((_get(LY) + _get(SCY)) % 8);
+
+                uint16_t address{};
+
+                // 8000 method or 8800 method to read
+                if (((_get(LCDC) >> 4) & 1) == 0) {
+                    // 8800 method
+                    address =
+                        0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
+
+                } else {
+                    // 8000 method
+                    address = 0x8000 + (tile_id * 16) + offset;
+                }
+
+                low_byte = _get(address);
+                high_byte_address = address + 1;
+            }
+
+            current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
+            break;
         }
+
+        case fetcher_mode::FetchTileDataHigh: {
+            if (ticks % 2 != 0)
+                break;
+
+            high_byte = _get(high_byte_address);
+
+            current_fetcher_mode = fetcher_mode::PushToFIFO;
+            break;
+        }
+
+        case fetcher_mode::PushToFIFO: {
+            if (fetch_sprite) {
+
+                assert((*sprite_to_fetch).x <= lcd_x + 8 &&
+                       "sprite x position is not <= lcd_x + 8!");
+
+                bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
+
+                while (sprite_fifo.size() < 8) {
+                    sprite_fifo_pixel filler = {0, 0, 0};
+                    sprite_fifo.emplace(sprite_fifo.begin(), filler);
+                }
+
+                for (unsigned int i = 0, fifo_index = 0; i < 8;
+                     ++i, ++fifo_index) {
+                    // check sprite x position to see if pixels should be loaded
+                    // into fifo
+
+                    if ((*sprite_to_fetch).x < 8) {
+                        if (i < 8 - (*sprite_to_fetch).x) {
+                            --fifo_index;
+                            continue;
+                        }
+                    }
+
+                    unsigned int j = x_flip ? 7 - i : i;
+
+                    uint8_t final_bit = ((low_byte >> j) & 1) |
+                                        (((high_byte >> j) << 1) & 0x02);
+
+                    sprite_fifo_pixel pixel = {(*sprite_to_fetch).x, final_bit,
+                                               (*sprite_to_fetch).flags};
+
+                    if (sprite_fifo[fifo_index].color_id == 0) {
+                        sprite_fifo[fifo_index] = pixel;
+                    }
+                }
+
+                // handle sprites to fetch array
+                sprite_to_fetch = nullptr;
+                sprites_to_fetch.erase(sprites_to_fetch.begin());
+                if (sprites_to_fetch.empty()) {
+                    fetch_sprite = false;
+                }
+
+                current_fetcher_mode = fetcher_mode::FetchTileNo;
+            }
+
+            else {
+                if (background_fifo.empty()) {
+                    // push to background fifo
+                    for (unsigned int i = 0; i < 8; ++i) {
+                        uint8_t final_bit = ((low_byte >> i) & 1) |
+                                            (((high_byte >> i) << 1) & 0x02);
+                        background_fifo.push_back(final_bit);
+                    }
+                    tile_index++;
+                    current_fetcher_mode = fetcher_mode::FetchTileNo;
+                }
+            }
+
+            break;
+        }
+        }
+
+        // push pixels to LCD, 1 pixel per dot
+        if (!background_fifo.empty() && !fetch_sprite) {
+
+            // fine x (scx)
+            if (lcd_x == 0) {
+                for (unsigned int i = 0; i < _get(SCX) % 8; ++i) {
+                    background_fifo.pop_back();
+                }
+            }
+
+            // get the background pixel
+            uint8_t bg_pixel = background_fifo.back();
+            background_fifo.pop_back();
+
+            sf::Color final_pixel_color =
+                _get(LCDC) & 1 ? get_pixel_color(bg_pixel) : get_pixel_color(0);
+
+            if (!sprite_fifo.empty()) {
+                sprite_fifo_pixel sprite_pixel = sprite_fifo.back();
+                sprite_fifo.pop_back();
+
+                uint8_t palette = (sprite_pixel.flags >> 4) & 1;
+
+                sf::Color sprite_pixel_color =
+                    get_pixel_color(sprite_pixel.color_id, palette);
+
+                bool sprite_priority =
+                    sprite_pixel.color_id && _get(LCDC) & 0x02 &&
+                    (!((sprite_pixel.flags >> 7) & 1) || !bg_pixel);
+
+                if (sprite_priority) {
+                    final_pixel_color = sprite_pixel_color;
+                }
+            }
+
+            assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
+
+            uint16_t position_x = (lcd_x);
+            uint16_t position_y = (_get(LY));
+
+            lcd_frame_image.setPixel({position_x, position_y},
+                                     final_pixel_color);
+
+            lcd_x++; // increment the lcd x position
+
+            // check for window fetching after pixel was shifted out to LCD
+            if (!fetch_window && (_get(LCDC) & 0x20) &&
+                (lcd_x >= _get(WX) - 7) && wy_condition) {
+                tile_index = 0;
+                background_fifo.clear();
+                fetch_window = true;
+                current_fetcher_mode = fetcher_mode::FetchTileNo;
+            }
+        }
+
+        if (lcd_x == 160) {
+            /*
+            assert(ticks >= 172+80 && ticks <= 293+80 &&
+                   "ticks in drawing mode should be between 172 and 289!!");
+                   */
+
+            // TODO: ticks are around 389 - 413, figure out why
+
+            if (ticks > 373) {
+                std::cout << ticks << '\n';
+            }
+            // std::cout << ticks << '\n';
+
+            current_mode = ppu_mode::HBlank;
+        }
+
         break;
     }
 
-    case mode::HBlank: {
+    case ppu_mode::HBlank: {
 
         // set IF for interrupt
         if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 
-        // wait 456 t-cycles
-        if (this->ppu_ticks == 456) {
-            this->ppu_ticks = 0;
+        // pause until 456 T-cycles have finished
+
+        // wait 456 T-cycles
+        if (ticks == 456) {
+
+            if (fetch_window) {
+                window_ly++;
+            } // add window ly before resetting fetch window
+
+            ticks = 0; // reset ticks
+
+            // i think we can reset LCD x in HBlank
+            lcd_x = 0;
+            // dummy fetch too?
+            dummy_fetch = true;
+            fetch_window = false;
+
+            // clear sprite buffer
+            sprite_buffer.clear();
+
             _set(LY, _get(LY) + 1); // new scanline reached
 
-            // reset lcd x position
-            // this->ppu_fetcher.lcd_x_position = 0;
-            // this->ppu_fetcher.lcd_x_position = _get(SCX) % 8;
-
-            if (this->ppu_fetcher.window_fetch) {
-                this->ppu_fetcher.window_ly++;
-            }
-
             if (_get(LY) == 144) {
+                // hit VBlank for the first time
 
-                // draw?
-                bool success = lcd_dots_texture.loadFromImage(lcd_dots_image);
+                bool success = lcd_frame.loadFromImage(lcd_frame_image);
                 assert(success && "LCD dots texture error loading from image");
 
-                sf::Sprite lcd_dots_sprite(lcd_dots_texture);
+                sf::Sprite frame(lcd_frame);
+
+                frame.setScale({draw::SCALE, draw::SCALE});
 
                 window.clear(sf::Color::White);
-                window.draw(lcd_dots_sprite);
+                window.draw(frame);
                 window.display();
 
                 // v-blank IF interrupt
                 _set(IF, _get(IF) | 1);
                 // end v-blank if interrupt
 
-                this->current_mode = mode::VBlank;
-            } else {
-                this->current_mode = mode::OAM_Scan;
+                current_mode = ppu_mode::VBlank;
+            }
+
+            else {
+                // reset LCD x
+                current_mode = ppu_mode::OAM_Scan;
             }
         }
 
         break;
     }
 
-    case mode::VBlank: {
+    case ppu_mode::VBlank: {
 
         // set IF for interrupt
         if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 
-        this->ppu_fetcher.wy_condition = false;
-
-        if (this->ppu_ticks == 456) {
-
-            this->ppu_ticks = 0;
+        if (ticks == 456) {
+            ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks
             _set(LY, _get(LY) + 1); // new scanline reached
 
-            if (_get(LY) == 153) {               // wait 10 more scanlines
-                _set(LY, 0);                     // reset LY
-                this->ppu_fetcher.window_ly = 0; // reset window_ly
-                this->ppu_fetcher.sprite_buffer_counter = 0; 
-                this->current_mode = PPU::mode::OAM_Scan;
-            }
+            if (_get(LY) == 154) {
+                // reset LY, window LY
+                _set(LY, 0);
+                window_ly = 0;
+
+                // set wy_condition = false since we are on the next frame
+                wy_condition = false;
+
+                current_mode = ppu_mode::OAM_Scan;
+
+            } // after 10 scanlines
         }
+
         break;
     }
     }
 
-    // stat interrupt check
-    // TODO: check stat interrupt
+    // stat interrupt every tick
     if (_get(LY) == _get(LYC)) {
         if ((_get(STAT) >> 6) & 1) {
             if (((_get(STAT) >> 2) & 1) == 0) {
@@ -772,7 +579,6 @@ void PPU::tick() {
             }
         }
     } else {
-        _set(STAT, _get(STAT) & ~4);
+        _set(STAT, _get(STAT) & ~4); // sets coincidence bit to 0 explicitly
     }
-
 }

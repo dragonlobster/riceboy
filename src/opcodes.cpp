@@ -1,7 +1,7 @@
-#include "CPU.h"
+#include "cpu.h"
 #include <array>
 
-int CPU::handle_opcode(const uint8_t opcode) {
+int cpu::handle_opcode(const uint8_t opcode) {
     /*
     x = the opcode's 1st octal digit (i.e. bits 7-6)
     y = the opcode's 2nd octal digit (i.e. bits 5-3)
@@ -291,7 +291,7 @@ int CPU::handle_opcode(const uint8_t opcode) {
     return 1;
 }
 
-int CPU::handle_cb_opcode(const uint8_t cb_opcode) {
+int cpu::handle_cb_opcode(const uint8_t cb_opcode) {
 
     uint8_t x = cb_opcode >> 6 & 3; // bits 7 - 6
     uint8_t y = cb_opcode >> 3 & 7; // bits 3 - 5

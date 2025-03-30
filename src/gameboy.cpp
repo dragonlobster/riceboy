@@ -1,6 +1,6 @@
-#include "Gameboy.h"
+#include "gameboy.h"
 
-void Gameboy::tick() {
+void gameboy::tick() {
 	this->gb_cpu.tick(); 
 
 	this->gb_cpu.timer_tick();

@@ -1,15 +1,14 @@
 #pragma once
 
-#include "Cartridge.h"
-#include "MBC1.h"
+#include "cartridge.h"
+#include "mbc1.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include <memory>
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
-class MMU {
+class mmu {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
     virtual uint8_t bus_read_memory(uint16_t address); // corruption bug could modify memory (not const)
@@ -76,7 +75,7 @@ class MMU {
         vram
     };
 
-    static MMU::section locate_section(const uint16_t address);
+    static mmu::section locate_section(const uint16_t address);
 
     cartridge_type _cartridge_type{};
 
@@ -84,7 +83,7 @@ class MMU {
     void set_cartridge_type(uint8_t type);
 
     // div, timer related
-    // div counter stored in MMU
+    // div counter stored in mmu
     uint16_t div_ff04{0};
     uint8_t tima_ff05{0}; // tima_ff05
     uint8_t tac_ff07{0xf8};
@@ -171,7 +170,7 @@ class MMU {
     // restart and interrupt vectors - 0x0000 - 0x00FF
     uint8_t restart_and_interrupt_vectors[0x00ff + 1]{};
 
-    std::unique_ptr<Cartridge> cartridge{};
+    std::unique_ptr<cartridge> cartridge{};
 
     bool load_rom_complete{false};
 };
