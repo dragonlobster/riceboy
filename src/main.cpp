@@ -73,8 +73,9 @@ int main() {
     // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably
     // related to ppu somehow)
 
-    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[3]);
-    riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
+    // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[0]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[4]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
