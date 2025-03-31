@@ -10,13 +10,13 @@ void ppu::_set(uint16_t address, uint8_t value) {
 }
 
 // ppu constructor
-ppu::ppu(mmu& gb_mmu_, sf::RenderWindow& window_)
+ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
     : gb_mmu(gb_mmu_), window(window_) {
 
     // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
     _set(STAT, 0x80);
 
-    sf::Image image({ window.getSize().x, window.getSize().y }, sf::Color::White);
+    sf::Image image({window.getSize().x, window.getSize().y}, sf::Color::White);
     this->lcd_frame_image = image; // image with pixels to display on the screen
 };
 
@@ -26,8 +26,7 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
 
     if (palette == 2) {
         palette_value = _get(BGP); // Background palette
-    }
-    else {
+    } else {
         // Assert valid sprite palette before using it
         assert(palette == 0 || palette == 1 && "sprite palette is not 0 or 1!");
         palette_value = palette == 0 ? _get(0xff48) : _get(0xff49);
@@ -41,29 +40,40 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
     // Map the color ID directly to the appropriate color palette
     const std::array<std::array<uint8_t, 3>, 4> color_map = {
         color_palette_white, color_palette_light_gray, color_palette_dark_gray,
-        color_palette_black };
+        color_palette_black};
 
     // Get the RGB values and return as sf::Color
-    const auto& color = color_map[color_id];
-    return { color[0], color[1], color[2] };
+    const auto &color = color_map[color_id];
+    return {color[0], color[1], color[2]};
 }
 
 void ppu::tick() {
-    // check for LCDC status
+    // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
         this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        // lcd is disabled
-        ticks = 0; // TODO: check reset clock ?
-        _set(LY, 0); // reset LY
-        current_mode = ppu_mode::OAM_Scan;
-        return;
-    };
+        ticks = 0;                       // reset ticks
+        //_set(LY, 0);                     // reset LY (handled by mmu already)
+        assert(oam_search_counter == 0 &&
+               this->gb_mmu.ppu_current_oam_row == 0 &&
+               "lcd toggled off outside of vblank!");
+        current_mode = ppu_mode::Off;
 
+        return;
+    }
+
+    // if lcd is off
+    else if (!this->gb_mmu.lcd_on) {
+        return;
+    }
+
+    // if lcd got toggled on
     if (this->gb_mmu.lcd_toggle && ((_get(LCDC) >> 7) & 1)) {
         this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        // lcd enabled again, LCD reset should be true
-        _set(LY, 0); // reset LY incase there was any write to it
+        //  lcd enabled again, LCD reset should be true
+        //_set(LY, 0); // reset LY incase there was any write to it (handled by
+        // mmu already)
         this->lcd_reset = true;
+        current_mode = ppu_mode::OAM_Scan;
     }
 
     ticks++;
@@ -77,6 +87,8 @@ void ppu::tick() {
     // set stat to mode
     _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
     last_mode = current_mode;
+
+    assert(current_mode != ppu_mode::Off && "lcd is off but ppu still ticked!");
 
     // oam search mode 2
     switch (current_mode) {
@@ -534,7 +546,8 @@ void ppu::tick() {
 
             if (_get(LY) == 144) {
                 // hit VBlank for the first time
-                // TODO: interrupts during the first frame after lcd enabled again?
+                // TODO: interrupts during the first frame after lcd enabled
+                // again?
 
                 if (lcd_reset) {
                     lcd_reset = false;

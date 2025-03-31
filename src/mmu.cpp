@@ -3,6 +3,8 @@
 #include <cassert>
 #include <iostream>
 
+// TODO: block writes to LY while LCD is off
+
 // TODO: use constexpr function instead?
 #define IS_MBC1                                                                \
     (_cartridge_type == mmu::cartridge_type::mbc1 ||                           \
@@ -115,6 +117,17 @@ void mmu::handle_lcdc_write(uint8_t value) {
         uint8_t new_lcd_bit = (this->lcdc_ff40 >> 7) & 1;
         // true if lcd was toggled on or off
         this->lcd_toggle = lcd_bit != new_lcd_bit;
+
+        lcd_on = new_lcd_bit;
+
+        // lcd toggled off
+        if (lcd_toggle && !lcd_on) {
+            // reset LY to 0
+            write_memory(0xff44, 0);
+
+            // reset STAT to 0
+            write_memory(0xff41, 0);
+        }
     }
 }
 
@@ -452,8 +465,7 @@ uint8_t mmu::read_memory(uint16_t address) const {
             // mask top 3 bits with 1s for IF (they are unused)
         } else if (address == 0xff40) {
             return this->lcdc_ff40; // lcdc ff40
-        }
-        else {
+        } else {
             return this->hardware_registers[address - base_address];
         }
 
@@ -500,7 +512,8 @@ void mmu::oam_bug_write(uint16_t address) {
 }
 
 void mmu::bus_write_memory(uint16_t address, uint8_t value) {
-    // TODO: stopping LCD operation (LCDC bit 7 1->0) happens in vblank only, otherwise crash
+    // TODO: stopping LCD operation (LCDC bit 7 1->0) happens in vblank only,
+    // otherwise crash
     if (this->dma_mode) {
 
         if (locate_section(address) == section::oam_ram) {
@@ -590,6 +603,18 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // lcdc
         if (address == 0xff40) {
             handle_lcdc_write(value);
+            return;
+        }
+
+        // ly based on lcd off
+        if (!lcd_on && address == 0xff44) {
+            hardware_registers[0x44] = 0;
+            return;
+        }
+
+        // stat based on lcd off
+        if (!lcd_on && address == 0xff41) {
+            hardware_registers[0x41] = 0;
             return;
         }
 
@@ -689,6 +714,16 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // lcdc
         else if (address == 0xff40) {
             handle_lcdc_write(value);
+        }
+
+        // ly based on lcd off
+        else if (!lcd_on && address == 0xff44) {
+            hardware_registers[0x44] = 0;
+        }
+
+        // stat based on lcd off
+        else if (!lcd_on && address == 0xff41) {
+            hardware_registers[0x41] = 0;
         }
 
         else {

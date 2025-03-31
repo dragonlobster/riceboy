@@ -11,7 +11,8 @@
 class mmu {
   public:
     virtual uint8_t read_memory(uint16_t address) const;
-    virtual uint8_t bus_read_memory(uint16_t address); // corruption bug could modify memory (not const)
+    virtual uint8_t bus_read_memory(
+        uint16_t address); // corruption bug could modify memory (not const)
 
     virtual void write_memory(uint16_t address, uint8_t value);
     virtual void bus_write_memory(uint16_t address, uint8_t value);
@@ -114,7 +115,8 @@ class mmu {
     // oam corruption bug related functions
     void oam_bug_read(uint16_t address);
     void oam_bug_write(uint16_t address);
-    void oam_bug_read_inc(uint16_t address); // when read and increase occur in the same cycle
+    void oam_bug_read_inc(
+        uint16_t address); // when read and increase occur in the same cycle
 
     // used for oam corruption bug (ppu current oam row accessed in mode 2)
     uint8_t ppu_current_oam_row{0};
@@ -123,6 +125,7 @@ class mmu {
     uint8_t lcdc_ff40{};
     void handle_lcdc_write(uint8_t value);
     bool lcd_toggle{false};
+    bool lcd_on{true}; // indicates whether lcd is on or off
 
   private:
     // Interrupt enable flag - 0xFFFF
