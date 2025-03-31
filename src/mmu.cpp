@@ -105,6 +105,19 @@ void mmu::handle_tac_write(uint8_t value) {
     this->falling_edge();
 }
 
+void mmu::handle_lcdc_write(uint8_t value) {
+
+    uint8_t lcd_bit = (this->lcdc_ff40 >> 7) & 1;
+
+    this->lcdc_ff40 = value;
+
+    if (load_rom_complete) {
+        uint8_t new_lcd_bit = (this->lcdc_ff40 >> 7) & 1;
+        // true if lcd was toggled on or off
+        this->lcd_toggle = lcd_bit != new_lcd_bit;
+    }
+}
+
 void mmu::handle_dma_write(uint8_t value) {
     this->dma_ff46 = value;
 
@@ -372,6 +385,10 @@ uint8_t mmu::read_memory(uint16_t address) const {
             // mask top 3 bits for IE (they are unused)
         }
 
+        if (address == 0xff40) {
+            return this->lcdc_ff40;
+        }
+
         uint16_t result = this->cartridge->read_memory(address);
 
         if (result <= 0xff) { // make sure result fits in 8 bits
@@ -433,7 +450,10 @@ uint8_t mmu::read_memory(uint16_t address) const {
         } else if (address == 0xff0f) {
             return this->hardware_registers[0x0f] | 0xe0;
             // mask top 3 bits with 1s for IF (they are unused)
-        } else {
+        } else if (address == 0xff40) {
+            return this->lcdc_ff40; // lcdc ff40
+        }
+        else {
             return this->hardware_registers[address - base_address];
         }
 
@@ -480,6 +500,7 @@ void mmu::oam_bug_write(uint16_t address) {
 }
 
 void mmu::bus_write_memory(uint16_t address, uint8_t value) {
+    // TODO: stopping LCD operation (LCDC bit 7 1->0) happens in vblank only, otherwise crash
     if (this->dma_mode) {
 
         if (locate_section(address) == section::oam_ram) {
@@ -563,6 +584,12 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // dma
         if (address == 0xff46) {
             handle_dma_write(value);
+            return;
+        }
+
+        // lcdc
+        if (address == 0xff40) {
+            handle_lcdc_write(value);
             return;
         }
 
@@ -657,6 +684,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // dma
         else if (address == 0xff46) {
             handle_dma_write(value);
+        }
+
+        // lcdc
+        else if (address == 0xff40) {
+            handle_lcdc_write(value);
         }
 
         else {

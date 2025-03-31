@@ -9,8 +9,8 @@ int cpu::handle_opcode(const uint8_t opcode) {
     p = y rightshifted one position (i.e. bits 5-4)
     q = y modulo 2 (i.e. bit 3)
     */
-    uint8_t x = opcode >> 6 & 3; // bits 7 - 6
-    uint8_t y = opcode >> 3 & 7; // bits 3 - 5
+    uint8_t x = (opcode >> 6) & 3; // bits 7 - 6
+    uint8_t y = (opcode >> 3) & 7; // bits 3 - 5
     uint8_t z = opcode & 7;      // bits 2 - 0
 
     uint8_t p = y >> 1; // bit 5 - 4

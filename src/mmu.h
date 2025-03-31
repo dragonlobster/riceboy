@@ -119,6 +119,11 @@ class mmu {
     // used for oam corruption bug (ppu current oam row accessed in mode 2)
     uint8_t ppu_current_oam_row{0};
 
+    // lcdc register, lcd was reset
+    uint8_t lcdc_ff40{};
+    void handle_lcdc_write(uint8_t value);
+    bool lcd_toggle{false};
+
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};

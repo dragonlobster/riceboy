@@ -75,6 +75,9 @@ class ppu {
     // lcd x position
     uint8_t lcd_x{0};
 
+    // lcd was reset
+    uint8_t lcd_reset{false};
+
     // registers
     uint16_t LCDC{0xff40};
     uint16_t STAT{0xff41};

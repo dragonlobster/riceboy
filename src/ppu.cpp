@@ -10,13 +10,13 @@ void ppu::_set(uint16_t address, uint8_t value) {
 }
 
 // ppu constructor
-ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
+ppu::ppu(mmu& gb_mmu_, sf::RenderWindow& window_)
     : gb_mmu(gb_mmu_), window(window_) {
 
     // TODO check logic for setting STAT to 1000 0000 (resetting STAT)
     _set(STAT, 0x80);
 
-    sf::Image image({window.getSize().x, window.getSize().y}, sf::Color::White);
+    sf::Image image({ window.getSize().x, window.getSize().y }, sf::Color::White);
     this->lcd_frame_image = image; // image with pixels to display on the screen
 };
 
@@ -26,7 +26,8 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
 
     if (palette == 2) {
         palette_value = _get(BGP); // Background palette
-    } else {
+    }
+    else {
         // Assert valid sprite palette before using it
         assert(palette == 0 || palette == 1 && "sprite palette is not 0 or 1!");
         palette_value = palette == 0 ? _get(0xff48) : _get(0xff49);
@@ -40,14 +41,31 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
     // Map the color ID directly to the appropriate color palette
     const std::array<std::array<uint8_t, 3>, 4> color_map = {
         color_palette_white, color_palette_light_gray, color_palette_dark_gray,
-        color_palette_black};
+        color_palette_black };
 
     // Get the RGB values and return as sf::Color
-    const auto &color = color_map[color_id];
-    return {color[0], color[1], color[2]};
+    const auto& color = color_map[color_id];
+    return { color[0], color[1], color[2] };
 }
 
 void ppu::tick() {
+    // check for LCDC status
+    if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
+        this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
+        // lcd is disabled
+        ticks = 0; // TODO: check reset clock ?
+        _set(LY, 0); // reset LY
+        current_mode = ppu_mode::OAM_Scan;
+        return;
+    };
+
+    if (this->gb_mmu.lcd_toggle && ((_get(LCDC) >> 7) & 1)) {
+        this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
+        // lcd enabled again, LCD reset should be true
+        _set(LY, 0); // reset LY incase there was any write to it
+        this->lcd_reset = true;
+    }
+
     ticks++;
     // 1 T-cycle
 
@@ -446,11 +464,13 @@ void ppu::tick() {
 
             assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
 
-            uint16_t position_x = (lcd_x);
-            uint16_t position_y = (_get(LY));
+            if (!lcd_reset) {
+                uint16_t position_x = (lcd_x);
+                uint16_t position_y = (_get(LY));
 
-            lcd_frame_image.setPixel({position_x, position_y},
-                                     final_pixel_color);
+                lcd_frame_image.setPixel({position_x, position_y},
+                                         final_pixel_color);
+            }
 
             lcd_x++; // increment the lcd x position
 
@@ -514,21 +534,29 @@ void ppu::tick() {
 
             if (_get(LY) == 144) {
                 // hit VBlank for the first time
+                // TODO: interrupts during the first frame after lcd enabled again?
 
-                bool success = lcd_frame.loadFromImage(lcd_frame_image);
-                assert(success && "LCD dots texture error loading from image");
+                if (lcd_reset) {
+                    lcd_reset = false;
+                }
 
-                sf::Sprite frame(lcd_frame);
+                else {
+                    bool success = lcd_frame.loadFromImage(lcd_frame_image);
+                    assert(success &&
+                           "LCD dots texture error loading from image");
 
-                frame.setScale({draw::SCALE, draw::SCALE});
+                    sf::Sprite frame(lcd_frame);
 
-                window.clear(sf::Color::White);
-                window.draw(frame);
-                window.display();
+                    frame.setScale({draw::SCALE, draw::SCALE});
 
-                // v-blank IF interrupt
-                _set(IF, _get(IF) | 1);
-                // end v-blank if interrupt
+                    window.clear(sf::Color::White);
+                    window.draw(frame);
+                    window.display();
+
+                    // v-blank IF interrupt
+                    _set(IF, _get(IF) | 1);
+                    // end v-blank if interrupt
+                }
 
                 current_mode = ppu_mode::VBlank;
             }
