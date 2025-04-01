@@ -78,11 +78,14 @@ class ppu {
     std::vector<oam_entry> sprites_to_fetch{};
     oam_entry *sprite_to_fetch{nullptr};
 
+    // update ppu mode
+    void update_ppu_mode(ppu_mode mode);
+
     // lcd x position
     uint8_t lcd_x{0};
 
     // lcd was reset
-    uint8_t lcd_reset{false};
+    bool lcd_reset{false};
 
     // registers
     uint16_t LCDC{0xff40};
@@ -106,6 +109,7 @@ class ppu {
     sf::Color get_pixel_color(
         uint8_t pixel,
         uint8_t palette = 2); // 2 means get BGP (non sprite palette)
+
 
   private:
     // functions

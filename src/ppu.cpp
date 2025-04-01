@@ -20,6 +20,16 @@ ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
     this->lcd_frame_image = image; // image with pixels to display on the screen
 };
 
+// update the ppu mode
+void ppu::update_ppu_mode(ppu_mode mode) {
+    this->current_mode = mode;
+    if (mode != ppu_mode::Off) {
+        this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode);
+    } else {
+        this->gb_mmu.ppu_mode = 0;
+    }
+}
+
 sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
     // Get the appropriate palette register
     uint8_t palette_value{};
@@ -54,9 +64,9 @@ void ppu::tick() {
         ticks = 0;                       // reset ticks
         //_set(LY, 0);                     // reset LY (handled by mmu already)
         assert(oam_search_counter == 0 &&
-               this->gb_mmu.ppu_current_oam_row == 0 &&
+               this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
                "lcd toggled off outside of vblank!");
-        current_mode = ppu_mode::Off;
+        update_ppu_mode(ppu_mode::Off);
 
         return;
     }
@@ -73,7 +83,7 @@ void ppu::tick() {
         //_set(LY, 0); // reset LY incase there was any write to it (handled by
         // mmu already)
         this->lcd_reset = true;
-        current_mode = ppu_mode::OAM_Scan;
+        //update_ppu_mode(ppu_mode::OAM_Scan);
     }
 
     ticks++;
@@ -85,13 +95,29 @@ void ppu::tick() {
     }
 
     // set stat to mode
-    _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
-    last_mode = current_mode;
+    if (current_mode != ppu_mode::Off) {
+        _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
+        last_mode = current_mode;
+    } 
 
-    assert(current_mode != ppu_mode::Off && "lcd is off but ppu still ticked!");
+    else {
+        _set(STAT, (_get(STAT) & 0xfc));
+        last_mode = ppu_mode::HBlank; // HBlank resolves to 0
+    }
 
     // oam search mode 2
     switch (current_mode) {
+    case ppu_mode::Off: {
+
+        assert(ticks <= 76 && "ticks must be <= 76 when lcd is toggled on "); 
+
+        if (ticks == 76) {
+            update_ppu_mode(ppu_mode::Drawing);
+        }
+
+        break;
+    }
+
     case ppu_mode::OAM_Scan: {
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
@@ -170,7 +196,7 @@ void ppu::tick() {
                     });
             }
 
-            current_mode = ppu_mode::Drawing;
+            update_ppu_mode(ppu_mode::Drawing);
         }
 
         break;
@@ -182,11 +208,27 @@ void ppu::tick() {
         // drawing mode 3
         // fetch tile no
 
+        // if lcd reset, ticks are at 77
+        /*
+        if (first_line && dummy_fetch) {
+            assert(lcd_reset && "lcd was not reset!");
+            assert(ticks >= 70 && ticks <= 75 &&
+                   "ticks not correct for dummy fetch after lcd toggled on!");
+            if (ticks == 75) { // 6 ticks for dummy fetching
+                current_fetcher_mode = fetcher_mode::FetchTileNo;
+                dummy_fetch = false;
+                first_line = false;
+            }
+            return;
+        }*/
+
         // dummy fetch - after 6 cycles (tick 81 being the first)
-        if (dummy_fetch) {
+        if (dummy_fetch && !lcd_reset) {
             // current_fetcher_mode = fetcher_mode::FetchTileNo;
             assert(ticks >= 81 && ticks <= 86 &&
                    "ticks not correct for dummy fetch!");
+
+            assert(!lcd_reset && "lcd reset can't be true in this if case, it wouldn't make sense!");
             if (ticks == 86) { // 6 ticks for dummy fetching
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
                 dummy_fetch = false;
@@ -509,7 +551,7 @@ void ppu::tick() {
             }
             // std::cout << ticks << '\n';
 
-            current_mode = ppu_mode::HBlank;
+            update_ppu_mode(ppu_mode::HBlank);
         }
 
         break;
@@ -571,12 +613,12 @@ void ppu::tick() {
                     // end v-blank if interrupt
                 }
 
-                current_mode = ppu_mode::VBlank;
+                update_ppu_mode(ppu_mode::VBlank);
             }
 
             else {
                 // reset LCD x
-                current_mode = ppu_mode::OAM_Scan;
+                update_ppu_mode(ppu_mode::OAM_Scan);
             }
         }
 
@@ -602,7 +644,7 @@ void ppu::tick() {
                 // set wy_condition = false since we are on the next frame
                 wy_condition = false;
 
-                current_mode = ppu_mode::OAM_Scan;
+                update_ppu_mode(ppu_mode::OAM_Scan);
 
             } // after 10 scanlines
         }
@@ -617,9 +659,12 @@ void ppu::tick() {
             if (((_get(STAT) >> 2) & 1) == 0) {
                 _set(IF, _get(IF) | 2);
                 _set(STAT, _get(STAT) | 4);
+                std::cout << "";
             }
         }
     } else {
         _set(STAT, _get(STAT) & ~4); // sets coincidence bit to 0 explicitly
+        std::cout << "";
     }
+
 }

@@ -127,6 +127,9 @@ class mmu {
     bool lcd_toggle{false};
     bool lcd_on{true}; // indicates whether lcd is on or off
 
+    // ppu mode
+    uint8_t ppu_mode{2};
+
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};

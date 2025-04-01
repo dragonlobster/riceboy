@@ -125,8 +125,9 @@ void mmu::handle_lcdc_write(uint8_t value) {
             // reset LY to 0
             write_memory(0xff44, 0);
 
-            // reset STAT to 0
-            write_memory(0xff41, 0);
+            // reset STAT mode bit to 0
+            uint8_t stat_mode = read_memory(0xff41);
+            write_memory(0xff41, (stat_mode & 0xfc));
         }
     }
 }
@@ -348,6 +349,15 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
         }
     }
 
+    // lock vram if ppu is in mode 3, check STAT first 2 bits
+    if (load_rom_complete &&
+        (locate_section(address) == section::character_ram ||
+         locate_section(address) == section::bg_map_data_1 ||
+         locate_section(address) == section::bg_map_data_2) &&
+        ppu_mode == 3) {
+        return 0xff;
+    }
+
     // OAM BUG read corruption
     if (locate_section(address) == section::oam_ram &&
         this->ppu_current_oam_row > 0) {
@@ -548,6 +558,15 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         }
     }
 
+    // lock vram if ppu is in mode 3, check STAT first 2 bits
+    else if (load_rom_complete &&
+             (locate_section(address) == section::character_ram ||
+              locate_section(address) == section::bg_map_data_1 ||
+              locate_section(address) == section::bg_map_data_2) &&
+             ppu_mode == 3) {
+        return;
+    }
+
     // OAM BUG write corruption
     else if (locate_section(address) == section::oam_ram &&
              this->ppu_current_oam_row > 0) {
@@ -613,10 +632,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         }
 
         // stat based on lcd off
+        /*
         if (!lcd_on && address == 0xff41) {
-            hardware_registers[0x41] = 0;
+            hardware_registers[0x41] = value & 0xfc;
             return;
-        }
+        }*/
 
         this->cartridge->write_memory(address, value);
     }
@@ -722,12 +742,14 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         }
 
         // stat based on lcd off
+        /*
         else if (!lcd_on && address == 0xff41) {
-            hardware_registers[0x41] = 0;
-        }
+            hardware_registers[0x41] = value & 0xfc;
+        }*/
 
         else {
             this->hardware_registers[address - base_address] = value;
+            std::cout << "";
         }
         break;
 
