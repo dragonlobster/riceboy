@@ -57,14 +57,15 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    std::array<std::string, 9> mooneye_ppu{
+    std::array<std::string, 10> mooneye_ppu{
         "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/sources-dmgABCmgbS.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing-GS.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb",
     };
@@ -76,7 +77,7 @@ int main() {
     // related to ppu somehow)
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[5]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[5]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);

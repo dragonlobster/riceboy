@@ -349,7 +349,7 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
         }
     }
 
-    // lock vram if ppu is in mode 3, check STAT first 2 bits
+    // lock vram if ppu is in mode 3, check ppu mode
     if (load_rom_complete &&
         (locate_section(address) == section::character_ram ||
          locate_section(address) == section::bg_map_data_1 ||
@@ -400,12 +400,12 @@ uint8_t mmu::read_memory(uint16_t address) const {
 
         if (address == 0xff0f) {
             return this->hardware_registers[0x0f] | 0xe0;
-            // mask top 3 bits for IF (they are unused)
+            // mask top 3 bits for IF to 1 (they are unused)
         }
 
         if (address == 0xffff) {
-            return this->interrupt_enable_flag | 0xe0;
-            // mask top 3 bits for IE (they are unused)
+            return this->interrupt_enable_flag & 0x1f;
+            // mask top 3 bits for IE to 0 (they are unused)
         }
 
         if (address == 0xff40) {
@@ -483,7 +483,7 @@ uint8_t mmu::read_memory(uint16_t address) const {
         return this->zero_page[address - base_address];
 
     case mmu::section::interrupt_enable_flag:
-        return this->interrupt_enable_flag | 0xe0;
+        return this->interrupt_enable_flag & 0x1f;
         // mask top 3 bits with 1s for IE (they are unused)
 
     default:
@@ -558,7 +558,7 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         }
     }
 
-    // lock vram if ppu is in mode 3, check STAT first 2 bits
+    // lock vram if ppu is in mode 3, check ppu mode
     else if (load_rom_complete &&
              (locate_section(address) == section::character_ram ||
               locate_section(address) == section::bg_map_data_1 ||
@@ -571,6 +571,19 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
     else if (locate_section(address) == section::oam_ram &&
              this->ppu_current_oam_row > 0) {
         oam_bug_write(address);
+    }
+
+
+    // stat
+    else if (address == 0xff41) {
+        write_memory(address, value & 0xfc); // bit 0 and 1 are not writable by bus
+        return;
+    }
+
+    // block LY writes when LCD is off
+    else if (!lcd_on && address == 0xff44) {
+        //write_memory(address, 0);
+        return;
     }
 
     else {
@@ -626,10 +639,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         }
 
         // ly based on lcd off
+        /*
         if (!lcd_on && address == 0xff44) {
             hardware_registers[0x44] = 0;
             return;
-        }
+        }*/
 
         // stat based on lcd off
         /*
@@ -737,9 +751,10 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         }
 
         // ly based on lcd off
+        /*
         else if (!lcd_on && address == 0xff44) {
             hardware_registers[0x44] = 0;
-        }
+        }*/
 
         // stat based on lcd off
         /*

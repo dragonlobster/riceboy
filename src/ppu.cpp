@@ -123,7 +123,8 @@ void ppu::tick() {
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
+        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
+        if ((_get(STAT) >> 5 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 
@@ -223,6 +224,7 @@ void ppu::tick() {
         }*/
 
         // dummy fetch - after 6 cycles (tick 81 being the first)
+        /*
         if (dummy_fetch && !lcd_reset) {
             // current_fetcher_mode = fetcher_mode::FetchTileNo;
             assert(ticks >= 81 && ticks <= 86 &&
@@ -234,6 +236,14 @@ void ppu::tick() {
                 dummy_fetch = false;
             }
             return;
+        }*/
+
+        // currently we have 166 cycles for minimum case (160 tiles + 6 initial fetch), we need to implement an 8 cycle dummy fetch but during which may include a sprite x = 0
+
+        // TODO: handle dummy fetch
+        if (dummy_fetch) {
+            dummy_fetch = false;
+            current_fetcher_mode = fetcher_mode::FetchTileNo;
         }
 
         // check for sprites right away
@@ -261,10 +271,15 @@ void ppu::tick() {
             sprite_to_fetch = &sprites_to_fetch[0];
         }
 
+        fetcher_ticks++;
         switch (current_fetcher_mode) {
+
         case fetcher_mode::FetchTileNo: {
-            if (ticks % 2 != 0)
+            if (fetcher_ticks < 2) {
                 break;
+            } else {
+                fetcher_ticks = 0;
+            }
 
             if (fetch_sprite) {
                 // set tile id to sprite to fetch tile id
@@ -312,8 +327,11 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataLow: {
-            if (ticks % 2 != 0)
+            if (fetcher_ticks < 2) {
                 break;
+            } else {
+                fetcher_ticks = 0;
+            }
 
             if (fetch_sprite) {
                 assert((*sprite_to_fetch).y >= 16 &&
@@ -407,13 +425,17 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataHigh: {
-            if (ticks % 2 != 0)
+            if (fetcher_ticks < 2) {
                 break;
+            } else {
+                fetcher_ticks = 0;
+            }
 
             high_byte = _get(high_byte_address);
 
             current_fetcher_mode = fetcher_mode::PushToFIFO;
             break;
+            //[[fallthrough]];
         }
 
         case fetcher_mode::PushToFIFO: {
@@ -461,6 +483,7 @@ void ppu::tick() {
                     fetch_sprite = false;
                 }
 
+                fetcher_ticks = 0;
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
             }
 
@@ -473,6 +496,8 @@ void ppu::tick() {
                         background_fifo.push_back(final_bit);
                     }
                     tile_index++;
+
+                    fetcher_ticks = 0;
                     current_fetcher_mode = fetcher_mode::FetchTileNo;
                 }
             }
@@ -560,7 +585,8 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+        if ((_get(STAT) >> 3 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 
@@ -628,7 +654,8 @@ void ppu::tick() {
     case ppu_mode::VBlank: {
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+        if ((_get(STAT) >> 4 & 1)) {
             _set(IF, _get(IF) | 2);
         }
 

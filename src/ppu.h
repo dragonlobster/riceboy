@@ -15,6 +15,7 @@ class ppu {
     // a "dot"
     void tick();
     uint16_t ticks{0}; // tick counter
+    uint16_t fetcher_ticks{0}; // pixel fetcher ticking for accurate 2 tick counts
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
