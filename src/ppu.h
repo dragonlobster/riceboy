@@ -15,7 +15,10 @@ class ppu {
     // a "dot"
     void tick();
     uint16_t ticks{0}; // tick counter
-    uint16_t fetcher_ticks{0}; // pixel fetcher ticking for accurate 2 tick counts
+    uint16_t fetcher_ticks{
+        0}; // pixel fetcher ticking for accurate 2 tick counts
+    uint8_t dummy_ticks{
+        0}; // 8 dummy ticks for dummy fetching (6 to fetch 2 to discard)
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
@@ -110,7 +113,6 @@ class ppu {
     sf::Color get_pixel_color(
         uint8_t pixel,
         uint8_t palette = 2); // 2 means get BGP (non sprite palette)
-
 
   private:
     // functions

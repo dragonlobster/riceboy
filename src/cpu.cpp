@@ -555,11 +555,12 @@ void cpu::inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
             uint16_t current_value = _combine_2_8bits(*r1_pointer, *r2_pointer);
 
             // oam bug oam corruption bug write on r16 == bc, or de or hl
+            /*
             if ((r1 == registers::B && r2 == registers::C) ||
                 (r1 == registers::D || r2 == registers::E) ||
                 (r1 == registers::H || r2 == registers::L)) {
                 this->gb_mmu->oam_bug_write(current_value);
-            }
+            }*/
 
             if (inc) {
                 current_value++;
@@ -810,7 +811,7 @@ void cpu::ld_hl_a(const bool increment, const bool to_a) {
 
         // oam bug oam corruption bug read inc (corruption happens before get
         // address)
-        this->gb_mmu->oam_bug_read_inc(address);
+        // this->gb_mmu->oam_bug_read_inc(address);
 
         this->A = _get(address);
 

@@ -359,13 +359,14 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
     }
 
     // OAM BUG read corruption
+    /*
     if (locate_section(address) == section::oam_ram &&
         this->ppu_current_oam_row > 0) {
 
         oam_bug_read(address);
 
         return 0xff; // bug returns 0xff i think?
-    }
+    }*/
 
     return read_memory(address);
 }
@@ -568,21 +569,22 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
     }
 
     // OAM BUG write corruption
+    /*
     else if (locate_section(address) == section::oam_ram &&
              this->ppu_current_oam_row > 0) {
         oam_bug_write(address);
-    }
-
+    }*/
 
     // stat
     else if (address == 0xff41) {
-        write_memory(address, value & 0xfc); // bit 0 and 1 are not writable by bus
+        write_memory(address,
+                     value & 0xfc); // bit 0 and 1 are not writable by bus
         return;
     }
 
     // block LY writes when LCD is off
     else if (!lcd_on && address == 0xff44) {
-        //write_memory(address, 0);
+        // write_memory(address, 0);
         return;
     }
 

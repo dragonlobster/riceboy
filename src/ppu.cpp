@@ -83,7 +83,7 @@ void ppu::tick() {
         //_set(LY, 0); // reset LY incase there was any write to it (handled by
         // mmu already)
         this->lcd_reset = true;
-        //update_ppu_mode(ppu_mode::OAM_Scan);
+        // update_ppu_mode(ppu_mode::OAM_Scan);
     }
 
     ticks++;
@@ -98,7 +98,7 @@ void ppu::tick() {
     if (current_mode != ppu_mode::Off) {
         _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
         last_mode = current_mode;
-    } 
+    }
 
     else {
         _set(STAT, (_get(STAT) & 0xfc));
@@ -109,7 +109,7 @@ void ppu::tick() {
     switch (current_mode) {
     case ppu_mode::Off: {
 
-        assert(ticks <= 76 && "ticks must be <= 76 when lcd is toggled on "); 
+        assert(ticks <= 76 && "ticks must be <= 76 when lcd is toggled on ");
 
         if (ticks == 76) {
             update_ppu_mode(ppu_mode::Drawing);
@@ -123,7 +123,8 @@ void ppu::tick() {
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
         // set IF for interrupt
-        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
+        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1))
+        // {
         if ((_get(STAT) >> 5 & 1)) {
             _set(IF, _get(IF) | 2);
         }
@@ -209,42 +210,9 @@ void ppu::tick() {
         // drawing mode 3
         // fetch tile no
 
-        // if lcd reset, ticks are at 77
-        /*
-        if (first_line && dummy_fetch) {
-            assert(lcd_reset && "lcd was not reset!");
-            assert(ticks >= 70 && ticks <= 75 &&
-                   "ticks not correct for dummy fetch after lcd toggled on!");
-            if (ticks == 75) { // 6 ticks for dummy fetching
-                current_fetcher_mode = fetcher_mode::FetchTileNo;
-                dummy_fetch = false;
-                first_line = false;
-            }
-            return;
-        }*/
-
-        // dummy fetch - after 6 cycles (tick 81 being the first)
-        /*
-        if (dummy_fetch && !lcd_reset) {
-            // current_fetcher_mode = fetcher_mode::FetchTileNo;
-            assert(ticks >= 81 && ticks <= 86 &&
-                   "ticks not correct for dummy fetch!");
-
-            assert(!lcd_reset && "lcd reset can't be true in this if case, it wouldn't make sense!");
-            if (ticks == 86) { // 6 ticks for dummy fetching
-                current_fetcher_mode = fetcher_mode::FetchTileNo;
-                dummy_fetch = false;
-            }
-            return;
-        }*/
-
-        // currently we have 166 cycles for minimum case (160 tiles + 6 initial fetch), we need to implement an 8 cycle dummy fetch but during which may include a sprite x = 0
-
-        // TODO: handle dummy fetch
-        if (dummy_fetch) {
-            dummy_fetch = false;
-            current_fetcher_mode = fetcher_mode::FetchTileNo;
-        }
+        // currently we have 174 cycles for minimum case (8 dummy fetch (6
+        // fetch, 2 discard?) + 6 initial fetch + 160 tiles inital fetch
+        // ),
 
         // check for sprites right away
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
@@ -269,6 +237,23 @@ void ppu::tick() {
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
 
             sprite_to_fetch = &sprites_to_fetch[0];
+        }
+
+        // TODO: handle dummy fetch
+        else if (dummy_fetch) {
+            // wait 8 ticks
+            dummy_ticks++;
+
+            if (dummy_ticks < 8) {
+                return;
+            }
+
+            current_fetcher_mode =
+                fetcher_mode::FetchTileNo; // set to fetch tile no in
+                                           // beginning
+            dummy_fetch = false;           // reset dummy fetch, dummy ticks
+            dummy_ticks = 0;
+            return;
         }
 
         fetcher_ticks++;
@@ -585,7 +570,8 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
 
         // set IF for interrupt
-        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1))
+        // {
         if ((_get(STAT) >> 3 & 1)) {
             _set(IF, _get(IF) | 2);
         }
@@ -654,7 +640,8 @@ void ppu::tick() {
     case ppu_mode::VBlank: {
 
         // set IF for interrupt
-        //if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1))
+        // {
         if ((_get(STAT) >> 4 & 1)) {
             _set(IF, _get(IF) | 2);
         }
@@ -693,5 +680,4 @@ void ppu::tick() {
         _set(STAT, _get(STAT) & ~4); // sets coincidence bit to 0 explicitly
         std::cout << "";
     }
-
 }
