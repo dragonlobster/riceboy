@@ -71,6 +71,7 @@ Problem | Solution
 First column of tiles missing | Reset the pixel fetcher to FetchTileNo mode if a sprite fetch is initiated.
 Blargg's cpu_intrs infinite loop | Must correctly implement MBC1 to stop looping.
 Mooneye's sprite priority test - rectangles incorrect | Sprite FIFO is always filled in with transparent pixels to maintain a fixed size of 8. This affects the rules of sprite (or obj) priority on overlapping pixels between different objects, where transparent pixels should always be replaced with non transparent ones regardless of priority.
-Can't pass blargg's oam_bug 1-lcd_sync |
+Mooneyes ppu timing tests hang | The PPU didn't set the IF bit correctly because it was comparing last PPU mode with current PPU mode to set the IF bit (but the mode didn't change), so the emulator was stuck in HALT mode after EI HALT.
+Can't pass blargg's oam_bug 1-lcd_sync or mooneyes lcdon_timing |
 
 
