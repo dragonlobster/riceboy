@@ -526,10 +526,10 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
     // TODO: stopping LCD operation (LCDC bit 7 1->0) happens in vblank only,
     // otherwise crash
     if (this->dma_mode) {
-
         if (locate_section(address) == section::oam_ram) {
             // oam is locked
             write_memory(dma_source_transfer_address, value);
+            return;
         }
 
         else if (dma_bus_source == bus::vram) {
@@ -538,6 +538,7 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
                 locate_section(address) == section::bg_map_data_1 ||
                 locate_section(address) == section::bg_map_data_2) {
                 write_memory(dma_source_transfer_address, value);
+                return;
             }
         }
 
@@ -555,16 +556,17 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
                 locate_section(address) == section::internal_ram_bank_1_to_7 ||
                 locate_section(address) == section::cartridge_ram) {
                 write_memory(dma_source_transfer_address, value);
+                return;
             }
         }
     }
 
     // lock vram if ppu is in mode 3, check ppu mode
-    else if (load_rom_complete &&
-             (locate_section(address) == section::character_ram ||
-              locate_section(address) == section::bg_map_data_1 ||
-              locate_section(address) == section::bg_map_data_2) &&
-             ppu_mode == 3) {
+    if (load_rom_complete &&
+        (locate_section(address) == section::character_ram ||
+         locate_section(address) == section::bg_map_data_1 ||
+         locate_section(address) == section::bg_map_data_2) &&
+        ppu_mode == 3) {
         return;
     }
 

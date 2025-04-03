@@ -15,9 +15,9 @@ Joypad | :white_large_square:
 ## Quirks
 Quirk | Complete | Description
 :------------ | :-------------| :-------------|
-Dummy Fetch | :white_check_mark: | The first tiles are fetched twice. In this implementation, we do nothing for the first 6 ticks at the start of Mode 3: Drawing (PPU ticks 81 - 86 inclusive)
+Dummy Fetch | :white_check_mark: | There is an 6-8 cycle process in which a fetch of the first tile occurs and is then discarded. I currently have it set to 8.
 HALT Bug | :white_check_mark: | Occurs when HALT is executed while IME is 0. PC fails to increment when executing the next instruction.
-DMA | :white_check_mark: | Fast transfer OAM. When value > `0xE0` is written to DMA, it reads from Echo WRAM instead, implemented as sourcing from the value `-0x20`.
+DMA | :white_check_mark: | Fast transfer OAM. When value > `0xE0` is written to DMA, it reads from Echo WRAM instead, implemented as sourcing from the value `-0x20`. Further, the bus at which the OAM sources from is locked. It's either the 
 OAM Bug | :white_large_square: | OAM memory gets corrupted when accessing it while the PPU is in Mode 2: OAM Scan.
 LCD Toggle | :white_large_square: | LCDC bit 7 enables and disables the LCD. It should only be done in VBlank, LY and STAT are set to 0 and writes to it are ignoredwhile LCD is off (to be confirmed). The first frame when LCD is toggled on is still processed but not drawn to LCD, so the first frame actually drawn will be the second frame.
 
@@ -58,6 +58,19 @@ Test | Pass | Remarks
 :------------ | :-------------| :-------------|
 sprite_priority | :white_check_mark: | will include screenshot once palette is finalized
 
+#### acceptance: interrupts
+Test | Pass | Remarks
+:------------ | :-------------| :-------------|
+ie_push | :white_check_mark: | there are 2 checks for IE, the first is corresponding bits with IE and IF, but when actually servicing the interrupt, if IE was written to it, it actually changes the interrupt vector from the original to the new interrupt vector based on the new IE. If 0 was written to IE, then it jumps to reset vector 0. This is a very tricky one.
+
+#### acceptance: oam_dma
+Test | Pass | Remarks
+:------------ | :-------------| :-------------|
+basic | :white_check_mark: | 
+reg_read | :white_check_mark: | 
+sources-dmgABCmgbS | :white_check_mark: | 
+
+
 ### Matt Currie
 #### acid
 Test | Pass | Remarks
@@ -71,7 +84,8 @@ Problem | Solution
 First column of tiles missing | Reset the pixel fetcher to FetchTileNo mode if a sprite fetch is initiated.
 Blargg's cpu_intrs infinite loop | Must correctly implement MBC1 to stop looping.
 Mooneye's sprite priority test - rectangles incorrect | Sprite FIFO is always filled in with transparent pixels to maintain a fixed size of 8. This affects the rules of sprite (or obj) priority on overlapping pixels between different objects, where transparent pixels should always be replaced with non transparent ones regardless of priority.
-Mooneyes ppu timing tests hang | The PPU didn't set the IF bit correctly because it was comparing last PPU mode with current PPU mode to set the IF bit (but the mode didn't change), so the emulator was stuck in HALT mode after EI HALT.
+Mooneye's ppu timing tests hang | The PPU didn't set the IF bit correctly because it was comparing last PPU mode with current PPU mode to set the IF bit (but the mode didn't change), so the emulator was stuck in HALT mode after EI HALT.
+Mooneye's oam dma reg_read test was failing | I accidentally didn't process writes to FF46, or any address that wasn't in the DMA source bus because I only focused on writing to the DMA source bus the current DMA transfer address (which is correct). 
 Can't pass blargg's oam_bug 1-lcd_sync or mooneyes lcdon_timing |
 
 

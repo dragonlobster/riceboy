@@ -42,6 +42,9 @@ class ppu {
     // dummy fetch once per scanline
     bool dummy_fetch{true};
 
+    // scx mod 8 bg pixels discard
+    uint8_t scx_discard_count{0};
+
     struct oam_entry {
         uint8_t x{};       // x position
         uint8_t y{};       // y position

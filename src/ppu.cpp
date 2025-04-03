@@ -239,7 +239,7 @@ void ppu::tick() {
             sprite_to_fetch = &sprites_to_fetch[0];
         }
 
-        // TODO: handle dummy fetch
+        // TODO: handle dummy fetch for window tiles?
         else if (dummy_fetch) {
             // wait 8 ticks
             dummy_ticks++;
@@ -247,7 +247,6 @@ void ppu::tick() {
             if (dummy_ticks < 8) {
                 return;
             }
-
             current_fetcher_mode =
                 fetcher_mode::FetchTileNo; // set to fetch tile no in
                                            // beginning
@@ -473,6 +472,20 @@ void ppu::tick() {
             }
 
             else {
+                if (scx_discard_count > 0) {
+                    assert(lcd_x == 0 &&
+                           "lcd x must be 0 when discarding scx % 8 "
+                           "pixels from background fifo!");
+
+                    background_fifo.pop_back();
+                    scx_discard_count--;
+
+                    if (scx_discard_count == 0) {
+                        current_fetcher_mode = fetcher_mode::FetchTileNo; // TODO: check timing
+                    }
+                    return; // rendering is paused when discarding scx % 8 pixels
+                }
+
                 if (background_fifo.empty()) {
                     // push to background fifo
                     for (unsigned int i = 0; i < 8; ++i) {
@@ -483,10 +496,20 @@ void ppu::tick() {
                     tile_index++;
 
                     fetcher_ticks = 0;
-                    current_fetcher_mode = fetcher_mode::FetchTileNo;
+
+                    if (lcd_x == 0 && _get(SCX) % 8) {
+                        scx_discard_count = _get(SCX) % 8;
+
+                        background_fifo.pop_back();
+                        scx_discard_count--;
+                        return; // return if we need to discard pixels (+1 dot), then go  to discard pixel mode to keep going
+                    }
+
+                    else {
+                        current_fetcher_mode = fetcher_mode::FetchTileNo;
+                    }
                 }
             }
-
             break;
         }
         }
@@ -494,12 +517,13 @@ void ppu::tick() {
         // push pixels to LCD, 1 pixel per dot
         if (!background_fifo.empty() && !fetch_sprite) {
 
-            // fine x (scx)
+            // fine x (scx) takes 1 dot per removal
+            /*
             if (lcd_x == 0) {
                 for (unsigned int i = 0; i < _get(SCX) % 8; ++i) {
                     background_fifo.pop_back();
                 }
-            }
+            }*/
 
             // get the background pixel
             uint8_t bg_pixel = background_fifo.back();
@@ -556,7 +580,7 @@ void ppu::tick() {
 
             // TODO: ticks are around 389 - 413, figure out why
 
-            if (ticks > 373) {
+            if (ticks > 400) {
                 std::cout << ticks << '\n';
             }
             // std::cout << ticks << '\n';
@@ -592,6 +616,8 @@ void ppu::tick() {
             // dummy fetch too?
             dummy_fetch = true;
             fetch_window = false;
+
+            fetcher_ticks = 0; // reset fetcher ticks for next scanline
 
             // clear sprite buffer
             sprite_buffer.clear();
