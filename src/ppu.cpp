@@ -205,7 +205,7 @@ void ppu::tick() {
     }
 
     case ppu_mode::Drawing: {
-
+        mode3_ticks++;
         // assert that ticks this step takes is between 172+80 and 289+80
         // drawing mode 3
         // fetch tile no
@@ -595,7 +595,7 @@ void ppu::tick() {
     }
 
     case ppu_mode::HBlank: {
-
+        mode0_ticks++;
         // set IF for interrupt
         // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1))
         // {
@@ -612,8 +612,12 @@ void ppu::tick() {
             _set(LY, _get(LY) + 1); // new scanline reached
         }
 
-        // wait 456 T-cycles
+        // wait 456 T-cycles (scanline ends there)
         if (ticks == 456) {
+
+            // TODO: debug this
+            assert(mode0_ticks + mode3_ticks + 80 == 456 &&
+                   "timing for ticks in the scnaline is not correct!");
 
             if (fetch_window) {
                 window_ly++;
@@ -631,6 +635,10 @@ void ppu::tick() {
 
             // clear sprite buffer
             sprite_buffer.clear();
+
+            // reset mode3 and mode0 ticks
+            mode0_ticks = 0;
+            mode3_ticks = 0;
 
             //_set(LY, _get(LY) + 1); // new scanline reached
 

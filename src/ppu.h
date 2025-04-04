@@ -12,13 +12,15 @@ class ppu {
 
     ppu(mmu &gb_mmu_, sf::RenderWindow &window_);
 
-    // a "dot"
+    // dot = tick = T-cycle
     void tick();
     uint16_t ticks{0}; // tick counter
     uint16_t fetcher_ticks{
         0}; // pixel fetcher ticking for accurate 2 tick counts
     uint8_t dummy_ticks{
         0}; // 8 dummy ticks for dummy fetching (6 to fetch 2 to discard)
+    uint16_t mode3_ticks{0}; // how many ticks mode 3 drawing takes
+    uint16_t mode0_ticks{0}; // how many ticks mode 0 hblank takes
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
