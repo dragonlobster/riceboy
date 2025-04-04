@@ -27,21 +27,21 @@ class cpu {
     // flags register, 4 MSBs: Z(ero) N(subtract) H(half-carry) C(carry), 4 LSB
     // 0 0 0 0 unused
     // uint8_t F{};
-    bool Zf{}; // zero flag
-    bool Nf{}; // subtract flag
-    bool Hf{}; // half-carry flag
-    bool Cf{}; // carry-flag
+    bool Zf{false}; // zero flag
+    bool Nf{false}; // subtract flag
+    bool Hf{false}; // half-carry flag
+    bool Cf{false}; // carry-flag
 
-    uint8_t H{};
-    uint8_t L{};
+    uint8_t H{0};
+    uint8_t L{0};
 
     // 16-bit registers - stack pointer, program counter
     uint16_t SP{0};
     uint16_t PC{0};
 
     // temporary registers for complex operations
-    uint8_t W{};
-    uint8_t Z{};
+    uint8_t W{0};
+    uint8_t Z{0};
 
     // interrupts, ime is either 0 or 1
     bool ei_delay{false};

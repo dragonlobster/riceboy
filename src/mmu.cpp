@@ -584,9 +584,8 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         return;
     }
 
-    // block LY writes when LCD is off
-    else if (!lcd_on && address == 0xff44) {
-        // write_memory(address, 0);
+    // LY writes are always ignored
+    else if (address == 0xff44) {
         return;
     }
 
@@ -641,13 +640,6 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
             handle_lcdc_write(value);
             return;
         }
-
-        // ly based on lcd off
-        /*
-        if (!lcd_on && address == 0xff44) {
-            hardware_registers[0x44] = 0;
-            return;
-        }*/
 
         // stat based on lcd off
         /*
@@ -753,12 +745,6 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         else if (address == 0xff40) {
             handle_lcdc_write(value);
         }
-
-        // ly based on lcd off
-        /*
-        else if (!lcd_on && address == 0xff44) {
-            hardware_registers[0x44] = 0;
-        }*/
 
         // stat based on lcd off
         /*

@@ -1,5 +1,9 @@
 #include "gameboy.h"
 
+void gameboy::initialize_values() {
+
+}
+
 void gameboy::tick() {
 	this->gb_cpu.tick(); 
 

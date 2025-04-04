@@ -22,8 +22,11 @@ class gameboy {
     // TODO: mmu, cpu, ppu
     mmu gb_mmu{};
     cpu gb_cpu = cpu(gb_mmu);
-    // ppu gb_ppu = ppu(gb_mmu, window);
     ppu gb_ppu = ppu(gb_mmu, window);
+
+    // used for initial values for the first time when the boot rom finished
+    bool need_to_initialize_values{false};
+    void initialize_values();
 
     void tick();
 
