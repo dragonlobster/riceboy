@@ -145,7 +145,7 @@ void cpu::add_a_hl() {
     auto _add_hl = [=]() {
         const uint16_t hl = this->_combine_2_8bits(this->H, this->L);
         this->W = _get(hl); // assign value of HL to temp register W
-        // 1 M-cycle - add HL value to register A
+                            // 1 M-cycle - add HL value to register A
         auto [result, z, n, h, c] = _addition_8bit(this->A, this->W);
 
         // optional: reset W after
@@ -556,11 +556,11 @@ void cpu::inc_or_dec_r16(const registers r1, const registers r2, const bool inc,
 
             // oam bug oam corruption bug write on r16 == bc, or de or hl
             /*
-            if ((r1 == registers::B && r2 == registers::C) ||
-                (r1 == registers::D || r2 == registers::E) ||
-                (r1 == registers::H || r2 == registers::L)) {
-                this->gb_mmu->oam_bug_write(current_value);
-            }*/
+               if ((r1 == registers::B && r2 == registers::C) ||
+               (r1 == registers::D || r2 == registers::E) ||
+               (r1 == registers::H || r2 == registers::L)) {
+               this->gb_mmu->oam_bug_write(current_value);
+               }*/
 
             if (inc) {
                 current_value++;
@@ -1020,13 +1020,12 @@ void cpu::ret(conditions condition, bool ime_condition) {
 
 void cpu::sla_r(const registers r, const bool hl) {
     auto m1 = [=]() {
-        uint8_t *rp =
-            this->_get_register(r); // r falls out of scope for some reason
-        // uint8_t* rp = &this->B;
+        uint8_t *rp = this->_get_register(r); // r falls out of scope for some
+                                              // reason uint8_t* rp = &this->B;
 
         uint8_t msbit = (*rp >> 7) & 1; // save the "carry" bit
         *rp <<= 1;                      // left shift A by 1 bit
-        // bit 0 is reset to 0
+                                        // bit 0 is reset to 0
 
         this->Zf = *rp == 0;
         this->Nf = false;
@@ -1044,7 +1043,7 @@ void cpu::sla_r(const registers r, const bool hl) {
 
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z <<= 1;                      // left shift A by 1 bit
-        // bit 0 is reset to 0
+                                            // bit 0 is reset to 0
 
         this->Zf = this->Z == 0;
         this->Nf = false;
@@ -1074,7 +1073,7 @@ void cpu::rl_r(const registers r, const bool hl, const bool z_flag,
         uint8_t carry_flag = this->Cf;   // take current carry flag
         *rp = *rp << 1;                  // left shift A by 1 bit
         *rp = (*rp & 0xfe) | carry_flag; // put carry_flag into bit 0
-        // set flags
+                                         // set flags
         if (!z_flag) {
             this->Zf = false;
         } else {
@@ -1105,7 +1104,7 @@ void cpu::rl_r(const registers r, const bool hl, const bool z_flag,
         uint8_t carry_flag = this->Cf;           // take current carry flag
         this->Z = this->Z << 1;                  // left shift A by 1 bit
         this->Z = (this->Z & 0xfe) | carry_flag; // put carry_flag into bit 0
-        // set flags
+                                                 // set flags
         this->Zf = this->Z == 0;
         this->Nf = false;
         this->Hf = false;
@@ -1134,7 +1133,7 @@ void cpu::rlc_r(const registers r, const bool hl, const bool z_flag,
         uint8_t msbit = (*rp >> 7) & 1; // save the "carry" bit
         *rp = *rp << 1;
         *rp = (*rp & 0xfe) | msbit; // put carry_flag into bit 0
-        // set flags
+                                    // set flags
         if (!z_flag) {
             this->Zf = false;
         } else {
@@ -1163,7 +1162,7 @@ void cpu::rlc_r(const registers r, const bool hl, const bool z_flag,
         uint8_t msbit = (this->Z >> 7) & 1; // save the "carry" bit
         this->Z = this->Z << 1;
         this->Z = (this->Z & 0xfe) | msbit; // put carry_flag into bit 0
-        // set flags
+                                            // set flags
         this->Zf = this->Z == 0;
         this->Nf = false;
         this->Hf = false;
@@ -1192,7 +1191,7 @@ void cpu::rr_r(const registers r, const bool hl, const bool z_flag,
         uint8_t carry_flag = this->Cf;          // take current carry flag
         *rp = *rp >> 1;                         // left shift A by 1 bit
         *rp = (*rp & 0x7f) | (carry_flag << 7); // put carry_flag into bit 0
-        // set flags
+                                                // set flags
         if (!z_flag) {
             this->Zf = false;
         } else {
@@ -1250,7 +1249,7 @@ void cpu::rrc_r(const registers r, const bool hl, const bool z_flag,
         uint8_t lsbit = *rp & 1;           // save the "carry" bit
         *rp = *rp >> 1;                    // left shift A by 1 bit
         *rp = (*rp & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
-        // set flags
+                                           // set flags
         if (!z_flag) {
             this->Zf = false;
         } else {
@@ -1279,7 +1278,7 @@ void cpu::rrc_r(const registers r, const bool hl, const bool z_flag,
         uint8_t lsbit = this->Z & 1; // save the "carry" bit
         this->Z = this->Z >> 1;
         this->Z = (this->Z & 0x7f) | (lsbit << 7); // put carry_flag into bit 0
-        // set flags
+                                                   // set flags
         this->Zf = this->Z == 0;
         this->Nf = false;
         this->Hf = false;
@@ -1302,9 +1301,8 @@ void cpu::rrc_r(const registers r, const bool hl, const bool z_flag,
 
 void cpu::sra_r(const registers r, const bool hl) {
     auto m1 = [=]() {
-        uint8_t *rp =
-            this->_get_register(r); // r falls out of scope for some reason
-        // uint8_t* rp = &this->B;
+        uint8_t *rp = this->_get_register(r); // r falls out of scope for some
+                                              // reason uint8_t* rp = &this->B;
 
         uint8_t msbit_retain = *rp & 0x80;
 
@@ -1350,9 +1348,8 @@ void cpu::sra_r(const registers r, const bool hl) {
 
 void cpu::swap_r(const registers r, const bool hl) {
     auto m1 = [=]() {
-        uint8_t *rp =
-            this->_get_register(r); // r falls out of scope for some reason
-        // uint8_t* rp = &this->B;
+        uint8_t *rp = this->_get_register(r); // r falls out of scope for some
+                                              // reason uint8_t* rp = &this->B;
 
         uint8_t lsb = *rp & 0x0f;
         *rp >>= 4;
@@ -1406,7 +1403,7 @@ void cpu::srl_r(const registers r, const bool hl) {
         uint8_t lsbit = *rp & 1;       // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
         *rp = *rp >> 1;                // left shift A by 1 bit
-        // bit 7 reset to 0
+                                       // bit 7 reset to 0
 
         // set flags
         this->Zf = *rp == 0;
@@ -1426,7 +1423,7 @@ void cpu::srl_r(const registers r, const bool hl) {
         uint8_t lsbit = this->Z & 1;   // save the "carry" bit
         uint8_t carry_flag = this->Cf; // take current carry flag
         this->Z = this->Z >> 1;        // left shift A by 1 bit
-        // bit 7 reset to 0
+                                       // bit 7 reset to 0
 
         this->Zf = this->Z == 0;
         this->Nf = false;
@@ -2022,6 +2019,8 @@ void cpu::tick() {
             // execute interrupt operations
             this->execute_I_operations();
         }
+
+        // TODO: are interrupts affected by HALT?
     }
 }
 
@@ -2097,6 +2096,47 @@ std::tuple<cpu::interrupts, cpu::if_mask> cpu::check_current_interrupt() {
     return {interrupt, mask};
 }
 
+void cpu::push_interrupts() {
+    auto m1 = [=]() {};              // NOP
+    auto m2 = [=]() { this->SP--; }; // pre-decrement SP
+
+    auto m3 = [=]() {
+        // write pc high to stack (upper byte push)
+
+        this->_set(this->SP, this->PC >> 8);
+        this->SP--;
+    };
+
+    auto m4 = [=]() {
+        // write pc low to stack (lower byte push)
+
+        // NOTE: if IE was pushed this cycle, it's too late. the reason is
+        // because this whole function (handle interrupts) occurs BEFORE cpu
+        // execution, so we are always looking at the IE value BEFORE the
+        // current M-cycle
+
+        this->_set(this->SP, this->PC & 0xff);
+
+        this->PC = static_cast<uint16_t>(current_interrupt);
+        this->_set(0xff0f,
+                   _get(0xff0f) & static_cast<uint8_t>(current_if_mask));
+    };
+
+    auto m5 = [=]() {
+        this->ime = false;
+        this->current_interrupt = interrupts::none;
+        this->current_if_mask = if_mask::none;
+    };
+
+    this->I_operations.push_back(m5);
+    this->I_operations.push_back(m4);
+    this->I_operations.push_back(m3);
+    this->I_operations.push_back(m2);
+    this->I_operations.push_back(m1);
+
+    this->fetch_opcode = false;
+}
+
 void cpu::handle_interrupts() {
     // takes 5 M-Cycles
 
@@ -2130,41 +2170,5 @@ void cpu::handle_interrupts() {
         return;
     }
 
-    auto m1 = [=]() {};              // NOP
-    auto m2 = [=]() { this->SP--; }; // pre-decrement SP
-
-    auto m3 = [=]() {
-        // write pc high to stack (upper byte push)
-
-        this->_set(this->SP, this->PC >> 8);
-        this->SP--;
-    };
-
-    auto m4 = [=]() {
-        // write pc low to stack (lower byte push)
-
-        // NOTE: if IE was pushed this cycle, it's too late. the reason is
-        // because this whole function (handle interrupts) occurs BEFORE cpu
-        // execution, so we are always looking at the IE value BEFORE the
-        // current M-cycle
-
-        this->_set(this->SP, this->PC & 0xff);
-
-        this->PC = static_cast<uint16_t>(current_interrupt);
-        this->_set(0xff0f, _if & static_cast<uint8_t>(current_if_mask));
-    };
-
-    auto m5 = [=]() {
-        this->ime = false;
-        this->current_interrupt = interrupts::none;
-        this->current_if_mask = if_mask::none;
-    };
-
-    this->I_operations.push_back(m5);
-    this->I_operations.push_back(m4);
-    this->I_operations.push_back(m3);
-    this->I_operations.push_back(m2);
-    this->I_operations.push_back(m1);
-
-    this->fetch_opcode = false;
+    this->push_interrupts();
 }

@@ -241,7 +241,7 @@ void ppu::tick() {
 
         // TODO: handle dummy fetch for window tiles?
         else if (dummy_fetch) {
-            // wait 8 ticks
+            // wait 6-8 ticks (172 or 174?)
             dummy_ticks++;
 
             if (dummy_ticks < 8) {
@@ -481,9 +481,11 @@ void ppu::tick() {
                     scx_discard_count--;
 
                     if (scx_discard_count == 0) {
-                        current_fetcher_mode = fetcher_mode::FetchTileNo; // TODO: check timing
+                        current_fetcher_mode =
+                            fetcher_mode::FetchTileNo; // TODO: check timing
                     }
-                    return; // rendering is paused when discarding scx % 8 pixels
+                    return; // rendering is paused when discarding scx % 8
+                            // pixels
                 }
 
                 if (background_fifo.empty()) {
@@ -502,7 +504,8 @@ void ppu::tick() {
 
                         background_fifo.pop_back();
                         scx_discard_count--;
-                        return; // return if we need to discard pixels (+1 dot), then go  to discard pixel mode to keep going
+                        return; // return if we need to discard pixels (+1 dot),
+                                // then go  to discard pixel mode to keep going
                     }
 
                     else {
@@ -602,6 +605,13 @@ void ppu::tick() {
 
         // pause until 456 T-cycles have finished
 
+        // test increment LY 6 T-cycles earlier
+        if (ticks == 451) {
+            // reading LY at this exact dot returns a bitwise AND between prev
+            // LY and current LY
+            _set(LY, _get(LY) + 1); // new scanline reached
+        }
+
         // wait 456 T-cycles
         if (ticks == 456) {
 
@@ -622,7 +632,7 @@ void ppu::tick() {
             // clear sprite buffer
             sprite_buffer.clear();
 
-            _set(LY, _get(LY) + 1); // new scanline reached
+            //_set(LY, _get(LY) + 1); // new scanline reached
 
             if (_get(LY) == 144) {
                 // hit VBlank for the first time
@@ -672,11 +682,18 @@ void ppu::tick() {
             _set(IF, _get(IF) | 2);
         }
 
+        // test incrementing LY 6 T-cycles earlier
+        if (ticks == 451) {
+            // reading LY at this exact dot returns a bitwise AND between prev
+            // LY and current LY
+            _set(LY, _get(LY) + 1); // new scanline reached
+        }
+
         if (ticks == 456) {
             ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks
-            _set(LY, _get(LY) + 1); // new scanline reached
+            //_set(LY, _get(LY) + 1); // new scanline reached
 
-            if (_get(LY) == 154) {
+            if (_get(LY) == 153) {
                 // reset LY, window LY
                 _set(LY, 0);
                 window_ly = 0;

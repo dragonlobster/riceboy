@@ -76,6 +76,7 @@ class cpu {
     void timer_tick();     // timer background_tick
 
     void handle_interrupts(); // handle interrupts
+    void push_interrupts();
 
     // load boot rom
     void load_boot_rom();
