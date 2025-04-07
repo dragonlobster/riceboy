@@ -126,6 +126,9 @@ class mmu {
     void handle_lcdc_write(uint8_t value);
     bool lcd_toggle{false};
     bool lcd_on{true}; // indicates whether lcd is on or off
+    // stat IRQ blocking (owned by PPU but CPU needs to check for interrupt handling)
+    // TODO: fix timer and interrupt as individual classes later on
+    bool stat_irq{false};
 
     // ppu mode
     uint8_t ppu_mode{2};
@@ -133,6 +136,7 @@ class mmu {
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
+
 
     // zero page - ff80 - fffe, High RAM (127 bytes)
     uint8_t zero_page[(0xfffe - 0xff80) + 1]{};

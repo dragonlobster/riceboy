@@ -30,6 +30,11 @@ void ppu::update_ppu_mode(ppu_mode mode) {
     }
 }
 
+void ppu::reset_scanline() { 
+    lcd_x = 0;
+    this->gb_mmu.stat_irq = false;
+}
+
 sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
     // Get the appropriate palette register
     uint8_t palette_value{};
@@ -109,7 +114,7 @@ void ppu::tick() {
     }
 
     else {
-        _set(STAT, (_get(STAT) & 0xfc));
+        _set(STAT, (_get(STAT) & 0xfc)); // for LCDToggledOn, the STAT mode should read 0 (HBlank)
         //last_mode = ppu_mode::LCDToggledOn;
     }
 
@@ -138,11 +143,10 @@ void ppu::tick() {
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
         // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1))
-        {
-        //if ((_get(STAT) >> 5 & 1)) {
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
             _set(IF, _get(IF) | 2);
         }
+
         last_mode = current_mode;
 
         if ((ticks % 2 == 0)) { // 40 objects
@@ -642,8 +646,8 @@ void ppu::tick() {
             reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
                            // mode3_ticks, mode0_ticks
 
-            // i think we can reset LCD x in HBlank
-            lcd_x = 0;
+            // resets lcd_x to 0, and stat irq
+            reset_scanline();
 
             // dummy fetch too?
             dummy_fetch = true;
@@ -710,8 +714,14 @@ void ppu::tick() {
         }
 
         if (ticks == 456) {
-            ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks
+            //ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks
             //_set(LY, _get(LY) + 1); // new scanline reached
+
+            reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
+                           // mode3_ticks, mode0_ticks
+
+            // resets lcd_x to 0, and stat irq
+            reset_scanline();
 
             if (_get(LY) == 153) {
                 // reset LY, window LY

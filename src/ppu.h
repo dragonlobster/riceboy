@@ -94,6 +94,9 @@ class ppu {
     // lcd x position
     uint8_t lcd_x{0};
 
+    // keep track of each scanline
+    void reset_scanline();
+
     // lcd was reset
     bool lcd_reset{false};
 

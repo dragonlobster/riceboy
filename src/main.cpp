@@ -55,7 +55,7 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    std::array<std::string, 10> mooneye_ppu{
+    std::array<std::string, 11> mooneye_ppu{
         "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb",
@@ -66,6 +66,7 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb",
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb",
     };
 
     std::array<std::string, 1> mooneye_cpu{
@@ -78,9 +79,9 @@ int main() {
     // related to ppu somehow)
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[10]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
-    // riceboy->gb_cpu.prepare_rom(blargg[3]);
+    // riceboy->gb_cpu.prepare_rom(blargg[1]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
