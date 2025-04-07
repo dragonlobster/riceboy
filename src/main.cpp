@@ -20,8 +20,6 @@ int main() {
     // initialize gameboy on heap
     std::unique_ptr<gameboy> riceboy = std::make_unique<gameboy>(window);
 
-    // TODO: load the BOOT ROM
-    riceboy->gb_cpu.load_boot_rom();
 
     // TODO: load chosen cartridge
     // std::string rom =
@@ -73,13 +71,16 @@ int main() {
     std::array<std::string, 1> mooneye_cpu{
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"};
 
+    // TODO: load the BOOT ROM
+    riceboy->gb_cpu.load_boot_rom();
+
     // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably
     // related to ppu somehow)
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
-    // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
-    riceboy->gb_cpu.prepare_rom(blargg[0]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    // riceboy->gb_cpu.prepare_rom(blargg[3]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
@@ -104,7 +105,7 @@ int main() {
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
 
         double target_frame_time = 1.f / (((1 << 22) / 70224) * 1000);
-        // double target_frame_time = 200
+        //double target_frame_time = 1000;
 
         // 70224 ipf - clock speed 4194304Hz
         while (frame_time >= target_frame_time) {

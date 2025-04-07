@@ -21,6 +21,7 @@ class ppu {
         0}; // 8 dummy ticks for dummy fetching (6 to fetch 2 to discard)
     uint16_t mode3_ticks{0}; // how many ticks mode 3 drawing takes
     uint16_t mode0_ticks{0}; // how many ticks mode 0 hblank takes
+    void reset_ticks();
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
@@ -67,7 +68,7 @@ class ppu {
         Drawing = 3,
         HBlank = 0,
         VBlank = 1,
-        Off = 4
+        LCDToggledOn = 4
     };
 
     enum class fetcher_mode {

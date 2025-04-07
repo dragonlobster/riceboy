@@ -23,7 +23,7 @@ ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
 // update the ppu mode
 void ppu::update_ppu_mode(ppu_mode mode) {
     this->current_mode = mode;
-    if (mode != ppu_mode::Off) {
+    if (mode != ppu_mode::LCDToggledOn) {
         this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode);
     } else {
         this->gb_mmu.ppu_mode = 0;
@@ -57,16 +57,24 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
     return {color[0], color[1], color[2]};
 }
 
+void ppu::reset_ticks() {
+    this->ticks = 0;
+    this->fetcher_ticks = 0;
+    this->dummy_ticks = 0;
+    this->mode3_ticks = 0;
+    this->mode0_ticks = 0;
+}
+
 void ppu::tick() {
     // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
         this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        ticks = 0;                       // reset ticks
+        reset_ticks();
         //_set(LY, 0);                     // reset LY (handled by mmu already)
         assert(oam_search_counter == 0 &&
                this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
                "lcd toggled off outside of vblank!");
-        update_ppu_mode(ppu_mode::Off);
+        update_ppu_mode(ppu_mode::LCDToggledOn);
 
         return;
     }
@@ -95,23 +103,30 @@ void ppu::tick() {
     }
 
     // set stat to mode
-    if (current_mode != ppu_mode::Off) {
+    if (current_mode != ppu_mode::LCDToggledOn) {
         _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
-        last_mode = current_mode;
+        //last_mode = current_mode;
     }
 
     else {
         _set(STAT, (_get(STAT) & 0xfc));
-        last_mode = ppu_mode::HBlank; // HBlank resolves to 0
+        //last_mode = ppu_mode::LCDToggledOn;
     }
 
     // oam search mode 2
     switch (current_mode) {
-    case ppu_mode::Off: {
+    case ppu_mode::LCDToggledOn: {
+
+        // TODO: once toggled on is STAT interrupt checked for mode 0?
+        last_mode = current_mode;
 
         assert(ticks <= 76 && "ticks must be <= 76 when lcd is toggled on ");
 
         if (ticks == 76) {
+            // LCD On for the first time started 4 T-cycles shorter, so we
+            // artifically align the tick numbers for this frame
+
+            ticks += 4;
             update_ppu_mode(ppu_mode::Drawing);
         }
 
@@ -123,11 +138,12 @@ void ppu::tick() {
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
         // set IF for interrupt
-        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1))
-        // {
-        if ((_get(STAT) >> 5 & 1)) {
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1))
+        {
+        //if ((_get(STAT) >> 5 & 1)) {
             _set(IF, _get(IF) | 2);
         }
+        last_mode = current_mode;
 
         if ((ticks % 2 == 0)) { // 40 objects
 
@@ -597,11 +613,11 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
         mode0_ticks++;
         // set IF for interrupt
-        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1))
-        // {
-        if ((_get(STAT) >> 3 & 1)) {
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
+            // if ((_get(STAT) >> 3 & 1)) {
             _set(IF, _get(IF) | 2);
         }
+        last_mode = current_mode;
 
         // pause until 456 T-cycles have finished
 
@@ -623,22 +639,18 @@ void ppu::tick() {
                 window_ly++;
             } // add window ly before resetting fetch window
 
-            ticks = 0; // reset ticks
+            reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
+                           // mode3_ticks, mode0_ticks
 
             // i think we can reset LCD x in HBlank
             lcd_x = 0;
+
             // dummy fetch too?
             dummy_fetch = true;
             fetch_window = false;
 
-            fetcher_ticks = 0; // reset fetcher ticks for next scanline
-
             // clear sprite buffer
             sprite_buffer.clear();
-
-            // reset mode3 and mode0 ticks
-            mode0_ticks = 0;
-            mode3_ticks = 0;
 
             //_set(LY, _get(LY) + 1); // new scanline reached
 
@@ -684,11 +696,11 @@ void ppu::tick() {
     case ppu_mode::VBlank: {
 
         // set IF for interrupt
-        // if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1))
-        // {
-        if ((_get(STAT) >> 4 & 1)) {
+        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
+            // if ((_get(STAT) >> 4 & 1)) {
             _set(IF, _get(IF) | 2);
         }
+        last_mode = current_mode;
 
         // test incrementing LY 6 T-cycles earlier
         if (ticks == 451) {
