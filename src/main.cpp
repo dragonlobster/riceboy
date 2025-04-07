@@ -79,7 +79,7 @@ int main() {
     // related to ppu somehow)
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[10]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
     // riceboy->gb_cpu.prepare_rom(blargg[1]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);

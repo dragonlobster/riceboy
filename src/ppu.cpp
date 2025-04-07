@@ -30,7 +30,7 @@ void ppu::update_ppu_mode(ppu_mode mode) {
     }
 }
 
-void ppu::reset_scanline() { 
+void ppu::reset_scanline() {
     lcd_x = 0;
     this->gb_mmu.stat_irq = false;
 }
@@ -110,12 +110,14 @@ void ppu::tick() {
     // set stat to mode
     if (current_mode != ppu_mode::LCDToggledOn) {
         _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
-        //last_mode = current_mode;
+        // last_mode = current_mode;
     }
 
     else {
-        _set(STAT, (_get(STAT) & 0xfc)); // for LCDToggledOn, the STAT mode should read 0 (HBlank)
-        //last_mode = ppu_mode::LCDToggledOn;
+        _set(STAT,
+             (_get(STAT) &
+              0xfc)); // for LCDToggledOn, the STAT mode should read 0 (HBlank)
+        // last_mode = ppu_mode::LCDToggledOn;
     }
 
     // oam search mode 2
@@ -259,8 +261,9 @@ void ppu::tick() {
             sprite_to_fetch = &sprites_to_fetch[0];
         }
 
-        // TODO: handle dummy fetch for window tiles?
         else if (dummy_fetch) {
+            assert(ticks >= 81 && ticks <= 89 &&
+                   "dummy fetch should only be the first 8 ticks!");
             // wait 6-8 ticks (172 or 174?)
             dummy_ticks++;
 
@@ -714,8 +717,8 @@ void ppu::tick() {
         }
 
         if (ticks == 456) {
-            //ticks = 0; // wait 456 T-cycles for the whole scanline, reset ticks
-            //_set(LY, _get(LY) + 1); // new scanline reached
+            // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
+            // ticks _set(LY, _get(LY) + 1); // new scanline reached
 
             reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
                            // mode3_ticks, mode0_ticks
