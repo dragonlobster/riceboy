@@ -48,21 +48,15 @@ void ppu::interrupt_line_check() {
     bool hblank = (current_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
     // 0000 1000
 
-    bool vblank = (current_mode == ppu_mode::VBlank) && (_get(STAT) & 0x10);
-    // 0001 0000
+    // bit 5 (& 0x20) applies to both VBlank and OAM_Scan
+    bool vblank = (current_mode == ppu_mode::VBlank) &&
+                  ((_get(STAT) & 0x10) || _get(STAT) & 0x20);
+    // 0001 0000, 0010 0000
 
     bool ly_lyc = (_get(LY) == _get(LYC)) && (_get(STAT) & 0x40);
+    // 0100 0000
 
     current_interrupt_line = oam_scan || hblank || vblank || ly_lyc;
-
-    /*
-    bool prev_vblank_interrupt = current_vblank_interrupt;
-    current_vblank_interrupt = current_mode == ppu_mode::VBlank;
-    // vblank interrupt
-    if (!prev_vblank_interrupt && current_vblank_interrupt) {
-        // set bit 0 of IF, vblank interrupt
-        _set(IF, _get(IF) | 1);
-    }*/
 
     if (ly_lyc) {
         _set(STAT, _get(STAT) | 4); // sets coincidence flag to 1
