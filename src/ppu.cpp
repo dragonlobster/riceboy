@@ -650,13 +650,16 @@ void ppu::tick() {
         // pause until 456 T-cycles have finished
 
         // test increment LY 6 T-cycles earlier
-        // TODO: At line 153 LY=153 only lasts 4 dots before snapping to 0 for
-        // the rest of the line
+
+        /*
         if (ticks == 451) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
-        }
+        }*/
+
+        // TODO: At line 153 LY=153 only lasts 4 dots before snapping to 0 for
+        // the rest of the line
 
         // wait 456 T-cycles (scanline ends there)
         if (ticks == 456) {
@@ -664,6 +667,8 @@ void ppu::tick() {
             // TODO: debug this
             assert(mode0_ticks + mode3_ticks + 80 == 456 &&
                    "timing for ticks in the scnaline is not correct!");
+
+            _set(LY, _get(LY) + 1); // new scanline reached
 
             if (fetch_window) {
                 window_ly++;
@@ -730,15 +735,16 @@ void ppu::tick() {
         }
 
         // test incrementing LY 6 T-cycles earlier
+        /*
         if (ticks == 451) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
-        }
+        }*/
 
         if (ticks == 456) {
             // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
-            // ticks _set(LY, _get(LY) + 1); // new scanline reached
+            _set(LY, _get(LY) + 1); // new scanline reached
 
             reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
                            // mode3_ticks, mode0_ticks
