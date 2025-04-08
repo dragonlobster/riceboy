@@ -69,7 +69,7 @@ void ppu::interrupt_line_check() {
     // only request interrupt on rising edge
     if (!prev_interrupt_line && current_interrupt_line) {
         // set bit 1 of IF, lcd interrupt
-        _set(IF, _get(IF) | 2); // 
+        _set(IF, _get(IF) | 2); //
     }
 }
 
@@ -650,6 +650,8 @@ void ppu::tick() {
         // pause until 456 T-cycles have finished
 
         // test increment LY 6 T-cycles earlier
+        // TODO: At line 153 LY=153 only lasts 4 dots before snapping to 0 for
+        // the rest of the line
         if (ticks == 451) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
@@ -720,7 +722,8 @@ void ppu::tick() {
     case ppu_mode::VBlank: {
         // vblank interrupt when we hit it the first time
         if (vblank_start) {
-            assert(_get(LY) == 144 && "VBlank should only be entered when LY=144!");
+            assert(_get(LY) == 144 &&
+                   "VBlank should only be entered when LY=144!");
 
             _set(IF, _get(IF) | 1);
             vblank_start = false;
@@ -762,5 +765,4 @@ void ppu::tick() {
 
     // stat interrupt every tick
     interrupt_line_check();
-
 }
