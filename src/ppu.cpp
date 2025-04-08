@@ -23,6 +23,13 @@ ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
 // update the ppu mode
 void ppu::update_ppu_mode(ppu_mode mode) {
     this->current_mode = mode;
+
+    if (mode == ppu_mode::VBlank) {
+        // first time we entered vblank
+        vblank_start = true;
+    }
+
+    // tell the mmu the ppu mode
     if (mode != ppu_mode::LCDToggledOn) {
         this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode);
     } else {
@@ -30,9 +37,46 @@ void ppu::update_ppu_mode(ppu_mode mode) {
     }
 }
 
-void ppu::reset_scanline() {
-    lcd_x = 0;
-    this->gb_mmu.stat_irq = false;
+void ppu::reset_scanline() { lcd_x = 0; }
+
+void ppu::interrupt_line_check() {
+    bool prev_interrupt_line = current_interrupt_line;
+
+    bool oam_scan = (current_mode == ppu_mode::OAM_Scan) && (_get(STAT) & 0x20);
+    // 0010 0000
+
+    bool hblank = (current_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
+    // 0000 1000
+
+    bool vblank = (current_mode == ppu_mode::VBlank) && (_get(STAT) & 0x10);
+    // 0001 0000
+
+    bool ly_lyc = (_get(LY) == _get(LYC)) && (_get(STAT) & 0x40);
+
+    current_interrupt_line = oam_scan || hblank || vblank || ly_lyc;
+
+    /*
+    bool prev_vblank_interrupt = current_vblank_interrupt;
+    current_vblank_interrupt = current_mode == ppu_mode::VBlank;
+    // vblank interrupt
+    if (!prev_vblank_interrupt && current_vblank_interrupt) {
+        // set bit 0 of IF, vblank interrupt
+        _set(IF, _get(IF) | 1);
+    }*/
+
+    if (ly_lyc) {
+        _set(STAT, _get(STAT) | 4); // sets coincidence flag to 1
+    }
+
+    else {
+        _set(STAT, _get(STAT) & ~4); // explicitely sets coincidence flag to 0
+    }
+
+    // only request interrupt on rising edge
+    if (!prev_interrupt_line && current_interrupt_line) {
+        // set bit 1 of IF, lcd interrupt
+        _set(IF, _get(IF) | 2); // 
+    }
 }
 
 sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
@@ -79,6 +123,10 @@ void ppu::tick() {
         assert(oam_search_counter == 0 &&
                this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
                "lcd toggled off outside of vblank!");
+
+        // interrupt line is always false when LCD is toggled off
+        current_interrupt_line = false;
+
         update_ppu_mode(ppu_mode::LCDToggledOn);
 
         return;
@@ -110,22 +158,16 @@ void ppu::tick() {
     // set stat to mode
     if (current_mode != ppu_mode::LCDToggledOn) {
         _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
-        // last_mode = current_mode;
     }
 
     else {
-        _set(STAT,
-             (_get(STAT) &
-              0xfc)); // for LCDToggledOn, the STAT mode should read 0 (HBlank)
-        // last_mode = ppu_mode::LCDToggledOn;
+        _set(STAT, (_get(STAT) & 0xfc));
+        // for LCDToggledOn, the STAT mode should read 0 (HBlank)
     }
 
     // oam search mode 2
     switch (current_mode) {
     case ppu_mode::LCDToggledOn: {
-
-        // TODO: once toggled on is STAT interrupt checked for mode 0?
-        last_mode = current_mode;
 
         assert(ticks <= 76 && "ticks must be <= 76 when lcd is toggled on ");
 
@@ -143,13 +185,6 @@ void ppu::tick() {
     case ppu_mode::OAM_Scan: {
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
-
-        // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 5 & 1)) {
-            _set(IF, _get(IF) | 2);
-        }
-
-        last_mode = current_mode;
 
         if ((ticks % 2 == 0)) { // 40 objects
 
@@ -262,9 +297,7 @@ void ppu::tick() {
         }
 
         else if (dummy_fetch) {
-            assert(ticks >= 81 && ticks <= 89 &&
-                   "dummy fetch should only be the first 8 ticks!");
-            // wait 6-8 ticks (172 or 174?)
+            // wait 6-8 ticks (172 or 174 for background tiles)
             dummy_ticks++;
 
             if (dummy_ticks < 8) {
@@ -619,12 +652,6 @@ void ppu::tick() {
 
     case ppu_mode::HBlank: {
         mode0_ticks++;
-        // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 3 & 1)) {
-            // if ((_get(STAT) >> 3 & 1)) {
-            _set(IF, _get(IF) | 2);
-        }
-        last_mode = current_mode;
 
         // pause until 456 T-cycles have finished
 
@@ -682,10 +709,6 @@ void ppu::tick() {
                     window.clear(sf::Color::White);
                     window.draw(frame);
                     window.display();
-
-                    // v-blank IF interrupt
-                    _set(IF, _get(IF) | 1);
-                    // end v-blank if interrupt
                 }
 
                 update_ppu_mode(ppu_mode::VBlank);
@@ -701,13 +724,13 @@ void ppu::tick() {
     }
 
     case ppu_mode::VBlank: {
+        // vblank interrupt when we hit it the first time
+        if (vblank_start) {
+            assert(_get(LY) == 144 && "VBlank should only be entered when LY=144!");
 
-        // set IF for interrupt
-        if ((this->last_mode != this->current_mode) && (_get(STAT) >> 4 & 1)) {
-            // if ((_get(STAT) >> 4 & 1)) {
-            _set(IF, _get(IF) | 2);
+            _set(IF, _get(IF) | 1);
+            vblank_start = false;
         }
-        last_mode = current_mode;
 
         // test incrementing LY 6 T-cycles earlier
         if (ticks == 451) {
@@ -744,16 +767,6 @@ void ppu::tick() {
     }
 
     // stat interrupt every tick
-    if (_get(LY) == _get(LYC)) {
-        if ((_get(STAT) >> 6) & 1) {
-            if (((_get(STAT) >> 2) & 1) == 0) {
-                _set(IF, _get(IF) | 2);
-                _set(STAT, _get(STAT) | 4);
-                std::cout << "";
-            }
-        }
-    } else {
-        _set(STAT, _get(STAT) & ~4); // sets coincidence bit to 0 explicitly
-        std::cout << "";
-    }
+    interrupt_line_check();
+
 }

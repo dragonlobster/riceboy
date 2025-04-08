@@ -63,6 +63,11 @@ class ppu {
 
     std::vector<sprite_fifo_pixel> sprite_fifo{}; // the whole pixel
 
+    // interrupts, stat handling
+    bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
+    bool vblank_start{false};
+    void interrupt_line_check();
+
     enum class ppu_mode {
         OAM_Scan = 2,
         Drawing = 3,

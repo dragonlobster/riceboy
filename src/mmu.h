@@ -126,9 +126,7 @@ class mmu {
     void handle_lcdc_write(uint8_t value);
     bool lcd_toggle{false};
     bool lcd_on{true}; // indicates whether lcd is on or off
-    // stat IRQ blocking (owned by PPU but CPU needs to check for interrupt handling)
     // TODO: fix timer and interrupt as individual classes later on
-    bool stat_irq{false};
 
     // ppu mode
     uint8_t ppu_mode{2};
