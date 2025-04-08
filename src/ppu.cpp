@@ -371,7 +371,6 @@ void ppu::tick() {
                 assert((*sprite_to_fetch).y >= 16 &&
                        "sprite to fetch y position is abnormal!");
 
-                // TODO: fetch sprite
                 uint16_t sprite_address{};
                 uint16_t line_offset{};
 
@@ -631,8 +630,6 @@ void ppu::tick() {
                    "ticks in drawing mode should be between 172 and 289!!");
                    */
 
-            // TODO: ticks are around 389 - 413, figure out why
-
             if (ticks > 400) {
                 std::cout << ticks << '\n';
             }
@@ -657,9 +654,6 @@ void ppu::tick() {
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
         }*/
-
-        // TODO: At line 153 LY=153 only lasts 4 dots before snapping to 0 for
-        // the rest of the line
 
         // wait 456 T-cycles (scanline ends there)
         if (ticks == 456) {
@@ -686,8 +680,6 @@ void ppu::tick() {
 
             // clear sprite buffer
             sprite_buffer.clear();
-
-            //_set(LY, _get(LY) + 1); // new scanline reached
 
             if (_get(LY) == 144) {
                 // hit VBlank for the first time
@@ -734,6 +726,14 @@ void ppu::tick() {
             vblank_start = false;
         }
 
+        // At line 153 LY=153 only lasts 4 dots before snapping to 0
+        // for the rest of the line
+        if (_get(LY) == 153 && ticks == 4) {
+            //
+            _set(LY, 0);
+            end_frame = true;
+        }
+
         // test incrementing LY 6 T-cycles earlier
         /*
         if (ticks == 451) {
@@ -744,6 +744,7 @@ void ppu::tick() {
 
         if (ticks == 456) {
             // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
+
             _set(LY, _get(LY) + 1); // new scanline reached
 
             reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
@@ -752,11 +753,12 @@ void ppu::tick() {
             // resets lcd_x to 0, and stat irq
             reset_scanline();
 
-            if (_get(LY) == 153) {
+            if (end_frame) {
                 // reset LY, window LY
                 _set(LY, 0);
                 window_ly = 0;
 
+                end_frame = false;
                 // set wy_condition = false since we are on the next frame
                 wy_condition = false;
 
