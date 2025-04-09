@@ -69,7 +69,17 @@ void ppu::interrupt_line_check() {
     // only request interrupt on rising edge
     if (!prev_interrupt_line && current_interrupt_line) {
         // set bit 1 of IF, lcd interrupt
-        _set(IF, _get(IF) | 2); //
+
+        // don't set a delay in mode 2 line 1 - 143
+        /*
+        if (current_mode == ppu_mode::OAM_Scan && _get(LY) >= 1 &&
+            _get(LY) <= 143) {
+            _set(IF, _get(IF) | 2); //
+        } else {
+            interrupt_delay = true;
+        }*/
+
+        interrupt_delay = true;
     }
 }
 
@@ -294,7 +304,7 @@ void ppu::tick() {
             // wait 6-8 ticks (172 or 174 for background tiles)
             dummy_ticks++;
 
-            if (dummy_ticks < 8) {
+            if (dummy_ticks < 6) {
                 return;
             }
             current_fetcher_mode =
@@ -648,12 +658,11 @@ void ppu::tick() {
 
         // test increment LY 6 T-cycles earlier
 
-        /*
-        if (ticks == 451) {
+        if (ticks == 456) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
-        }*/
+        }
 
         // wait 456 T-cycles (scanline ends there)
         if (ticks == 456) {
@@ -662,7 +671,7 @@ void ppu::tick() {
             assert(mode0_ticks + mode3_ticks + 80 == 456 &&
                    "timing for ticks in the scnaline is not correct!");
 
-            _set(LY, _get(LY) + 1); // new scanline reached
+            //_set(LY, _get(LY) + 1); // new scanline reached
 
             if (fetch_window) {
                 window_ly++;
@@ -729,24 +738,19 @@ void ppu::tick() {
         // At line 153 LY=153 only lasts 4 dots before snapping to 0
         // for the rest of the line
         if (_get(LY) == 153 && ticks == 4) {
-            //
             _set(LY, 0);
             end_frame = true;
         }
 
         // test incrementing LY 6 T-cycles earlier
-        /*
-        if (ticks == 451) {
+        if (ticks == 456 && !end_frame) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
-        }*/
+        }
 
         if (ticks == 456) {
             // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
-
-            _set(LY, _get(LY) + 1); // new scanline reached
-
             reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
                            // mode3_ticks, mode0_ticks
 
@@ -755,7 +759,7 @@ void ppu::tick() {
 
             if (end_frame) {
                 // reset LY, window LY
-                _set(LY, 0);
+                //_set(LY, 0);
                 window_ly = 0;
 
                 end_frame = false;
@@ -765,12 +769,30 @@ void ppu::tick() {
                 update_ppu_mode(ppu_mode::OAM_Scan);
 
             } // after 10 scanlines
+
+            /*
+            else {
+                _set(LY, _get(LY) + 1); // new scanline reached
+            }*/
         }
 
         break;
     }
     }
 
-    // stat interrupt every tick
+    interrupt_ticks++;
+    if (interrupt_ticks < 4) {
+        return;
+    }
+    interrupt_ticks = 0;
+
+    // interrupts are delayed 4 t-cycles
+    if (interrupt_delay) {
+        _set(IF, _get(IF) | 2);
+        interrupt_delay = false;
+    }
+
+    assert(interrupt_delay == false && "interrupt delay should be false here");
+    // stat interrupt every M-cycle
     interrupt_line_check();
 }

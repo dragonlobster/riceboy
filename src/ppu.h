@@ -23,6 +23,10 @@ class ppu {
     uint16_t mode0_ticks{0}; // how many ticks mode 0 hblank takes
     void reset_ticks();
 
+    // separate from the other ticks, aligns interrupt with T-cycles
+    uint16_t interrupt_ticks{0};
+    uint16_t interrupt_delay_ticks{4};
+
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
     uint8_t oam_search_counter{0};          // count oam searched
@@ -68,6 +72,7 @@ class ppu {
 
     // interrupts, stat handling
     bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
+    bool interrupt_delay{false}; // set IF flag 4 cycles after if rising edge occured on interrupt line
     bool vblank_start{false};
     void interrupt_line_check();
 
@@ -122,6 +127,9 @@ class ppu {
     uint16_t WX{0xff4b};
     uint16_t WY{0xff4a};
     uint16_t IF{0xff0f};
+
+    // internal LY, (real LY) different from LY register value
+    uint8_t internal_ly{};
 
     // pixel drawing
     sf::Image lcd_frame_image{};

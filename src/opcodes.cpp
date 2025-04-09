@@ -128,7 +128,6 @@ int cpu::handle_opcode(const uint8_t opcode) {
     case 1:
         if (z == 6 && y == 6) {
             // HALT
-            // TODO: halt bug
             if (this->ime) {
                 this->halt = true;
             } else {
