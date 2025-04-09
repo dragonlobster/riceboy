@@ -304,7 +304,7 @@ void ppu::tick() {
             // wait 6-8 ticks (172 or 174 for background tiles)
             dummy_ticks++;
 
-            if (dummy_ticks < 6) {
+            if (dummy_ticks < 8) {
                 return;
             }
             current_fetcher_mode =
@@ -780,19 +780,20 @@ void ppu::tick() {
     }
     }
 
+    if (!interrupt_delay) {
+        // stat interrupt every M-cycle
+        interrupt_line_check();
+    }
+
     interrupt_ticks++;
     if (interrupt_ticks < 4) {
         return;
     }
     interrupt_ticks = 0;
 
-    // interrupts are delayed 4 t-cycles
+    // interrupts are delayed to the nearest upper 1 M-cycle
     if (interrupt_delay) {
         _set(IF, _get(IF) | 2);
         interrupt_delay = false;
     }
-
-    assert(interrupt_delay == false && "interrupt delay should be false here");
-    // stat interrupt every M-cycle
-    interrupt_line_check();
 }
