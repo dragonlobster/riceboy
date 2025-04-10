@@ -42,7 +42,7 @@ void ppu::reset_scanline() { lcd_x = 0; }
 void ppu::interrupt_line_check() {
     bool prev_interrupt_line = current_interrupt_line;
 
-    bool oam_scan = (current_mode == ppu_mode::OAM_Scan) && (_get(STAT) & 0x20);
+    bool oam_scan = (current_mode == ppu_mode::OAM_Scan) && (_get(STAT) & 0x20); // only trigger the delay the tick after the mode starts
     // 0010 0000
 
     bool hblank = (current_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
@@ -153,6 +153,26 @@ void ppu::tick() {
 
     ticks++;
     // 1 T-cycle
+
+    // handle interrupt delay from previous cycle, should be read by CPU on the next M-cycle
+
+    if (ticks % 4 == 0 && interrupt_delay && _get(SCX) == 0) {
+        _set(IF, _get(IF) | 2);
+        interrupt_delay = false;
+    }
+
+    else if (interrupt_delay) {
+        if (ticks % 4 == 0) {
+            interrupt_ticks++;
+        }
+
+        if (interrupt_ticks == 4) {
+            _set(IF, _get(IF) | 2);
+            interrupt_delay = false;
+
+            interrupt_ticks = 0;
+        }
+    }
 
     // wy == ly every tick
     if (!wy_condition) {
@@ -561,6 +581,15 @@ void ppu::tick() {
                     if (lcd_x == 0 && _get(SCX) % 8) {
                         scx_discard_count = _get(SCX) % 8;
 
+                        /*
+                        if (scx_discard_count >= 1 && scx_discard_count <= 4) {
+                            interrupt_delay_ticks += 4;
+                        }
+
+                        if (scx_discard_count >= 5 && scx_discard_count <= 7) {
+                            interrupt_delay_ticks += 8;
+                        }*/
+
                         background_fifo.pop_back();
                         scx_discard_count--;
                         return; // return if we need to discard pixels (+1 dot),
@@ -781,19 +810,35 @@ void ppu::tick() {
     }
 
     if (!interrupt_delay) {
-        // stat interrupt every M-cycle
+        // stat interrupt every T-cycle
         interrupt_line_check();
     }
 
+    /*
     interrupt_ticks++;
+
     if (interrupt_ticks < 4) {
         return;
     }
     interrupt_ticks = 0;
 
-    // interrupts are delayed to the nearest upper 1 M-cycle
     if (interrupt_delay) {
         _set(IF, _get(IF) | 2);
         interrupt_delay = false;
+    }*/
+
+
+    /*
+    interrupt_ticks++;
+    if (interrupt_ticks < 8) {
+        return;
     }
+    interrupt_ticks = 0;
+
+    // interrupts are delayed to the nearest upper 1 M-cycle (clock 0, this value next clock reaches CPU)
+    if (interrupt_delay) {
+        _set(IF, _get(IF) | 2);
+        interrupt_delay = false;
+    }*/
+
 }
