@@ -69,6 +69,7 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
     };
 
+
     std::array<std::string, 1> mooneye_cpu{
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"};
 

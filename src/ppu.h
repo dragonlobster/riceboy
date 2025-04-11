@@ -25,7 +25,6 @@ class ppu {
 
     // separate from the other ticks, aligns interrupt with T-cycles
     uint16_t interrupt_ticks{0};
-    uint16_t interrupt_delay_ticks{4};
 
     // 2 fifos
     std::vector<uint8_t> background_fifo{}; // 2 bits
@@ -72,7 +71,10 @@ class ppu {
 
     // interrupts, stat handling
     bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
-    bool interrupt_delay{false}; // set IF flag 4 cycles after if rising edge occured on interrupt line
+    uint8_t interrupt_t_cycle{0}; // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
+    uint8_t interrupt_m_cycle{0}; // the exact M-cycle (1-114) that the rising edge occured
+    //uint8_t interrupt_delay{0}; // set the interrupt IF later on
+
     bool vblank_start{false};
     void interrupt_line_check();
 

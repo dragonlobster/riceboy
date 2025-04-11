@@ -42,7 +42,10 @@ void ppu::reset_scanline() { lcd_x = 0; }
 void ppu::interrupt_line_check() {
     bool prev_interrupt_line = current_interrupt_line;
 
-    bool oam_scan = (current_mode == ppu_mode::OAM_Scan) && (_get(STAT) & 0x20); // only trigger the delay the tick after the mode starts
+    bool oam_scan =
+        (current_mode == ppu_mode::OAM_Scan) &&
+        (_get(STAT) &
+         0x20); // only trigger the delay the tick after the mode starts
     // 0010 0000
 
     bool hblank = (current_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
@@ -68,18 +71,12 @@ void ppu::interrupt_line_check() {
 
     // only request interrupt on rising edge
     if (!prev_interrupt_line && current_interrupt_line) {
-        // set bit 1 of IF, lcd interrupt
+        // prepare to set IF bit for lcd interrupt
 
-        // don't set a delay in mode 2 line 1 - 143
-        /*
-        if (current_mode == ppu_mode::OAM_Scan && _get(LY) >= 1 &&
-            _get(LY) <= 143) {
-            _set(IF, _get(IF) | 2); //
-        } else {
-            interrupt_delay = true;
-        }*/
-
-        interrupt_delay = true;
+        // calculation for M-cycle group the interrupt is recognized
+        interrupt_m_cycle = ((ticks - 1) >> 2) + 1;
+        // calculation for the T-cycle group the interrupt recognized
+        interrupt_t_cycle = ((ticks - 1) & 3) + 1;
     }
 }
 
@@ -154,25 +151,31 @@ void ppu::tick() {
     ticks++;
     // 1 T-cycle
 
-    // handle interrupt delay from previous cycle, should be read by CPU on the next M-cycle
+    // grouping of M cycles 1 - 114 used for interrupt delay
+    uint8_t m_cycle_group = ((ticks - 1) >> 2) + 1;
 
-    if (ticks % 4 == 0 && interrupt_delay && _get(SCX) == 0) {
+    // if delay is 1, interrupt was recognized at T1 or T2, so on the next T4 we
+    // set IF
+    if ((interrupt_t_cycle == 1 || interrupt_t_cycle == 2) && ticks % 4 == 0) {
+        // assert we are in the same M-cycle
+        assert(m_cycle_group == interrupt_m_cycle &&
+               "we didn't set IF bit in the correct M cycle!");
+
         _set(IF, _get(IF) | 2);
-        interrupt_delay = false;
+        interrupt_t_cycle = 0; // reset interrupt t cycle
+        interrupt_m_cycle = 0; // reset interrupt m cycle
     }
 
-    else if (interrupt_delay) {
-        if (ticks % 4 == 0) {
-            interrupt_ticks++;
-        }
-
-        if (interrupt_ticks == 4) {
-            _set(IF, _get(IF) | 2);
-            interrupt_delay = false;
-
-            interrupt_ticks = 0;
-        }
+    else if ((interrupt_t_cycle == 3 || interrupt_t_cycle == 4) &&
+             interrupt_m_cycle + 2 == m_cycle_group) {
+        _set(IF, _get(IF) | 2);
+        interrupt_t_cycle = 0; // reset interrupt t cycle
+        interrupt_m_cycle = 0; // reset interrupt m cycle
     }
+
+    // if delay is 2, interrupt was recognized at T3 or T4, we need to delay
+    // setting IF to the M-cycle even after this one (i think this is because
+    // the CPU reads IF at T3)
 
     // wy == ly every tick
     if (!wy_condition) {
@@ -563,6 +566,9 @@ void ppu::tick() {
                         current_fetcher_mode =
                             fetcher_mode::FetchTileNo; // TODO: check timing
                     }
+
+                    fetcher_ticks = 0;
+
                     return; // rendering is paused when discarding scx % 8
                             // pixels
                 }
@@ -809,8 +815,8 @@ void ppu::tick() {
     }
     }
 
-    if (!interrupt_delay) {
-        // stat interrupt every T-cycle
+    if (!interrupt_t_cycle && !interrupt_m_cycle) {
+        //  stat interrupt every T-cycle
         interrupt_line_check();
     }
 
@@ -827,7 +833,6 @@ void ppu::tick() {
         interrupt_delay = false;
     }*/
 
-
     /*
     interrupt_ticks++;
     if (interrupt_ticks < 8) {
@@ -835,10 +840,8 @@ void ppu::tick() {
     }
     interrupt_ticks = 0;
 
-    // interrupts are delayed to the nearest upper 1 M-cycle (clock 0, this value next clock reaches CPU)
-    if (interrupt_delay) {
-        _set(IF, _get(IF) | 2);
+    // interrupts are delayed to the nearest upper 1 M-cycle (clock 0, this
+    value next clock reaches CPU) if (interrupt_delay) { _set(IF, _get(IF) | 2);
         interrupt_delay = false;
     }*/
-
 }
