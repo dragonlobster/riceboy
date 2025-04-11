@@ -37,7 +37,10 @@ void ppu::update_ppu_mode(ppu_mode mode) {
     }
 }
 
-void ppu::reset_scanline() { lcd_x = 0; }
+void ppu::reset_scanline() {
+    lcd_x = 0;
+    scx_discard = true;
+}
 
 void ppu::interrupt_line_check() {
     bool prev_interrupt_line = current_interrupt_line;
@@ -554,6 +557,7 @@ void ppu::tick() {
             }
 
             else {
+                /*
                 if (scx_discard_count > 0) {
                     assert(lcd_x == 0 &&
                            "lcd x must be 0 when discarding scx % 8 "
@@ -568,10 +572,9 @@ void ppu::tick() {
                     }
 
                     fetcher_ticks = 0;
-
                     return; // rendering is paused when discarding scx % 8
                             // pixels
-                }
+                }*/
 
                 if (background_fifo.empty()) {
                     // push to background fifo
@@ -582,19 +585,12 @@ void ppu::tick() {
                     }
                     tile_index++;
 
+                    current_fetcher_mode = fetcher_mode::FetchTileNo;
                     fetcher_ticks = 0;
 
+                    /*
                     if (lcd_x == 0 && _get(SCX) % 8) {
                         scx_discard_count = _get(SCX) % 8;
-
-                        /*
-                        if (scx_discard_count >= 1 && scx_discard_count <= 4) {
-                            interrupt_delay_ticks += 4;
-                        }
-
-                        if (scx_discard_count >= 5 && scx_discard_count <= 7) {
-                            interrupt_delay_ticks += 8;
-                        }*/
 
                         background_fifo.pop_back();
                         scx_discard_count--;
@@ -604,7 +600,7 @@ void ppu::tick() {
 
                     else {
                         current_fetcher_mode = fetcher_mode::FetchTileNo;
-                    }
+                    }*/
                 }
             }
             break;
@@ -614,13 +610,22 @@ void ppu::tick() {
         // push pixels to LCD, 1 pixel per dot
         if (!background_fifo.empty() && !fetch_sprite) {
 
-            // fine x (scx) takes 1 dot per removal
-            /*
-            if (lcd_x == 0) {
-                for (unsigned int i = 0; i < _get(SCX) % 8; ++i) {
-                    background_fifo.pop_back();
+            // discard scx (one per dot)
+            if (lcd_x == 0 && (_get(SCX) % 8) && scx_discard) {
+
+                if (!scx_discard_count) {
+                    scx_discard_count = _get(SCX) % 8;
                 }
-            }*/
+
+                background_fifo.pop_back();
+                scx_discard_count--;
+
+                if (scx_discard_count == 0) {
+                    scx_discard = false;
+                }
+
+                return;
+            }
 
             // get the background pixel
             uint8_t bg_pixel = background_fifo.back();

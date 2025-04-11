@@ -50,6 +50,7 @@ class ppu {
 
     // scx mod 8 bg pixels discard
     uint8_t scx_discard_count{0};
+    bool scx_discard{true}; // keep track of if we did the discard already
 
     // boolean value which VBlank checks to end the frame
     bool end_frame{false};
@@ -71,9 +72,11 @@ class ppu {
 
     // interrupts, stat handling
     bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
-    uint8_t interrupt_t_cycle{0}; // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
-    uint8_t interrupt_m_cycle{0}; // the exact M-cycle (1-114) that the rising edge occured
-    //uint8_t interrupt_delay{0}; // set the interrupt IF later on
+    uint8_t interrupt_t_cycle{
+        0}; // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
+    uint8_t interrupt_m_cycle{
+        0}; // the exact M-cycle (1-114) that the rising edge occured
+    // uint8_t interrupt_delay{0}; // set the interrupt IF later on
 
     bool vblank_start{false};
     void interrupt_line_check();
