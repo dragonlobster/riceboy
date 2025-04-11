@@ -557,25 +557,6 @@ void ppu::tick() {
             }
 
             else {
-                /*
-                if (scx_discard_count > 0) {
-                    assert(lcd_x == 0 &&
-                           "lcd x must be 0 when discarding scx % 8 "
-                           "pixels from background fifo!");
-
-                    background_fifo.pop_back();
-                    scx_discard_count--;
-
-                    if (scx_discard_count == 0) {
-                        current_fetcher_mode =
-                            fetcher_mode::FetchTileNo; // TODO: check timing
-                    }
-
-                    fetcher_ticks = 0;
-                    return; // rendering is paused when discarding scx % 8
-                            // pixels
-                }*/
-
                 if (background_fifo.empty()) {
                     // push to background fifo
                     for (unsigned int i = 0; i < 8; ++i) {
@@ -587,20 +568,6 @@ void ppu::tick() {
 
                     current_fetcher_mode = fetcher_mode::FetchTileNo;
                     fetcher_ticks = 0;
-
-                    /*
-                    if (lcd_x == 0 && _get(SCX) % 8) {
-                        scx_discard_count = _get(SCX) % 8;
-
-                        background_fifo.pop_back();
-                        scx_discard_count--;
-                        return; // return if we need to discard pixels (+1 dot),
-                                // then go  to discard pixel mode to keep going
-                    }
-
-                    else {
-                        current_fetcher_mode = fetcher_mode::FetchTileNo;
-                    }*/
                 }
             }
             break;
