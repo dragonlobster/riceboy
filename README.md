@@ -54,6 +54,17 @@ tima_reload | :white_check_mark: |
 tima_write | :white_check_mark: |
 tma_write | :white_check_mark: |
 
+#### acceptance: ppu
+Test | Pass | Remarks
+:------------ | :-------------| :-------------|
+hblank_ly_scx_timing-GS | :white_check_mark: | see Findings
+intr_1_2_timing-GS | :white_large_square: |
+intr_2_0_timing | :white_check_mark: |
+intr_2_mode3_timing | :white_large_square: |
+lcdon_write_timing-GS | :white_large_square: |
+lcdon_timing-dmgABCmgbS | :white_large_square: |
+stat_irq_blocking | :white_check_mark: |
+
 #### acceptance: manual-only
 Test | Pass | Remarks
 :------------ | :-------------| :-------------|

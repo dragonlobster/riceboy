@@ -34,8 +34,8 @@ int main() {
         "BOOT/blargg/mem_timing-2/mem_timing.gb",
         "BOOT/blargg/oam_bug/oam_bug.gb", // oam corruption bug not implemented
                                           // yet
-        "BOOT/blargg/oam_bug/rom_singles/1-lcd_sync.gb", // not implemented yet
-        "BOOT/blargg/halt_bug.gb"};                      // not implemented yet
+        "BOOT/blargg/oam_bug/rom_singles/1-lcd_sync.gb", // pass
+        "BOOT/blargg/halt_bug.gb"};                      // pass
 
     std::array<std::string, 13> mooneye_timing{
         "BOOT/mooneye-gb_hwtests/acceptance/timer/div_write.gb",
@@ -56,16 +56,16 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
     std::array<std::string, 11> mooneye_ppu{
-        "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/sources-dmgABCmgbS.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb", // fail
+        "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/sources-dmgABCmgbS.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb", // fail
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb",
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb",
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // fail
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
     };
 
@@ -81,9 +81,9 @@ int main() {
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[4]);
-    // riceboy->gb_cpu.prepare_rom(mooneye_timing[1]);
-    // riceboy->gb_cpu.prepare_rom(blargg[0]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[10]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
