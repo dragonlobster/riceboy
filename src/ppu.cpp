@@ -55,8 +55,9 @@ void ppu::interrupt_line_check() {
     // 0000 1000
 
     // bit 5 (& 0x20) applies to both VBlank and OAM_Scan
-    bool vblank = (current_mode == ppu_mode::VBlank) &&
-                  ((_get(STAT) & 0x10) || _get(STAT) & 0x20);
+    bool vblank =
+        (current_mode == ppu_mode::VBlank) &&
+        ((_get(STAT) & 0x10) || ((_get(STAT) & 0x20) && (_get(LY) == 144)));
     // 0001 0000, 0010 0000
 
     bool ly_lyc = (_get(LY) == _get(LYC)) && (_get(STAT) & 0x40);
@@ -72,14 +73,26 @@ void ppu::interrupt_line_check() {
         _set(STAT, _get(STAT) & ~4); // explicitely sets coincidence flag to 0
     }
 
-    // only request interrupt on rising edge
     if (!prev_interrupt_line && current_interrupt_line) {
-        // prepare to set IF bit for lcd interrupt
+        // rising edge occured, let's check each case to set the delay
 
-        // calculation for M-cycle group the interrupt is recognized
-        interrupt_m_cycle = ((ticks - 1) >> 2) + 1;
-        // calculation for the T-cycle group the interrupt recognized
-        interrupt_t_cycle = ((ticks - 1) & 3) + 1;
+        /*
+        if (!hblank) {
+            _set(IF, _get(IF) | 2);
+        }*/
+
+        if (!hblank) {
+            _set(IF, _get(IF) | 2);
+        }
+
+        else {
+            // prepare to set IF bit for lcd interrupt
+
+            // calculation for M-cycle group the interrupt is recognized
+            interrupt_m_cycle = ((ticks - 1) >> 2) + 1;
+            // calculation for the T-cycle group the interrupt recognized
+            interrupt_t_cycle = ((ticks - 1) & 3) + 1;
+        }
     }
 }
 

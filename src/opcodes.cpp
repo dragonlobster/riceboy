@@ -130,11 +130,13 @@ int cpu::handle_opcode(const uint8_t opcode) {
             // HALT
             if (this->ime) {
                 this->halt = true;
+                this->gb_mmu->cpu_halted = true;
             } else {
                 // if there is no interrupt, halt is entered
                 // ie & if & 0x1f
                 if (!(_get(0xffff) & _get(0xff0f) & 0x1f)) {
                     this->halt = true;
+                    this->gb_mmu->cpu_halted = true;
                 }
 
                 else {

@@ -2146,6 +2146,7 @@ void cpu::handle_interrupts() {
 
     if ((_ie & _if & 0x1f) && this->halt) {
         this->halt = false;
+        this->gb_mmu->cpu_halted = false;
     }
 
     // NOTE: This runs before cpu write to the interrupt (so it is based on

@@ -131,6 +131,9 @@ class mmu {
     // ppu mode
     uint8_t ppu_mode{2};
 
+    // cpu needs to tell us if it halted so the ppu can know
+    bool cpu_halted{false};
+
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
