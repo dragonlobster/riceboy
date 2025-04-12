@@ -89,7 +89,7 @@ Mooneye's ppu timing tests hang | The PPU didn't set the IF bit correctly becaus
 Mooneye's oam dma reg_read test was failing | I accidentally didn't process writes to FF46, or any address that wasn't in the DMA source bus because I only focused on writing to the DMA source bus the current DMA transfer address (which is correct). 
 Can't pass blargg's oam_bug 1-lcd_sync or mooneyes lcdon_timing |
 Mooneye's hblank_ly_scx_timing | The test works by executing HALT, waiting for a mode 0 interrupt, and executing a certain number of cycles while expecting LY to either stay the same, or increment. There are actually 4 tests for each SCX value (SCX = 0, 1, 2, 3, 4, 5, 6, 7). (more information in Findings section).
-SCX Timing | if SCX % 8 > 0, SCX % 8 number of pixels need to pop out of the background fifo 
+SCX Timing | if SCX % 8 > 0, SCX % 8 number of pixels need to pop out of the background fifo. Each pop takes 1 dot, and rendering is paused during this time. Thus, Mode 3 should be extended by SCX % 8 dots naturally, but mine was extended further at SCX % 8 > 3. The reason was because I mistakenly paused the pixel fetcher as well, which is incorrect. For example, at SCX % 8 = 7, if I paused the pixel fetcher while discarding SCX pixels, I would have 1 dot left to fill my background fifo (which is not enough time), which means the LCD is incremented and waiting for the background fifo to be filled while unable to display pixels, which incorrectly extends my Mode 3.
 
 ## Findings [UNVERIFIED]
 ### Mooneye's hblank_ly_scx_timing
