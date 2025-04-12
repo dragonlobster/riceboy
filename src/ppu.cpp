@@ -791,29 +791,4 @@ void ppu::tick() {
         //  stat interrupt every T-cycle
         interrupt_line_check();
     }
-
-    /*
-    interrupt_ticks++;
-
-    if (interrupt_ticks < 4) {
-        return;
-    }
-    interrupt_ticks = 0;
-
-    if (interrupt_delay) {
-        _set(IF, _get(IF) | 2);
-        interrupt_delay = false;
-    }*/
-
-    /*
-    interrupt_ticks++;
-    if (interrupt_ticks < 8) {
-        return;
-    }
-    interrupt_ticks = 0;
-
-    // interrupts are delayed to the nearest upper 1 M-cycle (clock 0, this
-    value next clock reaches CPU) if (interrupt_delay) { _set(IF, _get(IF) | 2);
-        interrupt_delay = false;
-    }*/
 }
