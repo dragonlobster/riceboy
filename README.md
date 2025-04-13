@@ -57,13 +57,14 @@ tma_write | :white_check_mark: |
 #### acceptance: ppu
 Test | Pass | Remarks
 :------------ | :-------------| :-------------|
-hblank_ly_scx_timing-GS | :white_check_mark: | see Findings
-intr_1_2_timing-GS | :white_large_square: |
+hblank_ly_scx_timing-GS | :white_check_mark: |
+intr_1_2_timing-GS | :white_check_mark: |
 intr_2_0_timing | :white_check_mark: |
-intr_2_mode3_timing | :white_large_square: |
+intr_2_mode3_timing | :white_check_mark_: |
 lcdon_write_timing-GS | :white_large_square: |
 lcdon_timing-dmgABCmgbS | :white_large_square: |
 stat_irq_blocking | :white_check_mark: |
+vblank_stat_intr-GS | :white_check_mark: |
 
 #### acceptance: manual-only
 Test | Pass | Remarks
@@ -99,100 +100,6 @@ Mooneye's sprite priority test - rectangles incorrect | Sprite FIFO is always fi
 Mooneye's ppu timing tests hang | The PPU didn't set the IF bit correctly because it was comparing last PPU mode with current PPU mode to set the IF bit (but the mode didn't change), so the emulator was stuck in HALT mode after EI HALT.
 Mooneye's oam dma reg_read test was failing | I accidentally didn't process writes to FF46, or any address that wasn't in the DMA source bus because I only focused on writing to the DMA source bus the current DMA transfer address (which is correct). 
 Can't pass blargg's oam_bug 1-lcd_sync or mooneyes lcdon_timing |
-Mooneye's hblank_ly_scx_timing | The test works by executing HALT, waiting for a mode 0 interrupt, and executing a certain number of cycles while expecting LY to either stay the same, or increment. There are actually 4 tests for each SCX value (SCX = 0, 1, 2, 3, 4, 5, 6, 7). (more information in Findings section).
+Mooneye's hblank_ly_scx_timing | The test works by executing HALT, waiting for a mode 0 interrupt, and executing a certain number of cycles while expecting LY to either stay the same, or increment. There are actually 4 tests for each SCX value (SCX = 0, 1, 2, 3, 4, 5, 6, 7). I was able to pass by just incrementing LY at frame dot 452 instead of dot 456. The other way I was able to pass was by delaying IF bit set to the next M-cycle* (see commit 3b32613 for details) but this fails some of the mooneye intr timing tests.
 SCX Timing | if SCX % 8 > 0, SCX % 8 number of pixels need to pop out of the background fifo. Each pop takes 1 dot, and rendering is paused during this time. Thus, Mode 3 should be extended by SCX % 8 dots naturally, but mine was extended further at SCX % 8 > 3. The reason was because I mistakenly paused the pixel fetcher as well, which is incorrect. For example, at SCX % 8 = 7, if I paused the pixel fetcher while discarding SCX pixels, I would have 1 dot left to fill my background fifo (which is not enough time), which means the LCD is incremented and waiting for the background fifo to be filled while unable to display pixels, which incorrectly extends my Mode 3.
 
-## Findings [UNVERIFIED]
-### Mooneye's hblank_ly_scx_timing
-This test only handle background tiles. There are 4 tests for each SCX case: `SCX = 0 - 7`. This can be verified by observing how many times `HALT` is executed at each `SCX` value (despite the source code suggesting 2 tests per `SCX`). The timing of `Mode 0 HBlank` `0x48` interrupt is important. Note that the following assumes a `174` dot default `Mode 3 Drawing` and `LY` increment at dot `456`. We will refer dots as the absolute dot of the current frame of `456` dots unless state otherwise. T-cycle and dots will be used interchangeably.
-
-#### SCX = 0
-* `HALT` is executed
-* `Mode 3 Drawing` should last `174` dots (dot `254`/`456` of the frame). We will refer dots as the absolute dot of the current frame of `456` dots from here on.
-* At the moment that dot `254` ends, we enter `Mode 0 HBlank` the interrupt line should have a rising edge, but the `IF` bit for the `Mode 0 HBlank` interrupt should be set at a later time will be explained:
-* Technically, the real hardware DMG samples the `IF` bit at a `T3R` (if we are getting into edge clocks), but for the simplicity, we can say that the CPU will process the `IF` bit **AT THE 2nd** `T3` that follows, which means at dot `259`. The T-cycles are the following: 
-
-    M-Cycle A
-    * `T1` - `253` 
-    * `T2` - `254` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-    * `T3` - `255` 
-    * `T4` - `256`
-
-    M-Cycle B
-    * `T1` - `257` 
-    * `T2` - `258` 
-    * `T3` - `259` - CPU samples the `IF` bit here
-    * `T4` - `260`
-
-  However, with an M-cycle accurate CPU it is only important to process this interrupt at `T4` - `260` (The timing is potentially different for other `SCX` values, will be explained in later sections). Therefore, the PPU can set the `IF` bit either at `T1`, `T2`, or `T3` of M-Cycle B.
-
-* The first `SCX = 0` tests that after 49 M-cycles (`196` T-cycles), we should be **exactly** at dot `456` of the frame, and loaded `LY` into register `A` RIGHT BEFORE incrementing `LY`. This is the exact sequences:
-
-    * Dot `260` - `Mode 0 HBlank` interrupt processed by CPU (explained above)
-    * Interrupt takes `20` T-cycles, so now are on dot `280`.
-    * `NOPs` and other instructions run for `168` T-cycles, we are now on dot `448`.
-    * `LD (HL, A)` takes `8` T-cycles, so we loaded the old `LY` (0x41) into register `A` RIGHT before we increment `LY`. a `CP D` operation followed by a `JP NZ` occurs to see that we loaded the *correct* value into `A`, otherwise we will jump to printing the failure onto the screen.
-
-    Note that this first test is not documented in the source code.
-
-* The second `SCX = 0` is almost the same, except that an Extra `NOP` is executed before `LD (HL, A)`:
-
-    * Dot `260` - `Mode 0 HBlank` interrupt processed by CPU (explained above)
-    * Interrupt takes `20` T-cycles, so now are on dot `280`.
-    * `NOPs` and other instructions run for `172` T-cycles, we are now on dot `452`.
-    * `LD (HL, A)` takes `8` T-cycles. Note that the actual value load occurs at the *last* 4 T-Cycles, meaning that by dot `460` `LY` would have already incremented, so we loaded the *new* `LY` (`0x42`) into register `A`.
-
-    There are 2 more tests but the details of the first 2 are sufficient to pass the last 2.
-
-#### SCX = 1 - 4
-
-Here, `Mode 3 Drawing` lasts `1` - `4` dots longer, therefore the `Mode 0 HBlank` interrupt also is processed at a later point. Here are the timings:
-
-M-Cycle A
-* `T1` - `253` 
-* `T2` - `254`
-* `T3` - `255`: if `SCX = 1` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-* `T4` - `256`: if `SCX = 2` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-
-
-M-Cycle B
-* `T1` - `257` - if `SCX = 3` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-* `T2` - `258` - if `SCX = 4` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-* `T3` - `259`
-* `T4` - `260`
-
-M-Cycle C
-* `T1` - `261`
-* `T2` - `262`
-* `T3` - `263` - CPU samples the `IF` bit here
-* `T4` - `264`
-
-Is it confusing? If we followed the rule earlier, it makes sense: the CPU samples the `IF` bit **AT THE 2nd** `T3` **THAT FOLLOWS**, even if `Mode 0 HBlank` starts *exactly* at a `T3`. This explains why the test expects the same cycles between `Mode 0 HBlank` interrupt and `LY` increment for values `SCX = 1 - 4`. 
-
-Remember that for an M-cycle accurate CPU, it is only important that the CPU processes the interrupt at `T4` - `264`.
-
-#### SCX = 5 - 7
-M-Cycle A
-* `T1` - `253` 
-* `T2` - `254`
-* `T3` - `255`
-* `T4` - `256`
-
-
-M-Cycle B
-* `T1` - `257`
-* `T2` - `258`
-* `T3` - `259`: if `SCX = 5` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-* `T4` - `260`: if `SCX = 6` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-
-M-Cycle C
-* `T1` - `261`: if `SCX = 7` - `Mode 0 HBlank` starts, interrupt line rising edge recognized
-* `T2` - `262`
-* `T3` - `263`
-* `T4` - `264`
-
-M-Cycle D
-* `T1` - `265`
-* `T2` - `266`
-* `T3` - `267` - CPU samples the `IF` bit here
-* `T4` - `268`

@@ -72,11 +72,16 @@ class ppu {
 
     // interrupts, stat handling
     bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
-    uint8_t interrupt_t_cycle{
-        0}; // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
-    uint8_t interrupt_m_cycle{
-        0}; // the exact M-cycle (1-114) that the rising edge occured
+
+    uint8_t interrupt_t_cycle{0};
+    // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
+    uint8_t interrupt_m_cycle{0};
+    // the exact M-cycle (1-114) that the rising edge occured
     // uint8_t interrupt_delay{0}; // set the interrupt IF later on
+    // 255 means off
+
+    // calculate t and m cycles of current tick
+    std::tuple<uint8_t, uint8_t> get_current_cycle();
 
     bool vblank_start{false};
     void interrupt_line_check();
@@ -96,8 +101,12 @@ class ppu {
         PushToFIFO
     };
 
+    // setting stat.mode might be delayed
     ppu_mode current_mode{ppu_mode::OAM_Scan};
-    ppu_mode last_mode{ppu_mode::OAM_Scan};
+    // the exact T cycle mode changes (1, 2, 3, 4)
+    uint8_t mode_t_cycle{0};
+    // the M-cycle group (1-114) that mode changed
+    uint8_t mode_m_cycle{0};
 
     fetcher_mode current_fetcher_mode{fetcher_mode::FetchTileNo};
 

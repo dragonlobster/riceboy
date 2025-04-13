@@ -45,18 +45,20 @@ void ppu::reset_scanline() {
 void ppu::interrupt_line_check() {
     bool prev_interrupt_line = current_interrupt_line;
 
+    ppu_mode stat_mode = static_cast<ppu_mode>(_get(STAT) & 3);
+
     bool oam_scan =
-        (current_mode == ppu_mode::OAM_Scan) &&
+        (stat_mode == ppu_mode::OAM_Scan) &&
         (_get(STAT) &
          0x20); // only trigger the delay the tick after the mode starts
     // 0010 0000
 
-    bool hblank = (current_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
+    bool hblank = (stat_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
     // 0000 1000
 
     // bit 5 (& 0x20) applies to both VBlank and OAM_Scan
     bool vblank =
-        (current_mode == ppu_mode::VBlank) &&
+        (stat_mode == ppu_mode::VBlank) &&
         ((_get(STAT) & 0x10) || ((_get(STAT) & 0x20) && (_get(LY) == 144)));
     // 0001 0000, 0010 0000
 
@@ -74,25 +76,8 @@ void ppu::interrupt_line_check() {
     }
 
     if (!prev_interrupt_line && current_interrupt_line) {
-        // rising edge occured, let's check each case to set the delay
-
-        /*
-        if (!hblank) {
-            _set(IF, _get(IF) | 2);
-        }*/
-
-        if (!hblank) {
-            _set(IF, _get(IF) | 2);
-        }
-
-        else {
-            // prepare to set IF bit for lcd interrupt
-
-            // calculation for M-cycle group the interrupt is recognized
-            interrupt_m_cycle = ((ticks - 1) >> 2) + 1;
-            // calculation for the T-cycle group the interrupt recognized
-            interrupt_t_cycle = ((ticks - 1) & 3) + 1;
-        }
+        // rising edge occured, set the IF bit
+        _set(IF, _get(IF) | 2);
     }
 }
 
@@ -167,46 +152,13 @@ void ppu::tick() {
     ticks++;
     // 1 T-cycle
 
-    // grouping of M cycles 1 - 114 used for interrupt delay
-    uint8_t m_cycle_group = ((ticks - 1) >> 2) + 1;
-
-    // if delay is 1, interrupt was recognized at T1 or T2, so on the next T4 we
-    // set IF
-    if ((interrupt_t_cycle == 1 || interrupt_t_cycle == 2) && ticks % 4 == 0) {
-        // assert we are in the same M-cycle
-        assert(m_cycle_group == interrupt_m_cycle &&
-               "we didn't set IF bit in the correct M cycle!");
-
-        _set(IF, _get(IF) | 2);
-        interrupt_t_cycle = 0; // reset interrupt t cycle
-        interrupt_m_cycle = 0; // reset interrupt m cycle
-    }
-
-    else if ((interrupt_t_cycle == 3 || interrupt_t_cycle == 4) &&
-             interrupt_m_cycle + 2 == m_cycle_group) {
-        _set(IF, _get(IF) | 2);
-        interrupt_t_cycle = 0; // reset interrupt t cycle
-        interrupt_m_cycle = 0; // reset interrupt m cycle
-    }
-
-    // if delay is 2, interrupt was recognized at T3 or T4, we need to delay
-    // setting IF to the M-cycle even after this one (i think this is because
-    // the CPU reads IF at T3)
-
     // wy == ly every tick
     if (!wy_condition) {
         wy_condition = _get(WY) == _get(LY);
     }
 
-    // set stat to mode
-    if (current_mode != ppu_mode::LCDToggledOn) {
-        _set(STAT, (_get(STAT) & 0xfc) | static_cast<uint8_t>(current_mode));
-    }
-
-    else {
-        _set(STAT, (_get(STAT) & 0xfc));
-        // for LCDToggledOn, the STAT mode should read 0 (HBlank)
-    }
+    // for LCDToggledOn (4), the STAT mode should read 0 (HBlank)
+    _set(STAT, (_get(STAT) & 0xfc) | (static_cast<uint8_t>(current_mode) % 4));
 
     // oam search mode 2
     switch (current_mode) {
@@ -678,7 +630,7 @@ void ppu::tick() {
 
         // test increment LY 6 T-cycles earlier
 
-        if (ticks == 456) {
+        if (ticks == 452) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
@@ -763,7 +715,7 @@ void ppu::tick() {
         }
 
         // test incrementing LY 6 T-cycles earlier
-        if (ticks == 456 && !end_frame) {
+        if (ticks == 452 && !end_frame) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             _set(LY, _get(LY) + 1); // new scanline reached
@@ -800,8 +752,5 @@ void ppu::tick() {
     }
     }
 
-    if (!interrupt_t_cycle && !interrupt_m_cycle) {
-        //  stat interrupt every T-cycle
-        interrupt_line_check();
-    }
+    interrupt_line_check();
 }
