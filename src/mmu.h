@@ -101,7 +101,7 @@ class mmu {
     void handle_tma_write(uint8_t value);
 
     // dma
-    uint8_t dma_ff46{0};
+    uint8_t dma_ff46{0}; // dma starts out as 0xff
     bool dma_mode{false};
     bool dma_delay{false}; // delay dma start by one cycle
 
@@ -130,6 +130,10 @@ class mmu {
 
     // ppu mode
     uint8_t ppu_mode{2};
+
+    // oam write and read block
+    bool oam_write_block{false};
+    bool oam_read_block{false};
 
     // cpu needs to tell us if it halted so the ppu can know
     bool cpu_halted{false};

@@ -358,6 +358,22 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
         return 0xff;
     }
 
+    // oam is locked during mode 2 and mode 3 but the exact timing of stat.mode
+    // seems tricky
+    // uint8_t stat_mode = hardware_registers[0x41] & 2;
+
+    if (locate_section(address) == section::oam_ram && (oam_read_block)) {
+
+        return 0xff; // bug returns 0xff i think?
+    }
+
+    /*
+    if (locate_section(address) == section::oam_ram &&
+        (ppu_mode == 2 || ppu_mode == 3)) {
+
+        return 0xff; // bug returns 0xff i think?
+    }*/
+
     // OAM BUG read corruption
     /*
     if (locate_section(address) == section::oam_ram &&
@@ -561,6 +577,7 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         }
     }
 
+    uint8_t stat_mode = hardware_registers[0x41] & 2;
     // lock vram if ppu is in mode 3, check ppu mode
     if (load_rom_complete &&
         (locate_section(address) == section::character_ram ||
@@ -577,10 +594,22 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         oam_bug_write(address);
     }*/
 
+    /*
+    else if (locate_section(address) == section::oam_ram &&
+             (ppu_mode == 2 || ppu_mode == 3) && load_rom_complete) {
+        return; // block oam access during mode 2 and 3
+    }*/
+
+    else if (locate_section(address) == section::oam_ram && oam_write_block &&
+             load_rom_complete) {
+        return; // block oam access during mode 2 and 3
+    }
+
+
     // stat
     else if (address == 0xff41) {
-        write_memory(address,
-                     value & 0xfc); // bit 0 and 1 are not writable by bus
+        // bit 0 and 1 are not writable by bus
+        write_memory(address, value & 0xfc);
         return;
     }
 

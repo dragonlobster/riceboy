@@ -16,7 +16,7 @@ MBC1 | :white_check_mark: |
 ## Quirks
 Quirk | Complete | Description
 :------------ | :-------------| :-------------|
-Dummy Fetch | :white_check_mark: | There is an 6-8 cycle process in which a fetch of the first tile occurs and is then discarded. I currently have it set to 8.
+Dummy Fetch | :white_check_mark: | There is an 6-8 cycle process in which a fetch of the first tile occurs and is then discarded. I currently have it set to 8. It depends if you believe Mode 3 takes 172 dots or 174. I personally think it takes 174 dots.
 HALT Bug | :white_check_mark: | Occurs when HALT is executed while IME is 0. PC fails to increment when executing the next instruction.
 DMA | :white_check_mark: | Fast transfer OAM. When value > `0xE0` is written to DMA, it reads from Echo WRAM instead, implemented as sourcing from the value `-0x20`. Further, the bus at which the OAM sources from is locked. It's either the 
 OAM Bug | :white_large_square: | OAM memory gets corrupted when accessing it while the PPU is in Mode 2: OAM Scan.
@@ -60,9 +60,9 @@ Test | Pass | Remarks
 hblank_ly_scx_timing-GS | :white_check_mark: |
 intr_1_2_timing-GS | :white_check_mark: |
 intr_2_0_timing | :white_check_mark: |
-intr_2_mode3_timing | :white_check_mark_: |
+intr_2_mode3_timing | :white_check_mark: |
 lcdon_write_timing-GS | :white_large_square: |
-lcdon_timing-dmgABCmgbS | :white_large_square: |
+lcdon_timing-dmgABCmgbS | :white_check_mark: |
 stat_irq_blocking | :white_check_mark: |
 vblank_stat_intr-GS | :white_check_mark: |
 
@@ -99,7 +99,8 @@ Blargg's cpu_intrs infinite loop | Must correctly implement MBC1 to stop looping
 Mooneye's sprite priority test - rectangles incorrect | Sprite FIFO is always filled in with transparent pixels to maintain a fixed size of 8. This affects the rules of sprite (or obj) priority on overlapping pixels between different objects, where transparent pixels should always be replaced with non transparent ones regardless of priority.
 Mooneye's ppu timing tests hang | The PPU didn't set the IF bit correctly because it was comparing last PPU mode with current PPU mode to set the IF bit (but the mode didn't change), so the emulator was stuck in HALT mode after EI HALT.
 Mooneye's oam dma reg_read test was failing | I accidentally didn't process writes to FF46, or any address that wasn't in the DMA source bus because I only focused on writing to the DMA source bus the current DMA transfer address (which is correct). 
-Can't pass blargg's oam_bug 1-lcd_sync or mooneyes lcdon_timing |
+Mooneye's lcdon_timing | It looks the the first frame has some weird behavior even though it's not shown on the screen. LY increments at dot 456 (instead of 452), LY==LYC is forced to 0 for 1 M-cycle after HBlank ends, and for OAM read block access I blocked access 1 dot PRIOR to reading STAT (don't know why this works).
+Mooneye's lcdon_write_timing | It looks like OAM write blocks timing are different from OAM read blocks timing when lcd turned on? It's possible it's the first frame's weird behavior.
 Mooneye's hblank_ly_scx_timing | The test works by executing HALT, waiting for a mode 0 interrupt, and executing a certain number of cycles while expecting LY to either stay the same, or increment. There are actually 4 tests for each SCX value (SCX = 0, 1, 2, 3, 4, 5, 6, 7). I was able to pass by just incrementing LY at frame dot 452 instead of dot 456. The other way I was able to pass was by delaying IF bit set to the next M-cycle* (see commit 3b32613 for details) but this fails some of the mooneye intr timing tests.
 SCX Timing | if SCX % 8 > 0, SCX % 8 number of pixels need to pop out of the background fifo. Each pop takes 1 dot, and rendering is paused during this time. Thus, Mode 3 should be extended by SCX % 8 dots naturally, but mine was extended further at SCX % 8 > 3. The reason was because I mistakenly paused the pixel fetcher as well, which is incorrect. For example, at SCX % 8 = 7, if I paused the pixel fetcher while discarding SCX pixels, I would have 1 dot left to fill my background fifo (which is not enough time), which means the LCD is incremented and waiting for the background fifo to be filled while unable to display pixels, which incorrectly extends my Mode 3.
 

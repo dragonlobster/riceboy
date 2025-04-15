@@ -2102,7 +2102,6 @@ void cpu::push_interrupts() {
 
     auto m3 = [=]() {
         // write pc high to stack (upper byte push)
-
         this->_set(this->SP, this->PC >> 8);
         this->SP--;
     };

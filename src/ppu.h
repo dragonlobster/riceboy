@@ -80,8 +80,10 @@ class ppu {
     // uint8_t interrupt_delay{0}; // set the interrupt IF later on
     // 255 means off
 
+    void increment_ly();
+
     // calculate t and m cycles of current tick
-    std::tuple<uint8_t, uint8_t> get_current_cycle();
+    //std::tuple<uint8_t, uint8_t> get_current_cycle();
 
     bool vblank_start{false};
     void interrupt_line_check();
@@ -117,6 +119,7 @@ class ppu {
 
     // update ppu mode
     void update_ppu_mode(ppu_mode mode);
+    uint16_t mode_change_ticks{0};
 
     // lcd x position
     uint8_t lcd_x{0};
@@ -143,7 +146,7 @@ class ppu {
     uint16_t IF{0xff0f};
 
     // internal LY, (real LY) different from LY register value
-    uint8_t internal_ly{};
+    uint8_t internal_ly{0};
 
     // pixel drawing
     sf::Image lcd_frame_image{};

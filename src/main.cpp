@@ -65,11 +65,10 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb", // fail
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/vblank_stat_intr-GS.gb", // pass
     };
-
 
     std::array<std::string, 1> mooneye_cpu{
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"};
@@ -77,11 +76,8 @@ int main() {
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
 
-    // why does mooneye sources-dmgABCmgbS.gb flash before pass (probably
-    // related to ppu somehow)
     // riceboy->gb_cpu.prepare_rom("BOOT/mooneye-test-suite-wilbertpol/acceptance/gpu/intr_1_timing.gb");
     //riceboy->gb_cpu.prepare_rom(mooneye_ppu[7]);
-
 
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
