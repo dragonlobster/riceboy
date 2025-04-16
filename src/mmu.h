@@ -134,6 +134,8 @@ class mmu {
     // oam write and read block
     bool oam_write_block{false};
     bool oam_read_block{false};
+    bool vram_write_block{false};
+    bool vram_read_block{false};
 
     // cpu needs to tell us if it halted so the ppu can know
     bool cpu_halted{false};

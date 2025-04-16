@@ -354,7 +354,7 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
         (locate_section(address) == section::character_ram ||
          locate_section(address) == section::bg_map_data_1 ||
          locate_section(address) == section::bg_map_data_2) &&
-        ppu_mode == 3) {
+        vram_read_block) {
         return 0xff;
     }
 
@@ -577,13 +577,12 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         }
     }
 
-    uint8_t stat_mode = hardware_registers[0x41] & 2;
     // lock vram if ppu is in mode 3, check ppu mode
     if (load_rom_complete &&
         (locate_section(address) == section::character_ram ||
          locate_section(address) == section::bg_map_data_1 ||
          locate_section(address) == section::bg_map_data_2) &&
-        ppu_mode == 3) {
+        vram_write_block) {
         return;
     }
 
@@ -599,10 +598,12 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
              (ppu_mode == 2 || ppu_mode == 3) && load_rom_complete) {
         return; // block oam access during mode 2 and 3
     }*/
+    
 
-    else if (locate_section(address) == section::oam_ram && oam_write_block &&
-             load_rom_complete) {
-        return; // block oam access during mode 2 and 3
+    else if (locate_section(address) == section::oam_ram && load_rom_complete &&
+             oam_write_block) {
+        return;
+        // return; // block oam access during mode 2 and 3
     }
 
 

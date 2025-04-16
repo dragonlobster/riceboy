@@ -105,6 +105,11 @@ class ppu {
 
     // setting stat.mode might be delayed
     ppu_mode current_mode{ppu_mode::OAM_Scan};
+    // setting last_mode
+    ppu_mode last_mode{ppu_mode::OAM_Scan};
+
+    bool extend_oam_write_block{false};
+
     // the exact T cycle mode changes (1, 2, 3, 4)
     uint8_t mode_t_cycle{0};
     // the M-cycle group (1-114) that mode changed

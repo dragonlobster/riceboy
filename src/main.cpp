@@ -82,7 +82,7 @@ int main() {
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[11]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[8]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
