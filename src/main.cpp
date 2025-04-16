@@ -55,7 +55,7 @@ int main() {
     std::array<std::string, 1> mooneye_interrupts{
         "BOOT/mooneye-gb_hwtests/acceptance/interrupts/ie_push.gb"};
 
-    std::array<std::string, 12> mooneye_ppu{
+    std::array<std::string, 14> mooneye_ppu{
         "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb", // pass
@@ -64,10 +64,12 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/vblank_stat_intr-GS.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing_sprites.gb", // fail
     };
 
     std::array<std::string, 1> mooneye_cpu{
@@ -77,12 +79,12 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // riceboy->gb_cpu.prepare_rom("BOOT/mooneye-test-suite-wilbertpol/acceptance/gpu/intr_1_timing.gb");
-    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[7]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[12]);
 
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[8]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[11]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);

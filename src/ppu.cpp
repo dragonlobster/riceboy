@@ -44,7 +44,6 @@ void ppu::update_ppu_mode(ppu_mode mode) {
             current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
 
         this->gb_mmu.vram_read_block = current_mode == ppu_mode::Drawing;
-        this->gb_mmu.vram_write_block = current_mode == ppu_mode::Drawing;
         //this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode) % 4;
     }
 
@@ -56,6 +55,9 @@ void ppu::reset_scanline() {
 }
 
 void ppu::interrupt_line_check() {
+    assert(this->gb_mmu.lcd_on &&
+           "lcd is not on! no interrupt check should occur!");
+
     bool prev_interrupt_line = current_interrupt_line;
 
     ppu_mode stat_mode = static_cast<ppu_mode>(_get(STAT) & 3);
@@ -288,6 +290,7 @@ void ppu::tick() {
         // fetch, 2 discard?) + 6 initial fetch + 160 tiles inital fetch
         // ),
 
+        this->gb_mmu.vram_write_block = true;
         this->gb_mmu.oam_write_block = true;
 
         if (lcd_reset && mode3_ticks == 4) {
@@ -656,6 +659,7 @@ void ppu::tick() {
         mode0_ticks++;
 
         this->gb_mmu.oam_write_block = false;
+        this->gb_mmu.vram_write_block = false;
 
         // test increment LY 6 T-cycles earlier (past line 0)
         if (ticks == 452 && !lcd_reset) {
@@ -682,8 +686,7 @@ void ppu::tick() {
         // wait 456 T-cycles (scanline ends there)
         if (ticks == 456) {
 
-            assert(mode0_ticks + mode3_ticks + 80 == 456 ||
-                   mode0_ticks + mode3_ticks + 76 == 456 &&
+            assert(mode0_ticks + mode3_ticks + 80 == 456 &&
                        "timing for ticks in the scnaline is not correct!");
 
             //_set(LY, _get(LY) + 1); // new scanline reached
