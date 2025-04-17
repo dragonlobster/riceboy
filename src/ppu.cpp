@@ -37,15 +37,20 @@ void ppu::update_ppu_mode(ppu_mode mode) {
 
     // tell the mmu the ppu mode
     // LCD toggled on = 0
-    //this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode) % 4;
+    // this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode) % 4;
 
-    if (last_mode != ppu_mode::LCDToggledOn) {
-        this->gb_mmu.oam_read_block =
-            current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
+    // if (last_mode != ppu_mode::LCDToggledOn) {
+    this->gb_mmu.oam_read_block =
+        current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
 
-        this->gb_mmu.vram_read_block = current_mode == ppu_mode::Drawing;
-        //this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode) % 4;
-    }
+    this->gb_mmu.vram_read_block = current_mode == ppu_mode::Drawing;
+    // this->gb_mmu.ppu_mode = static_cast<uint8_t>(current_mode) % 4;
+    //}
+
+    this->gb_mmu.oam_write_block =
+        current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
+
+    this->gb_mmu.vram_write_block = current_mode == ppu_mode::Drawing;
 
 }
 
@@ -83,13 +88,21 @@ void ppu::interrupt_line_check() {
 
     current_interrupt_line = oam_scan || hblank || vblank || ly_lyc;
 
-    // ly == lyc comparison delayed for 1 cycle
-    if (_get(LY) == _get(LYC) && ticks >= 4) {
-        _set(STAT, _get(STAT) | 4); // sets coincidence flag to 1
+    //    // ly == lyc comparison delayed for 1 cycle
+    if (ticks >= 452) {
+        _set(STAT,
+             _get(STAT) & ~4); // explicitely sets coincidence flag to 0
     }
 
     else {
-        _set(STAT, _get(STAT) & ~4); // explicitely sets coincidence flag to 0
+        if (_get(LY) == _get(LYC)) {
+            _set(STAT, _get(STAT) | 4); // sets coincidence flag to 1
+        }
+
+        else {
+            _set(STAT,
+                 _get(STAT) & ~4); // explicitely sets coincidence flag to 0
+        }
     }
 
     if (!prev_interrupt_line && current_interrupt_line) {
@@ -166,6 +179,7 @@ void ppu::tick() {
         // mmu already)
         this->lcd_reset = true;
         // update_ppu_mode(ppu_mode::OAM_Scan);
+        return;
     }
 
     ticks++;
@@ -198,7 +212,7 @@ void ppu::tick() {
     }
 
     case ppu_mode::OAM_Scan: {
-        this->gb_mmu.oam_write_block = true;
+        //this->gb_mmu.oam_write_block = true;
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
@@ -240,6 +254,10 @@ void ppu::tick() {
             // by the ppu)
         }
 
+        if (ticks == 76) {
+            this->gb_mmu.vram_read_block = true;
+        }
+
         if (ticks == 80) {
             assert(oam_search_counter == 40 && "oam search counter is not 40!");
             assert(this->gb_mmu.ppu_current_oam_row == 0xa0 &&
@@ -272,9 +290,6 @@ void ppu::tick() {
             }
 
             update_ppu_mode(ppu_mode::Drawing);
-            
-            // oam write is enabled for 1 cycle during the transition from mode 2 to mode 3
-            this->gb_mmu.oam_write_block = false;
         }
 
         break;
@@ -290,13 +305,8 @@ void ppu::tick() {
         // fetch, 2 discard?) + 6 initial fetch + 160 tiles inital fetch
         // ),
 
-        this->gb_mmu.vram_write_block = true;
-        this->gb_mmu.oam_write_block = true;
-
-        if (lcd_reset && mode3_ticks == 4) {
-            // update ppu mode later on first frame of lcd toggling on
-            update_ppu_mode(ppu_mode::Drawing);
-        }
+        //this->gb_mmu.vram_write_block = true;
+        //this->gb_mmu.oam_write_block = true;
 
         // check for sprites right away
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
@@ -658,24 +668,18 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
         mode0_ticks++;
 
-        this->gb_mmu.oam_write_block = false;
-        this->gb_mmu.vram_write_block = false;
+        //this->gb_mmu.oam_write_block = false;
+        //this->gb_mmu.vram_write_block = false;
 
         // test increment LY 6 T-cycles earlier (past line 0)
-        if (ticks == 452 && !lcd_reset) {
+        if (ticks == 452) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             //_set(LY, _get(LY) + 1);
             increment_ly(); // new scanline reached
-        }
 
-        else if (ticks == 456 && lcd_reset) {
-            // reading LY at this exact dot returns a bitwise AND between prev
-            // LY and current LY
-            //_set(LY, _get(LY) + 1); // new scanline reached
-            increment_ly(); // new scanline reached
+            this->gb_mmu.oam_read_block = true;
         }
-
         /*
         if (ticks == 456 && _get(LY) == 0) {
             // reading LY at this exact dot returns a bitwise AND between prev
@@ -752,7 +756,7 @@ void ppu::tick() {
             _set(IF, _get(IF) | 1);
             vblank_start = false;
 
-            this->gb_mmu.oam_write_block = false;
+            //this->gb_mmu.oam_write_block = false;
         }
 
         // At line 153 LY=153 only lasts 4 dots before snapping to 0
@@ -770,19 +774,14 @@ void ppu::tick() {
             _set(LY, _get(LY) + 1); // new scanline reached
         }*/
 
-        if (ticks == 452 && !end_frame && !lcd_reset) {
+        if (ticks == 452 && !end_frame) {
             // reading LY at this exact dot returns a bitwise AND between prev
             // LY and current LY
             //_set(LY, _get(LY) + 1); // new scanline reached
             increment_ly(); // new scanline reached
         }
 
-        else if (ticks == 456 && !end_frame && lcd_reset) {
-            // reading LY at this exact dot returns a bitwise AND between prev
-            // LY and current LY
-            //_set(LY, _get(LY) + 1); // new scanline reached
-            increment_ly(); // new scanline reached
-        }
+        // is oam read blocked early in vblank?
 
         if (ticks == 456) {
             // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
