@@ -99,6 +99,7 @@ class mmu {
     void handle_tac_write(uint8_t value);
     void handle_tima_write(uint8_t value);
     void handle_tma_write(uint8_t value);
+    void handle_stat_write(uint8_t value);
 
     // dma
     uint8_t dma_ff46{0}; // dma starts out as 0xff

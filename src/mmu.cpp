@@ -121,7 +121,7 @@ void mmu::handle_lcdc_write(uint8_t value) {
         lcd_on = new_lcd_bit;
 
         // lcd toggled off
-        if (lcd_toggle && !lcd_on) {
+        if (lcd_toggle && !new_lcd_bit) {
             // reset LY to 0
             write_memory(0xff44, 0);
 
@@ -130,6 +130,10 @@ void mmu::handle_lcdc_write(uint8_t value) {
             write_memory(0xff41, (stat_mode & 0xfc));
         }
     }
+}
+
+void mmu::handle_stat_write(uint8_t value) {
+    this->hardware_registers[0x41] = value | 0x80; // mask top bit as 1 always
 }
 
 void mmu::handle_dma_write(uint8_t value) {
@@ -671,6 +675,12 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
             return;
         }
 
+        // stat (mask top bit)
+        if (address == 0xff41) {
+            handle_stat_write(value);
+            return;
+        }
+
         // stat based on lcd off
         /*
         if (!lcd_on && address == 0xff41) {
@@ -774,6 +784,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // lcdc
         else if (address == 0xff40) {
             handle_lcdc_write(value);
+        }
+
+        // stat (mask top bit)
+        else if (address == 0xff41) {
+            handle_stat_write(value);
         }
 
         // stat based on lcd off
