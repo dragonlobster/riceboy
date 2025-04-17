@@ -256,6 +256,7 @@ void ppu::tick() {
 
         if (ticks == 76) {
             this->gb_mmu.vram_read_block = true;
+            this->gb_mmu.oam_write_block = false;
         }
 
         if (ticks == 80) {
