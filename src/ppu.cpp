@@ -156,8 +156,7 @@ void ppu::tick() {
                this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
                "lcd toggled off outside of vblank!");
 
-        // interrupt line is always false when LCD is toggled off
-        current_interrupt_line = false;
+        // keep current interrupt line as the value before lcd turned off
 
         update_ppu_mode(ppu_mode::LCDToggledOn);
 
@@ -179,6 +178,8 @@ void ppu::tick() {
         // mmu already)
         this->lcd_reset = true;
         // update_ppu_mode(ppu_mode::OAM_Scan);
+
+        // TODO: check if i need to run all the functions and just align ticks instead of returning here (does LCD turn on the same cycle as LCDC write?)
         return;
     }
 

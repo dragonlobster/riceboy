@@ -68,7 +68,7 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/vblank_stat_intr-GS.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing_sprites.gb", // fail
     };
 
@@ -79,14 +79,14 @@ int main() {
     riceboy->gb_cpu.load_boot_rom();
 
     // riceboy->gb_cpu.prepare_rom("BOOT/mooneye-test-suite-wilbertpol/acceptance/gpu/intr_1_timing.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[8]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[5]);
 
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[11]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
-    // riceboy->gb_cpu.prepare_rom(blargg[6]);
+    // riceboy->gb_cpu.prepare_rom(blargg[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
