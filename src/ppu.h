@@ -83,7 +83,7 @@ class ppu {
     void increment_ly();
 
     // calculate t and m cycles of current tick
-    //std::tuple<uint8_t, uint8_t> get_current_cycle();
+    // std::tuple<uint8_t, uint8_t> get_current_cycle();
 
     bool vblank_start{false};
     void interrupt_line_check();
@@ -97,6 +97,7 @@ class ppu {
     };
 
     enum class fetcher_mode {
+        DummyFetch,
         FetchTileNo,
         FetchTileDataLow,
         FetchTileDataHigh,
@@ -115,7 +116,7 @@ class ppu {
     // the M-cycle group (1-114) that mode changed
     uint8_t mode_m_cycle{0};
 
-    fetcher_mode current_fetcher_mode{fetcher_mode::FetchTileNo};
+    fetcher_mode current_fetcher_mode{fetcher_mode::DummyFetch};
 
     std::vector<oam_entry> sprite_buffer{}; // sprite buffer
 

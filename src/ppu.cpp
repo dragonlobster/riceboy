@@ -51,7 +51,6 @@ void ppu::update_ppu_mode(ppu_mode mode) {
         current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
 
     this->gb_mmu.vram_write_block = current_mode == ppu_mode::Drawing;
-
 }
 
 void ppu::reset_scanline() {
@@ -179,7 +178,9 @@ void ppu::tick() {
         this->lcd_reset = true;
         // update_ppu_mode(ppu_mode::OAM_Scan);
 
-        // TODO: check if i need to run all the functions and just align ticks instead of returning here (does LCD turn on the same cycle as LCDC write?)
+        // TODO: check if i need to run all the functions and just align ticks
+        // instead of returning here (does LCD turn on the same cycle as LCDC
+        // write?)
         return;
     }
 
@@ -213,7 +214,7 @@ void ppu::tick() {
     }
 
     case ppu_mode::OAM_Scan: {
-        //this->gb_mmu.oam_write_block = true;
+        // this->gb_mmu.oam_write_block = true;
 
         assert(ticks <= 80 && "ticks must be <= 80 during OAM Scan");
 
@@ -307,10 +308,11 @@ void ppu::tick() {
         // fetch, 2 discard?) + 6 initial fetch + 160 tiles inital fetch
         // ),
 
-        //this->gb_mmu.vram_write_block = true;
-        //this->gb_mmu.oam_write_block = true;
+        // this->gb_mmu.vram_write_block = true;
+        // this->gb_mmu.oam_write_block = true;
 
         // check for sprites right away
+        /*
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty()) { // check bit 1 for enable sprites
 
@@ -333,25 +335,29 @@ void ppu::tick() {
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
 
             sprite_to_fetch = &sprites_to_fetch[0];
-        }
-
-        else if (dummy_fetch) {
-            // wait 6-8 ticks (172 or 174 for background tiles)
-            dummy_ticks++;
-
-            if (dummy_ticks < 8) {
-                return;
-            }
-            current_fetcher_mode =
-                fetcher_mode::FetchTileNo; // set to fetch tile no in
-                                           // beginning
-            dummy_fetch = false;           // reset dummy fetch, dummy ticks
-            dummy_ticks = 0;
-            return;
-        }
+        }*/
 
         fetcher_ticks++;
         switch (current_fetcher_mode) {
+
+        case fetcher_mode::DummyFetch: {
+            // 6 ticks for dummy fetch then push to fifo, 2 dots to empty
+            // background fifo
+            if (fetcher_ticks < 6) {
+                break;
+            }
+            assert(fetcher_ticks == 6 && "fetcher ticks must now be 6?!");
+
+            // fill background fifo with 0s
+            for (unsigned int i = 0; i < 8; ++i) {
+                background_fifo.push_back(0);
+            }
+
+            fetcher_ticks = 0;
+            dummy_fetch = false;
+            current_fetcher_mode = fetcher_mode::FetchTileNo;
+            return;
+        }
 
         case fetcher_mode::FetchTileNo: {
             if (fetcher_ticks < 2) {
@@ -587,7 +593,7 @@ void ppu::tick() {
         if (!background_fifo.empty() && !fetch_sprite) {
 
             // discard scx (one per dot)
-            if (lcd_x == 0 && (_get(SCX) % 8) && scx_discard) {
+            if (lcd_x == 8 && (_get(SCX) % 8) && scx_discard) {
 
                 if (!scx_discard_count) {
                     scx_discard_count = _get(SCX) % 8;
@@ -628,10 +634,10 @@ void ppu::tick() {
                 }
             }
 
-            assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
+            assert(lcd_x < 168 && "LCD X Position exceeded the screen width!");
 
-            if (!lcd_reset) {
-                uint16_t position_x = (lcd_x);
+            if (!lcd_reset && lcd_x >= 8) {
+                uint16_t position_x = (lcd_x - 8);
                 uint16_t position_y = (_get(LY));
 
                 lcd_frame_image.setPixel({position_x, position_y},
@@ -650,7 +656,7 @@ void ppu::tick() {
             }
         }
 
-        if (lcd_x == 160) {
+        if (lcd_x == 168) {
             /*
             assert(ticks >= 172+80 && ticks <= 293+80 &&
                    "ticks in drawing mode should be between 172 and 289!!");
@@ -661,6 +667,8 @@ void ppu::tick() {
             }
             // std::cout << ticks << '\n';
 
+            // reset fetcher mode to dummy fetch
+            current_fetcher_mode = fetcher_mode::DummyFetch;
             update_ppu_mode(ppu_mode::HBlank);
         }
 
@@ -670,8 +678,8 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
         mode0_ticks++;
 
-        //this->gb_mmu.oam_write_block = false;
-        //this->gb_mmu.vram_write_block = false;
+        // this->gb_mmu.oam_write_block = false;
+        // this->gb_mmu.vram_write_block = false;
 
         // test increment LY 6 T-cycles earlier (past line 0)
         if (ticks == 452) {
@@ -693,7 +701,7 @@ void ppu::tick() {
         if (ticks == 456) {
 
             assert(mode0_ticks + mode3_ticks + 80 == 456 &&
-                       "timing for ticks in the scnaline is not correct!");
+                   "timing for ticks in the scnaline is not correct!");
 
             //_set(LY, _get(LY) + 1); // new scanline reached
 
@@ -758,7 +766,7 @@ void ppu::tick() {
             _set(IF, _get(IF) | 1);
             vblank_start = false;
 
-            //this->gb_mmu.oam_write_block = false;
+            // this->gb_mmu.oam_write_block = false;
         }
 
         // At line 153 LY=153 only lasts 4 dots before snapping to 0
