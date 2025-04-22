@@ -308,23 +308,24 @@ void ppu::tick() {
             // wait 6-8 ticks (172 or 174 for background tiles)
             dummy_ticks++;
 
-            if (dummy_ticks < 8) {
+            if (dummy_ticks < 7) {
                 return;
             }
             current_fetcher_mode =
-                fetcher_mode::FetchTileNo; // set to fetch tile no in
+                fetcher_mode::PushToFIFO; // set to fetch tile no in
                                            // beginning
-            dummy_fetch = false;           // reset dummy fetch, dummy ticks
+            //dummy_fetch = false;           // reset dummy fetch, dummy ticks
             dummy_ticks = 0;
-            return;
+            //return;
         }
 
+        /*
         // check for sprites right away
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty()) { // check bit 1 for enable sprites
 
             for (unsigned int i = 0; i < sprite_buffer.size();) {
-                if (sprite_buffer[i].x <= lcd_x + 8) {
+                if (sprite_buffer[i].x <= lcd_x) {
                     sprites_to_fetch.push_back(sprite_buffer[i]);
                     sprite_buffer.erase(sprite_buffer.begin() + i);
                 } else {
@@ -342,7 +343,7 @@ void ppu::tick() {
                 fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
 
             sprite_to_fetch = &sprites_to_fetch[0];
-        }
+        }*/
 
         fetcher_ticks++;
         switch (current_fetcher_mode) {
@@ -350,8 +351,6 @@ void ppu::tick() {
         case fetcher_mode::FetchTileNo: {
             if (fetcher_ticks < 2) {
                 break;
-            } else {
-                fetcher_ticks = 0;
             }
 
             if (fetch_sprite) {
@@ -400,10 +399,8 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataLow: {
-            if (fetcher_ticks < 2) {
+            if (fetcher_ticks < 4) {
                 break;
-            } else {
-                fetcher_ticks = 0;
             }
 
             if (fetch_sprite) {
@@ -497,10 +494,8 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataHigh: {
-            if (fetcher_ticks < 2) {
+            if (fetcher_ticks < 6) {
                 break;
-            } else {
-                fetcher_ticks = 0;
             }
 
             high_byte = _get(high_byte_address);
@@ -553,6 +548,8 @@ void ppu::tick() {
                 sprites_to_fetch.erase(sprites_to_fetch.begin());
                 if (sprites_to_fetch.empty()) {
                     fetch_sprite = false;
+                } else {
+                    sprite_to_fetch = &sprites_to_fetch[0];
                 }
 
                 fetcher_ticks = 1;
@@ -561,6 +558,16 @@ void ppu::tick() {
             }
 
             else {
+                if (dummy_fetch) {
+                    for (unsigned int i = 0; i < 8; ++i) {
+                        background_fifo.push_back(0);
+                    }
+                    current_fetcher_mode = fetcher_mode::FetchTileNo;
+                    // takes up 1 cycle of FetchTileNo
+                    fetcher_ticks = 1;
+                    dummy_fetch = false;
+                }
+
                 if (background_fifo.empty()) {
                     // push to background fifo
                     for (unsigned int i = 0; i < 8; ++i) {
@@ -574,16 +581,43 @@ void ppu::tick() {
                     // takes up 1 cycle of FetchTileNo
                     fetcher_ticks = 1;
                 }
+
+                // if sprites are not empty
+                if (!sprites_to_fetch.empty()) {
+                    fetch_sprite = true;
+                    sprite_to_fetch = &sprites_to_fetch[0];
+
+                    // fetch tile no step should be completed already! resync timing
+                    this->tile_id = (*sprite_to_fetch).tile_id;
+
+                    current_fetcher_mode = fetcher_mode::FetchTileDataLow;
+                    fetcher_ticks = 2; // beginning of fetch tile data low fetcher ticks should be 3
+                }
+
             }
             break;
         }
         }
 
+        // check for sprites every dot, wait for background fifo to be empty
+        if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
+            sprites_to_fetch.empty() && !background_fifo.empty()) { // check bit 1 for enable sprites
+
+            for (unsigned int i = 0; i < sprite_buffer.size();) {
+                if (sprite_buffer[i].x <= lcd_x) {
+                    sprites_to_fetch.push_back(sprite_buffer[i]);
+                    sprite_buffer.erase(sprite_buffer.begin() + i);
+                } else {
+                    ++i;
+                }
+            }
+        }
+
         // push pixels to LCD, 1 pixel per dot
-        if (!background_fifo.empty() && !fetch_sprite) {
+        if (!background_fifo.empty() && !fetch_sprite && sprites_to_fetch.empty()) {
 
             // discard scx (one per dot)
-            if (lcd_x == 0 && (_get(SCX) % 8) && scx_discard) {
+            if (lcd_x == 8 && (_get(SCX) % 8) && scx_discard) {
 
                 if (!scx_discard_count) {
                     scx_discard_count = _get(SCX) % 8;
@@ -624,10 +658,10 @@ void ppu::tick() {
                 }
             }
 
-            assert(lcd_x < 160 && "LCD X Position exceeded the screen width!");
+            assert(lcd_x < 168 && "LCD X Position exceeded the screen width!");
 
-            if (!lcd_reset) {
-                uint16_t position_x = (lcd_x);
+            if (!lcd_reset && lcd_x >= 8) {
+                uint16_t position_x = (lcd_x - 8);
                 uint16_t position_y = (_get(LY));
 
                 lcd_frame_image.setPixel({position_x, position_y},
@@ -638,7 +672,7 @@ void ppu::tick() {
 
             // check for window fetching after pixel was shifted out to LCD
             if (!fetch_window && (_get(LCDC) & 0x20) &&
-                (lcd_x >= _get(WX) - 7) && wy_condition) {
+                (lcd_x >= _get(WX) + 1) && wy_condition) {
                 tile_index = 0;
                 background_fifo.clear();
                 fetch_window = true;
@@ -646,7 +680,7 @@ void ppu::tick() {
             }
         }
 
-        if (lcd_x == 160) {
+        if (lcd_x == 168) {
             /*
             assert(ticks >= 172+80 && ticks <= 293+80 &&
                    "ticks in drawing mode should be between 172 and 289!!");
