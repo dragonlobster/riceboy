@@ -555,7 +555,8 @@ void ppu::tick() {
                     fetch_sprite = false;
                 }
 
-                fetcher_ticks = 0;
+                fetcher_ticks = 1;
+                // takes up 1 cycle of FetchTileNo
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
             }
 
@@ -570,7 +571,8 @@ void ppu::tick() {
                     tile_index++;
 
                     current_fetcher_mode = fetcher_mode::FetchTileNo;
-                    fetcher_ticks = 0;
+                    // takes up 1 cycle of FetchTileNo
+                    fetcher_ticks = 1;
                 }
             }
             break;
