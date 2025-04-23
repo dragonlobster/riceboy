@@ -12,6 +12,8 @@ class ppu {
 
     ppu(mmu &gb_mmu_, sf::RenderWindow &window_);
 
+    void initialize_skip_bootrom_values();
+
     // dot = tick = T-cycle
     void tick();
     uint16_t ticks{0}; // tick counter

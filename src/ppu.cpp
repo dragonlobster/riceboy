@@ -25,6 +25,42 @@ ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
     this->lcd_frame_image = image; // image with pixels to display on the screen
 };
 
+void ppu::initialize_skip_bootrom_values() {
+    ticks = 0x019f;
+    fetcher_ticks = 0;
+    dummy_ticks = 0;
+    mode3_ticks = 0;
+    mode0_ticks = 0;
+    interrupt_ticks = 0;
+    oam_search_counter = 0;
+    window_ly = 0;
+    wy_condition = true;
+    tile_index = 0x14;
+    tile_id = 0;
+    fetch_window_ip = false;
+    fetch_sprite_ip = false;
+    low_byte = 0;
+    high_byte = 0;
+    high_byte_address = 0x800f;
+    dummy_fetch = true;
+    scx_discard_count = 0;
+    scx_discard = true;
+    end_frame = true;
+    current_interrupt_line = false;
+    interrupt_t_cycle = 0;
+    interrupt_m_cycle = 0;
+    vblank_start = false;
+    current_mode = ppu_mode::VBlank;
+    last_mode = ppu_mode::HBlank;
+    extend_oam_write_block = false;
+    mode_t_cycle = 0;
+    mode_m_cycle = 0;
+    current_fetcher_mode = fetcher_mode::PushToFIFO;
+    mode_change_ticks = 0;
+    lcd_x = 0;
+    lcd_reset = false;
+}
+
 // update the ppu mode
 void ppu::update_ppu_mode(ppu_mode mode) {
     last_mode = this->current_mode;

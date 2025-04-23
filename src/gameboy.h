@@ -26,5 +26,8 @@ class gameboy {
 
     void tick();
 
+    // skip the boot rom?
+    void skip_bootrom();
+
   private:
 };

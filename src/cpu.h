@@ -18,7 +18,7 @@ class cpu {
     mmu *gb_mmu{}; // the central mmu
 
     // main 8-bit registers
-    uint8_t A{0};
+    uint8_t A{1};
     uint8_t B{0};
     uint8_t C{0};
     uint8_t D{0};
@@ -127,6 +127,9 @@ class cpu {
 
     std::tuple<interrupts, if_mask>
     check_current_interrupt(); // set current interrupt based on the new IE / IF
+
+    // skip bootrom
+    void initialize_skip_bootrom_values();
 
   private:
     // interrupts

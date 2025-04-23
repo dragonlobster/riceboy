@@ -83,9 +83,9 @@ int main() {
 
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[1]);
-    // riceboy->gb_cpu.prepare_rom(mooneye_timing[0]);
-    // riceboy->gb_cpu.prepare_rom(blargg[0]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
@@ -95,6 +95,9 @@ int main() {
 
     // double accumulator{0};
     // double last_frame_time{0};
+
+    // skips the bootrom (i captured the initial values by setting a breakpoint at load rom complete
+    riceboy->skip_bootrom();
 
     // frame clock (avoiding setFrameRateLimit imprecision)
     sf::Clock frame_clock{};

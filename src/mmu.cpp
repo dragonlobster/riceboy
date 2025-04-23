@@ -11,6 +11,27 @@
      _cartridge_type == mmu::cartridge_type::mbc1_ram ||                       \
      _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
+void mmu::initialize_skip_bootrom_values() {
+    div_ff04 = 0xd1e4;
+    tac_ff07 = 0xf8;
+    lcdc_ff40 = 0x91;
+    lcd_toggle = false;
+    lcd_on = true;
+    ppu_mode = 0x02;
+    hardware_registers[0x50] = 0x01;
+    hardware_registers[0x0f] = 0xe1;
+    hardware_registers[0x41] = 0x85;
+    hardware_registers[0x47] = 0xfc;
+    hardware_registers[0x50] = 0x01;
+
+    hardware_registers[0x12] = 0xf3;
+    hardware_registers[0x13] = 0xc1;
+    hardware_registers[0x14] = 0x87;
+    hardware_registers[0x24] = 0x77;
+    hardware_registers[0x25] = 0xf3;
+    hardware_registers[0x26] = 0x80;
+}
+
 void mmu::handle_tma_write(uint8_t value) {
 
     // tma address at the moment is hardware_registers[0x06]
@@ -602,14 +623,12 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
              (ppu_mode == 2 || ppu_mode == 3) && load_rom_complete) {
         return; // block oam access during mode 2 and 3
     }*/
-    
 
     else if (locate_section(address) == section::oam_ram && load_rom_complete &&
              oam_write_block) {
         return;
         // return; // block oam access during mode 2 and 3
     }
-
 
     // stat
     else if (address == 0xff41) {

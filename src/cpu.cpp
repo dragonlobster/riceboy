@@ -1944,6 +1944,33 @@ cpu::cpu(mmu &mmu) {
     this->gb_mmu = &mmu; // & refers to actual address to assign to the pointer
 }
 
+void cpu::initialize_skip_bootrom_values() {
+    // initialize values if skipping bootrom
+    A = 0x01;
+    B = 0x00;
+    C = 0x13;
+    D = 0x00;
+    E = 0xd8;
+    Zf = true;
+    Nf = false;
+    Hf = true;
+    Cf = true;
+    H = 0x01;
+    L = 0x4d;
+    SP = 0xfffe;
+    PC = 0x0100;
+    W = 0x00;
+    Z = 0x50;
+    ei_delay = false;
+    ime = false;
+    halt = false;
+    halt_bug = false;
+    interrupt_ticks = 3;
+    timer_ticks = 3;
+    ticks = 3;
+    fetch_opcode = true;
+}
+
 void cpu::tick() {
     this->ticks++;
 

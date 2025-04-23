@@ -141,6 +141,9 @@ class mmu {
     // cpu needs to tell us if it halted so the ppu can know
     bool cpu_halted{false};
 
+    // initialize mmu values if skip boot rom
+    void initialize_skip_bootrom_values();
+
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
