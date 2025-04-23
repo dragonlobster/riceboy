@@ -103,6 +103,9 @@ class ppu {
         PushToFIFO
     };
 
+    // fetch tile data low function
+    void sprite_fetch_tile_data_low();
+
     // setting stat.mode might be delayed
     ppu_mode current_mode{ppu_mode::OAM_Scan};
     // setting last_mode

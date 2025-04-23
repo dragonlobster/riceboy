@@ -138,6 +138,63 @@ void ppu::reset_ticks() {
     this->mode0_ticks = 0;
 }
 
+void ppu::sprite_fetch_tile_data_low() {
+
+    assert((*sprite_to_fetch).y >= 16 &&
+           "sprite to fetch y position is abnormal!");
+
+    uint16_t sprite_address{};
+    uint16_t line_offset{};
+
+    bool y_flip = (*sprite_to_fetch).flags & 0x40; // bit 6 y-flip
+
+    if (_get(LCDC) & 0x04) {
+        // tall sprite mode
+        if (_get(LY) <= ((*sprite_to_fetch).y - 16) + 7) {
+            // top half
+            if (!y_flip) {
+                tile_id &= 0xfe; // set lsb to 0
+                line_offset = (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+            } else {
+                tile_id |= 0x01; // set lsb to 1
+                line_offset =
+                    (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) * 2;
+            }
+        }
+
+        else {
+            // bottom half
+            if (!y_flip) {
+                tile_id |= 0x01;
+                line_offset = (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+            } else {
+                tile_id &= 0xfe;
+                line_offset =
+                    (8 - 1 - (_get(LY) - (((*sprite_to_fetch).y - 16) + 7))) *
+                    2;
+            }
+        }
+
+    }
+
+    else {
+        if (!y_flip) {
+            line_offset = (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
+        }
+
+        else {
+            // get the flipped sprite data
+            line_offset =
+                (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) * 2;
+        }
+    }
+
+    sprite_address = 0x8000 + (16 * tile_id) + line_offset;
+
+    low_byte = _get(sprite_address);
+    high_byte_address = sprite_address + 1;
+}
+
 void ppu::tick() {
     // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
@@ -313,10 +370,10 @@ void ppu::tick() {
             }
             current_fetcher_mode =
                 fetcher_mode::PushToFIFO; // set to fetch tile no in
-                                           // beginning
-            //dummy_fetch = false;           // reset dummy fetch, dummy ticks
+                                          // beginning
+            // dummy_fetch = false;           // reset dummy fetch, dummy ticks
             dummy_ticks = 0;
-            //return;
+            // return;
         }
 
         /*
@@ -404,67 +461,7 @@ void ppu::tick() {
             }
 
             if (fetch_sprite) {
-                assert((*sprite_to_fetch).y >= 16 &&
-                       "sprite to fetch y position is abnormal!");
-
-                uint16_t sprite_address{};
-                uint16_t line_offset{};
-
-                bool y_flip = (*sprite_to_fetch).flags & 0x40; // bit 6 y-flip
-
-                if (_get(LCDC) & 0x04) {
-                    // tall sprite mode
-                    if (_get(LY) <= ((*sprite_to_fetch).y - 16) + 7) {
-                        // top half
-                        if (!y_flip) {
-                            tile_id &= 0xfe; // set lsb to 0
-                            line_offset =
-                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
-                        } else {
-                            tile_id |= 0x01; // set lsb to 1
-                            line_offset =
-                                (8 - 1 -
-                                 (_get(LY) - ((*sprite_to_fetch).y - 16))) *
-                                2;
-                        }
-                    }
-
-                    else {
-                        // bottom half
-                        if (!y_flip) {
-                            tile_id |= 0x01;
-                            line_offset =
-                                (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
-                        } else {
-                            tile_id &= 0xfe;
-                            line_offset =
-                                (8 - 1 -
-                                 (_get(LY) -
-                                  (((*sprite_to_fetch).y - 16) + 7))) *
-                                2;
-                        }
-                    }
-
-                }
-
-                else {
-                    if (!y_flip) {
-                        line_offset =
-                            (_get(LY) - ((*sprite_to_fetch).y - 16)) * 2;
-                    }
-
-                    else {
-                        // get the flipped sprite data
-                        line_offset =
-                            (8 - 1 - (_get(LY) - ((*sprite_to_fetch).y - 16))) *
-                            2;
-                    }
-                }
-
-                sprite_address = 0x8000 + (16 * tile_id) + line_offset;
-
-                low_byte = _get(sprite_address);
-                high_byte_address = sprite_address + 1;
+                sprite_fetch_tile_data_low();
             }
 
             else { // bg/window
@@ -587,13 +584,20 @@ void ppu::tick() {
                     fetch_sprite = true;
                     sprite_to_fetch = &sprites_to_fetch[0];
 
-                    // fetch tile no step should be completed already! resync timing
+                    // fetch tile no step should be completed already! resync
+                    // timing
                     this->tile_id = (*sprite_to_fetch).tile_id;
 
-                    current_fetcher_mode = fetcher_mode::FetchTileDataLow;
-                    fetcher_ticks = 2; // beginning of fetch tile data low fetcher ticks should be 3
-                }
+                    // see if you want to fetch data low as well fetcher_ticks = 4-5
+                    sprite_fetch_tile_data_low();
 
+                    // try fetch tile data high? fetcher ticks = 6
+                    //high_byte = _get(high_byte_address);
+                    //current_fetcher_mode = fetcher_mode::PushToFIFO;
+
+                    current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
+                    fetcher_ticks = 5; // beginning of fetch tile data low
+                }
             }
             break;
         }
@@ -601,7 +605,8 @@ void ppu::tick() {
 
         // check for sprites every dot, wait for background fifo to be empty
         if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
-            sprites_to_fetch.empty() && !background_fifo.empty()) { // check bit 1 for enable sprites
+            sprites_to_fetch.empty() &&
+            !background_fifo.empty()) { // check bit 1 for enable sprites
 
             for (unsigned int i = 0; i < sprite_buffer.size();) {
                 if (sprite_buffer[i].x <= lcd_x) {
@@ -614,7 +619,8 @@ void ppu::tick() {
         }
 
         // push pixels to LCD, 1 pixel per dot
-        if (!background_fifo.empty() && !fetch_sprite && sprites_to_fetch.empty()) {
+        if (!background_fifo.empty() && !fetch_sprite &&
+            sprites_to_fetch.empty()) {
 
             // discard scx (one per dot)
             if (lcd_x == 8 && (_get(SCX) % 8) && scx_discard) {
