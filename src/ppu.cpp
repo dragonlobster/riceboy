@@ -195,6 +195,69 @@ void ppu::sprite_fetch_tile_data_low() {
     high_byte_address = sprite_address + 1;
 }
 
+void ppu::sprite_push_to_fifo() {
+
+    assert((*sprite_to_fetch).x <= lcd_x + 8 &&
+           "sprite x position is not <= lcd_x + 8!");
+
+    bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
+
+    while (sprite_fifo.size() < 8) {
+        sprite_fifo_pixel filler = {0, 0, 0};
+        sprite_fifo.emplace(sprite_fifo.begin(), filler);
+    }
+
+    for (unsigned int i = 0, fifo_index = 0; i < 8; ++i, ++fifo_index) {
+        // check sprite x position to see if pixels should be loaded
+        // into fifo
+
+        if ((*sprite_to_fetch).x < 8) {
+            if (i < 8 - (*sprite_to_fetch).x) {
+                --fifo_index;
+                continue;
+            }
+        }
+
+        unsigned int j = x_flip ? 7 - i : i;
+
+        uint8_t final_bit =
+            ((low_byte >> j) & 1) | (((high_byte >> j) << 1) & 0x02);
+
+        sprite_fifo_pixel pixel = {(*sprite_to_fetch).x, final_bit,
+                                   (*sprite_to_fetch).flags};
+
+        if (sprite_fifo[fifo_index].color_id == 0) {
+            sprite_fifo[fifo_index] = pixel;
+        }
+    }
+
+    // handle sprites to fetch array
+    sprite_to_fetch = nullptr;
+    sprites_to_fetch.erase(sprites_to_fetch.begin());
+    if (sprites_to_fetch.empty()) {
+        fetch_sprite_ip = false;
+    } else {
+        sprite_to_fetch = &sprites_to_fetch[0];
+    }
+}
+
+void ppu::fetch_sprite() {
+    // fetch a sprite, remember to stall the appropriate amount of cycles based
+    // on sprite x mod 8
+
+    // step 1: get tile id
+    this->tile_id = (*sprite_to_fetch).tile_id;
+
+    // step 2: fetch tile data low
+    sprite_fetch_tile_data_low();
+
+    // step 3: fetch tile data high:
+    high_byte = _get(high_byte_address);
+
+    // step 4: push to sprite fifo
+    sprite_push_to_fifo();
+}
+
 void ppu::tick() {
     // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
@@ -378,7 +441,7 @@ void ppu::tick() {
 
         /*
         // check for sprites right away
-        if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
+        if (!sprite_buffer.empty() && !fetch_sprite_ip && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty()) { // check bit 1 for enable sprites
 
             for (unsigned int i = 0; i < sprite_buffer.size();) {
@@ -393,7 +456,7 @@ void ppu::tick() {
 
         if (!sprites_to_fetch.empty() &&
             !sprite_to_fetch) { // check if we are already fetching a sprite
-            fetch_sprite = true;
+            fetch_sprite_ip = true;
 
             // NOTE: this fixed a bug where my first column of tiles was missing
             current_fetcher_mode =
@@ -410,7 +473,7 @@ void ppu::tick() {
                 break;
             }
 
-            if (fetch_sprite) {
+            if (fetch_sprite_ip) {
                 // set tile id to sprite to fetch tile id
                 this->tile_id = (*sprite_to_fetch).tile_id;
             }
@@ -420,7 +483,7 @@ void ppu::tick() {
                 // check to see which map to use
                 uint16_t bgmap_start = 0x9800;
 
-                if (!fetch_window) {
+                if (!fetch_window_ip) {
                     if (((_get(LCDC) >> 3) & 1) == 1) {
                         bgmap_start = 0x9c00;
                     }
@@ -460,12 +523,12 @@ void ppu::tick() {
                 break;
             }
 
-            if (fetch_sprite) {
+            if (fetch_sprite_ip) {
                 sprite_fetch_tile_data_low();
             }
 
             else { // bg/window
-                uint16_t offset = fetch_window
+                uint16_t offset = fetch_window_ip
                                       ? 2 * (this->window_ly % 8)
                                       : 2 * ((_get(LY) + _get(SCY)) % 8);
 
@@ -503,51 +566,9 @@ void ppu::tick() {
         }
 
         case fetcher_mode::PushToFIFO: {
-            if (fetch_sprite) {
+            if (fetch_sprite_ip) {
 
-                assert((*sprite_to_fetch).x <= lcd_x + 8 &&
-                       "sprite x position is not <= lcd_x + 8!");
-
-                bool x_flip = (*sprite_to_fetch).flags & 0x20; // x flip
-
-                while (sprite_fifo.size() < 8) {
-                    sprite_fifo_pixel filler = {0, 0, 0};
-                    sprite_fifo.emplace(sprite_fifo.begin(), filler);
-                }
-
-                for (unsigned int i = 0, fifo_index = 0; i < 8;
-                     ++i, ++fifo_index) {
-                    // check sprite x position to see if pixels should be loaded
-                    // into fifo
-
-                    if ((*sprite_to_fetch).x < 8) {
-                        if (i < 8 - (*sprite_to_fetch).x) {
-                            --fifo_index;
-                            continue;
-                        }
-                    }
-
-                    unsigned int j = x_flip ? 7 - i : i;
-
-                    uint8_t final_bit = ((low_byte >> j) & 1) |
-                                        (((high_byte >> j) << 1) & 0x02);
-
-                    sprite_fifo_pixel pixel = {(*sprite_to_fetch).x, final_bit,
-                                               (*sprite_to_fetch).flags};
-
-                    if (sprite_fifo[fifo_index].color_id == 0) {
-                        sprite_fifo[fifo_index] = pixel;
-                    }
-                }
-
-                // handle sprites to fetch array
-                sprite_to_fetch = nullptr;
-                sprites_to_fetch.erase(sprites_to_fetch.begin());
-                if (sprites_to_fetch.empty()) {
-                    fetch_sprite = false;
-                } else {
-                    sprite_to_fetch = &sprites_to_fetch[0];
-                }
+                sprite_push_to_fifo();
 
                 fetcher_ticks = 1;
                 // takes up 1 cycle of FetchTileNo
@@ -581,19 +602,20 @@ void ppu::tick() {
 
                 // if sprites are not empty
                 if (!sprites_to_fetch.empty()) {
-                    fetch_sprite = true;
+                    fetch_sprite_ip = true;
                     sprite_to_fetch = &sprites_to_fetch[0];
 
                     // fetch tile no step should be completed already! resync
                     // timing
                     this->tile_id = (*sprite_to_fetch).tile_id;
 
-                    // see if you want to fetch data low as well fetcher_ticks = 4-5
+                    // see if you want to fetch data low as well fetcher_ticks =
+                    // 4-5
                     sprite_fetch_tile_data_low();
 
                     // try fetch tile data high? fetcher ticks = 6
-                    //high_byte = _get(high_byte_address);
-                    //current_fetcher_mode = fetcher_mode::PushToFIFO;
+                    // high_byte = _get(high_byte_address);
+                    // current_fetcher_mode = fetcher_mode::PushToFIFO;
 
                     current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
                     fetcher_ticks = 5; // beginning of fetch tile data low
@@ -604,7 +626,7 @@ void ppu::tick() {
         }
 
         // check for sprites every dot, wait for background fifo to be empty
-        if (!sprite_buffer.empty() && !fetch_sprite && (_get(LCDC) & 0x02) &&
+        if (!sprite_buffer.empty() && !fetch_sprite_ip && (_get(LCDC) & 0x02) &&
             sprites_to_fetch.empty() &&
             !background_fifo.empty()) { // check bit 1 for enable sprites
 
@@ -619,7 +641,7 @@ void ppu::tick() {
         }
 
         // push pixels to LCD, 1 pixel per dot
-        if (!background_fifo.empty() && !fetch_sprite &&
+        if (!background_fifo.empty() && !fetch_sprite_ip &&
             sprites_to_fetch.empty()) {
 
             // discard scx (one per dot)
@@ -677,11 +699,11 @@ void ppu::tick() {
             lcd_x++; // increment the lcd x position
 
             // check for window fetching after pixel was shifted out to LCD
-            if (!fetch_window && (_get(LCDC) & 0x20) &&
+            if (!fetch_window_ip && (_get(LCDC) & 0x20) &&
                 (lcd_x >= _get(WX) + 1) && wy_condition) {
                 tile_index = 0;
                 background_fifo.clear();
-                fetch_window = true;
+                fetch_window_ip = true;
                 current_fetcher_mode = fetcher_mode::FetchTileNo;
             }
         }
@@ -733,7 +755,7 @@ void ppu::tick() {
 
             //_set(LY, _get(LY) + 1); // new scanline reached
 
-            if (fetch_window) {
+            if (fetch_window_ip) {
                 window_ly++;
             } // add window ly before resetting fetch window
 
@@ -745,7 +767,7 @@ void ppu::tick() {
 
             // dummy fetch too?
             dummy_fetch = true;
-            fetch_window = false;
+            fetch_window_ip = false;
 
             // clear sprite buffer
             sprite_buffer.clear();

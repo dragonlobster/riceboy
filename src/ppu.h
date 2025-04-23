@@ -36,8 +36,8 @@ class ppu {
 
     uint8_t tile_index{0}; // saved tile index for fetcher
     uint8_t tile_id{0};    // saved tile_id for grabbing
-    bool fetch_window{false};
-    bool fetch_sprite{false};
+    bool fetch_window_ip{false}; // fetch window in progress
+    bool fetch_sprite_ip{false}; // fetch sprite in progress
 
     // saved low byte and high byte for processing
     uint8_t low_byte{};
@@ -103,8 +103,10 @@ class ppu {
         PushToFIFO
     };
 
-    // fetch tile data low function
+    // sprite fetch tile data low function
     void sprite_fetch_tile_data_low();
+    // sprite push to fifo function
+    void sprite_push_to_fifo();
 
     // setting stat.mode might be delayed
     ppu_mode current_mode{ppu_mode::OAM_Scan};
@@ -124,6 +126,9 @@ class ppu {
 
     std::vector<oam_entry> sprites_to_fetch{};
     oam_entry *sprite_to_fetch{nullptr};
+
+    // fetch sprite method so i can control the precise timing
+    void fetch_sprite();
 
     // update ppu mode
     void update_ppu_mode(ppu_mode mode);
