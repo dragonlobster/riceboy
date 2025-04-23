@@ -106,9 +106,9 @@ class ppu {
     };
 
     // sprite fetch tile data low function
-    void sprite_fetch_tile_data_low();
+    void sprite_fetch_tile_data_low(oam_entry sprite);
     // sprite push to fifo function
-    void sprite_push_to_fifo();
+    void sprite_push_to_fifo(oam_entry sprite);
 
     // setting stat.mode might be delayed
     ppu_mode current_mode{ppu_mode::OAM_Scan};
@@ -127,10 +127,11 @@ class ppu {
     std::vector<oam_entry> sprite_buffer{}; // sprite buffer
 
     std::vector<oam_entry> sprites_to_fetch{};
-    oam_entry *sprite_to_fetch{nullptr};
+    //oam_entry *sprite_to_fetch{nullptr};
 
-    // fetch sprite method so i can control the precise timing
+    // fetch sprite method so i can control the precise timing, returns total stall
     void fetch_sprite();
+    uint8_t sprite_fetch_stall_cycles{0};
 
     // update ppu mode
     void update_ppu_mode(ppu_mode mode);
