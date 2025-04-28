@@ -19,6 +19,8 @@ class ppu {
     uint16_t ticks{0}; // tick counter
     uint16_t fetcher_ticks{
         0}; // pixel fetcher ticking for accurate 2 tick counts
+    uint16_t sprite_ticks{
+        0}; // sprite fetcher ticks
     uint8_t dummy_ticks{
         0}; // 8 dummy ticks for dummy fetching (6 to fetch 2 to discard)
     uint16_t mode3_ticks{0}; // how many ticks mode 3 drawing takes
@@ -130,7 +132,8 @@ class ppu {
     //oam_entry *sprite_to_fetch{nullptr};
 
     // fetch sprite method so i can control the precise timing, returns total stall
-    void fetch_sprite();
+    void fetch_sprites();
+    //uint8_t sprite_fetch_stall_cycles{0};
     uint8_t sprite_fetch_stall_cycles{0};
 
     // update ppu mode
