@@ -69,6 +69,11 @@ void ppu::update_ppu_mode(ppu_mode mode) {
         vblank_start = true;
     }
 
+    if (current_mode == ppu_mode::Drawing) {
+        // CRITICAL: remember to reset pixel fetcehr mode!
+        this->current_fetcher_mode = fetcher_mode::FetchTileNo;
+    }
+
     this->gb_mmu.oam_read_block =
         current_mode == ppu_mode::OAM_Scan || current_mode == ppu_mode::Drawing;
 
@@ -226,7 +231,7 @@ void ppu::sprite_fetch_tile_data_low(oam_entry sprite) {
 
 void ppu::sprite_push_to_fifo(oam_entry sprite) {
 
-    assert((sprite).x <= lcd_x + 8 && "sprite x position is not <= lcd_x + 8!");
+    assert((sprite).x <= lcd_x && "sprite x position is not <= lcd_x!");
 
     bool x_flip = (sprite).flags & 0x20; // x flip
 
@@ -321,6 +326,7 @@ void ppu::fetch_sprites() {
     uint8_t first_sprite_cycles{0};
 
     // first sprite x can only be 0-7 (because we used %8)
+    /*
     switch (mod8) {
     case 0: first_sprite_cycles = 8; break; // 7 - 8
     case 1: first_sprite_cycles = 8; break; // 7 - 8
@@ -330,6 +336,17 @@ void ppu::fetch_sprites() {
     case 5: first_sprite_cycles = 0; break;
     case 6: first_sprite_cycles = 0; break;
     case 7: first_sprite_cycles = 0; break;
+    }*/
+
+    switch (mod8) {
+    case 0: first_sprite_cycles = 8; break; // default stall: 0  8
+    case 1: first_sprite_cycles = 8; break; // default stall: 0  8
+    case 2: first_sprite_cycles = 4; break; // default stall: 1  5
+    case 3: first_sprite_cycles = 4; break; // default stall: 2  6
+    case 4: first_sprite_cycles = 0; break; // default stall: 3  3
+    case 5: first_sprite_cycles = 0; break; // default stall: 3  3
+    case 6: first_sprite_cycles = 0; break; // default stall: 4  4
+    case 7: first_sprite_cycles = 0; break; // default stall: 5  5
     }
 
     // assert(first_sprite_cycles && "first sprite cycles must have been set!");
@@ -341,15 +358,46 @@ void ppu::fetch_sprites() {
     // sprite_fetch_stall_cycles += penalty;
     sprite_fetch_stall_cycles = first_sprite_cycles + default_cycles;
 
-    if (first_sprite_x == 15) {
+    // 0, 0, 1, 2, 3, 3, 4, 5
+    if (first_sprite_x == 160) {
+        sprite_fetch_stall_cycles += 2;
+    }
+    /*
+    if (first_sprite_x == 160 && sprites_to_fetch.size() < 10) {
         sprite_fetch_stall_cycles += 0;
+    }*/
+
+    if (first_sprite_x == 161) {
+        sprite_fetch_stall_cycles += 2;
+    }
+    if (first_sprite_x == 162) {
+        sprite_fetch_stall_cycles += 0;
+    }
+    if (first_sprite_x == 163) {
+        sprite_fetch_stall_cycles += 2;
+    }
+    if (first_sprite_x == 164) {
+        sprite_fetch_stall_cycles += 3;
+    }
+    if (first_sprite_x == 165) {
+        sprite_fetch_stall_cycles += 3;
+    }
+    if (first_sprite_x == 166) {
+        sprite_fetch_stall_cycles += 4;
+    }
+    if (first_sprite_x == 167) {
+        sprite_fetch_stall_cycles += 5;
+    }
+
+    /*
+    if (first_sprite_x == 167) {
+        sprite_fetch_stall_cycles = 0;
     }
 
     if (first_sprite_x == 167) {
         sprite_fetch_stall_cycles += 5;
     }
 
-    /*
     if (first_sprite_x == 160) {
         sprite_fetch_stall_cycles += 2;
     }
@@ -458,7 +506,7 @@ void ppu::tick() {
             // LCD On for the first time started 4 T-cycles shorter, so we
             // artifically align the tick numbers for this frame
             ticks += 4;
-            this->current_fetcher_mode = fetcher_mode::FetchTileNo;
+            // this->current_fetcher_mode = fetcher_mode::FetchTileNo;
             update_ppu_mode(ppu_mode::Drawing);
         }
 
@@ -546,8 +594,8 @@ void ppu::tick() {
 
             // NOTE: this fixed a bug where my first column of tiles was
             // missing; reset the current fetcher mode
-            current_fetcher_mode =
-                fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
+            // current_fetcher_mode =
+            //    fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
 
             update_ppu_mode(ppu_mode::Drawing);
         }
@@ -558,54 +606,7 @@ void ppu::tick() {
     case ppu_mode::Drawing: {
         mode3_ticks++;
 
-        // assert that ticks this step takes is between 172+80 and 289+80
-        // drawing mode 3
-        // fetch tile no
-
-        // currently we have 174 cycles for minimum case (8 dummy fetch (6
-        // fetch, 2 discard?) + 6 initial fetch + 160 tiles inital fetch
-        // ),
-
-        // this->gb_mmu.vram_write_block = true;
-        // this->gb_mmu.oam_write_block = true;
-
-        /*
-        // check for sprites right away
-        if (!sprite_buffer.empty() && !fetch_sprite_ip && (_get(LCDC) & 0x02) &&
-            sprites_to_fetch.empty()) { // check bit 1 for enable sprites
-
-            for (unsigned int i = 0; i < sprite_buffer.size();) {
-                if (sprite_buffer[i].x <= lcd_x) {
-                    sprites_to_fetch.push_back(sprite_buffer[i]);
-                    sprite_buffer.erase(sprite_buffer.begin() + i);
-                } else {
-                    ++i;
-                }
-            }
-        }
-
-        if (!sprites_to_fetch.empty() &&
-            !sprite_to_fetch) { // check if we are already fetching a sprite
-            fetch_sprite_ip = true;
-
-            // NOTE: this fixed a bug where my first column of tiles was missing
-            current_fetcher_mode =
-                fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
-
-            sprite_to_fetch = &sprites_to_fetch[0];
-        }*/
-
         fetcher_ticks++;
-
-        /*
-        if (dummy_fetch) {
-            assert(current_fetcher_mode == fetcher_mode::FetchTileNo && "wtf mode?");
-            // wait 6-8 ticks (172 or 174 for background tiles)
-            if (fetcher_ticks < 7) {
-                return;
-            }
-            current_fetcher_mode = fetcher_mode::PushToFIFO;
-        }*/
 
         switch (current_fetcher_mode) {
 
@@ -614,12 +615,6 @@ void ppu::tick() {
             if (fetcher_ticks < 2 || fetch_sprite_ip) {
                 break;
             }
-
-            /*
-            if (fetch_sprite_ip) {
-                // set tile id to sprite to fetch tile id
-                this->tile_id = (*sprite_to_fetch).tile_id;
-            }*/
 
             if (dummy_fetch) {
                 current_fetcher_mode = fetcher_mode::FetchTileDataLow;
@@ -743,29 +738,7 @@ void ppu::tick() {
                 fetcher_ticks = 1;
             }
 
-            // if sprites are not empty
-            /*
-            if (!sprites_to_fetch.empty()) {
-                fetch_sprite_ip = true;
-                sprite_to_fetch = &sprites_to_fetch[0];
-
-                // fetch tile no step should be completed already! resync
-                // timing
-                this->tile_id = (*sprite_to_fetch).tile_id;
-
-                // see if you want to fetch data low as well fetcher_ticks =
-                // 4-5
-                sprite_fetch_tile_data_low();
-
-                // try fetch tile data high? fetcher ticks = 6
-                // high_byte = _get(high_byte_address);
-                // current_fetcher_mode = fetcher_mode::PushToFIFO;
-
-                current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
-                fetcher_ticks = 5; // beginning of fetch tile data low
-            }*/
         } break;
-            //}
         }
 
         // check for sprites every dot, wait for background fifo to be empty
@@ -886,7 +859,6 @@ void ppu::tick() {
             if (ticks > 400) {
                 std::cout << ticks << '\n';
             }
-            // std::cout << ticks << '\n';
 
             update_ppu_mode(ppu_mode::HBlank);
         }
