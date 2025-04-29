@@ -339,15 +339,16 @@ void ppu::fetch_sprites() {
     }*/
 
     switch (mod8) {
-    case 0: first_sprite_cycles = 8; break; // default stall: 0  8
-    case 1: first_sprite_cycles = 8; break; // default stall: 0  8
-    case 2: first_sprite_cycles = 4; break; // default stall: 1  5
-    case 3: first_sprite_cycles = 4; break; // default stall: 2  6
-    case 4: first_sprite_cycles = 0; break; // default stall: 3  3
-    case 5: first_sprite_cycles = 0; break; // default stall: 3  3
-    case 6: first_sprite_cycles = 0; break; // default stall: 4  4
-    case 7: first_sprite_cycles = 0; break; // default stall: 5  5
+    case 0: first_sprite_cycles = 11-0; break; // default stall: 0  8
+    case 1: first_sprite_cycles = 10-0; break; // default stall: 0  8
+    case 2: first_sprite_cycles = 9-1; break; // default stall: 1-2?  5
+    case 3: first_sprite_cycles = 8-2; break; // default stall: 2  4
+    case 4: first_sprite_cycles = 7-3; break; // default stall: 3  1
+    case 5: first_sprite_cycles = 6-3; break; // default stall: 3  1
+    case 6: first_sprite_cycles = 6-4; break; // default stall: 4  0
+    case 7: first_sprite_cycles = 6-5; break; // default stall: 5  0
     }
+
 
     // assert(first_sprite_cycles && "first sprite cycles must have been set!");
 
@@ -355,45 +356,46 @@ void ppu::fetch_sprites() {
     // uint8_t penalty = largest_sprite_x > 160 ? (largest_sprite_x - 160) - 3 :
     // 0;
 
+    if (first_sprite_x == 1) {
+        first_sprite_cycles += 0;
+    }
+
+    /*
+    // 0, 0, 1, 2, 3, 3, 4, 5
+    if (first_sprite_x == 160) {
+        first_sprite_cycles += 0;
+    }
+    if (first_sprite_x == 161) {
+        first_sprite_cycles += 0;
+    }
+    if (first_sprite_x == 162) {
+        first_sprite_cycles += 1;
+    }
+    if (first_sprite_x == 163) {
+        first_sprite_cycles += 2;
+    }
+    if (first_sprite_x == 164) {
+        first_sprite_cycles += 3;
+    }
+    if (first_sprite_x == 165) {
+        first_sprite_cycles += 3;
+    }
+    if (first_sprite_x == 166) {
+        first_sprite_cycles += 4;
+    }
+    if (first_sprite_x == 167) {
+        first_sprite_cycles += 5;
+    }*/
+
     // sprite_fetch_stall_cycles += penalty;
     sprite_fetch_stall_cycles = first_sprite_cycles + default_cycles;
 
-    // 0, 0, 1, 2, 3, 3, 4, 5
-    if (first_sprite_x == 160) {
-        sprite_fetch_stall_cycles += 2;
-    }
-    /*
-    if (first_sprite_x == 160 && sprites_to_fetch.size() < 10) {
-        sprite_fetch_stall_cycles += 0;
-    }*/
-
-    if (first_sprite_x == 161) {
-        sprite_fetch_stall_cycles += 2;
-    }
-    if (first_sprite_x == 162) {
-        sprite_fetch_stall_cycles += 0;
-    }
-    if (first_sprite_x == 163) {
-        sprite_fetch_stall_cycles += 2;
-    }
-    if (first_sprite_x == 164) {
-        sprite_fetch_stall_cycles += 3;
-    }
-    if (first_sprite_x == 165) {
-        sprite_fetch_stall_cycles += 3;
-    }
-    if (first_sprite_x == 166) {
-        sprite_fetch_stall_cycles += 4;
-    }
-    if (first_sprite_x == 167) {
-        sprite_fetch_stall_cycles += 5;
+    // subtract until divisible by 4
+    while (sprite_fetch_stall_cycles % 4 != 0) {
+        sprite_fetch_stall_cycles--;
     }
 
     /*
-    if (first_sprite_x == 167) {
-        sprite_fetch_stall_cycles = 0;
-    }
-
     if (first_sprite_x == 167) {
         sprite_fetch_stall_cycles += 5;
     }
@@ -429,15 +431,8 @@ void ppu::fetch_sprites() {
 
     if (first_sprite_x == 167) {
         sprite_fetch_stall_cycles += 4;
-    }
-
-    if (first_sprite_x == 5 && sprites_to_fetch.size() == 1) {
-        sprite_fetch_stall_cycles += 0;
-    }
-
-    if (first_sprite_x == 6 && sprites_to_fetch.size() == 1) {
-        sprite_fetch_stall_cycles += 0;
     }*/
+
 
     sprites_to_fetch.clear();
 
