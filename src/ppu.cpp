@@ -356,7 +356,7 @@ void ppu::fetch_sprites() {
     // uint8_t penalty = largest_sprite_x > 160 ? (largest_sprite_x - 160) - 3 :
     // 0;
 
-    if (first_sprite_x == 1) {
+    if (first_sprite_x == 2) {
         first_sprite_cycles += 0;
     }
 
