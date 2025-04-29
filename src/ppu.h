@@ -19,12 +19,9 @@ class ppu {
     uint16_t ticks{0}; // tick counter
     uint16_t fetcher_ticks{
         0}; // pixel fetcher ticking for accurate 2 tick counts
-    uint16_t sprite_ticks{
-        0}; // sprite fetcher ticks
-    uint8_t dummy_ticks{
-        0}; // 8 dummy ticks for dummy fetching (6 to fetch 2 to discard)
-    uint16_t mode3_ticks{0}; // how many ticks mode 3 drawing takes
-    uint16_t mode0_ticks{0}; // how many ticks mode 0 hblank takes
+    uint16_t sprite_ticks{0}; // sprite fetcher ticks
+    uint16_t mode3_ticks{0};  // how many ticks mode 3 drawing takes
+    uint16_t mode0_ticks{0};  // how many ticks mode 0 hblank takes
     void reset_ticks();
 
     // separate from the other ticks, aligns interrupt with T-cycles
@@ -38,8 +35,8 @@ class ppu {
     bool wy_condition{
         false}; // triggers window if wy == ly at some point in this frame
 
-    uint8_t tile_index{0}; // saved tile index for fetcher
-    uint8_t tile_id{0};    // saved tile_id for grabbing
+    uint8_t tile_index{0};       // saved tile index for fetcher
+    uint8_t tile_id{0};          // saved tile_id for grabbing
     bool fetch_window_ip{false}; // fetch window in progress
     bool fetch_sprite_ip{false}; // fetch sprite in progress
 
@@ -87,7 +84,7 @@ class ppu {
     void increment_ly();
 
     // calculate t and m cycles of current tick
-    //std::tuple<uint8_t, uint8_t> get_current_cycle();
+    // std::tuple<uint8_t, uint8_t> get_current_cycle();
 
     bool vblank_start{false};
     void interrupt_line_check();
@@ -129,11 +126,12 @@ class ppu {
     std::vector<oam_entry> sprite_buffer{}; // sprite buffer
 
     std::vector<oam_entry> sprites_to_fetch{};
-    //oam_entry *sprite_to_fetch{nullptr};
+    // oam_entry *sprite_to_fetch{nullptr};
 
-    // fetch sprite method so i can control the precise timing, returns total stall
+    // fetch sprite method so i can control the precise timing, returns total
+    // stall
     void fetch_sprites();
-    //uint8_t sprite_fetch_stall_cycles{0};
+    // uint8_t sprite_fetch_stall_cycles{0};
     uint8_t sprite_fetch_stall_cycles{0};
 
     // update ppu mode

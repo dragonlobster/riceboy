@@ -28,7 +28,6 @@ ppu::ppu(mmu &gb_mmu_, sf::RenderWindow &window_)
 void ppu::initialize_skip_bootrom_values() {
     ticks = 0x019f;
     fetcher_ticks = 0;
-    dummy_ticks = 0;
     mode3_ticks = 0;
     mode0_ticks = 0;
     interrupt_ticks = 0;
@@ -52,7 +51,6 @@ void ppu::initialize_skip_bootrom_values() {
     vblank_start = false;
     current_mode = ppu_mode::VBlank;
     last_mode = ppu_mode::HBlank;
-    extend_oam_write_block = false;
     mode_t_cycle = 0;
     mode_m_cycle = 0;
     current_fetcher_mode = fetcher_mode::PushToFIFO;
@@ -169,7 +167,6 @@ sf::Color ppu::get_pixel_color(uint8_t pixel, uint8_t palette) {
 void ppu::reset_ticks() {
     this->ticks = 0;
     this->fetcher_ticks = 0;
-    this->dummy_ticks = 0;
     this->mode3_ticks = 0;
     this->mode0_ticks = 0;
 }
@@ -344,6 +341,15 @@ void ppu::fetch_sprites() {
     // sprite_fetch_stall_cycles += penalty;
     sprite_fetch_stall_cycles = first_sprite_cycles + default_cycles;
 
+    if (first_sprite_x == 15) {
+        sprite_fetch_stall_cycles += 0;
+    }
+
+    if (first_sprite_x == 167) {
+        sprite_fetch_stall_cycles += 5;
+    }
+
+    /*
     if (first_sprite_x == 160) {
         sprite_fetch_stall_cycles += 2;
     }
@@ -383,7 +389,7 @@ void ppu::fetch_sprites() {
 
     if (first_sprite_x == 6 && sprites_to_fetch.size() == 1) {
         sprite_fetch_stall_cycles += 0;
-    }
+    }*/
 
     sprites_to_fetch.clear();
 
@@ -452,6 +458,7 @@ void ppu::tick() {
             // LCD On for the first time started 4 T-cycles shorter, so we
             // artifically align the tick numbers for this frame
             ticks += 4;
+            this->current_fetcher_mode = fetcher_mode::FetchTileNo;
             update_ppu_mode(ppu_mode::Drawing);
         }
 
@@ -537,6 +544,11 @@ void ppu::tick() {
                     });
             }
 
+            // NOTE: this fixed a bug where my first column of tiles was
+            // missing; reset the current fetcher mode
+            current_fetcher_mode =
+                fetcher_mode::FetchTileNo; // set to fetch tile no for sprites
+
             update_ppu_mode(ppu_mode::Drawing);
         }
 
@@ -545,6 +557,7 @@ void ppu::tick() {
 
     case ppu_mode::Drawing: {
         mode3_ticks++;
+
         // assert that ticks this step takes is between 172+80 and 289+80
         // drawing mode 3
         // fetch tile no
@@ -555,21 +568,6 @@ void ppu::tick() {
 
         // this->gb_mmu.vram_write_block = true;
         // this->gb_mmu.oam_write_block = true;
-
-        if (dummy_fetch) {
-            // wait 6-8 ticks (172 or 174 for background tiles)
-            dummy_ticks++;
-
-            if (dummy_ticks < 7) {
-                return;
-            }
-            current_fetcher_mode =
-                fetcher_mode::PushToFIFO; // set to fetch tile no in
-                                          // beginning
-            // dummy_fetch = false;           // reset dummy fetch, dummy ticks
-            dummy_ticks = 0;
-            // return;
-        }
 
         /*
         // check for sprites right away
@@ -598,9 +596,21 @@ void ppu::tick() {
         }*/
 
         fetcher_ticks++;
+
+        /*
+        if (dummy_fetch) {
+            assert(current_fetcher_mode == fetcher_mode::FetchTileNo && "wtf mode?");
+            // wait 6-8 ticks (172 or 174 for background tiles)
+            if (fetcher_ticks < 7) {
+                return;
+            }
+            current_fetcher_mode = fetcher_mode::PushToFIFO;
+        }*/
+
         switch (current_fetcher_mode) {
 
         case fetcher_mode::FetchTileNo: {
+
             if (fetcher_ticks < 2 || fetch_sprite_ip) {
                 break;
             }
@@ -611,41 +621,43 @@ void ppu::tick() {
                 this->tile_id = (*sprite_to_fetch).tile_id;
             }*/
 
-            else {
-                uint16_t address{};
-                // check to see which map to use
-                uint16_t bgmap_start = 0x9800;
-
-                if (!fetch_window_ip) {
-                    if (((_get(LCDC) >> 3) & 1) == 1) {
-                        bgmap_start = 0x9c00;
-                    }
-
-                    uint16_t scy_offset =
-                        32 * (((_get(LY) + _get(SCY)) % 256) / 8);
-
-                    uint16_t scx_offset = (tile_index + _get(SCX) / 8) % 32;
-
-                    address = bgmap_start + ((scy_offset + scx_offset) & 0x3ff);
-
-                    tile_id = _get(address);
-
-                }
-
-                else {
-                    // window fetch
-                    if (_get(LCDC) & 0x40) { // 6th bit
-                        bgmap_start = 0x9c00;
-                    } // bgmap_start is either 0x9c00 or 0x9800
-
-                    uint16_t wy_offset = 32 * (window_ly / 8);
-                    uint16_t wx_offset = tile_index;
-
-                    address = bgmap_start + ((wy_offset + wx_offset) & 0x3ff);
-                }
-
-                this->tile_id = _get(address);
+            if (dummy_fetch) {
+                current_fetcher_mode = fetcher_mode::FetchTileDataLow;
+                break;
             }
+
+            uint16_t address{};
+            // check to see which map to use
+            uint16_t bgmap_start = 0x9800;
+
+            if (!fetch_window_ip) {
+                if (((_get(LCDC) >> 3) & 1) == 1) {
+                    bgmap_start = 0x9c00;
+                }
+
+                uint16_t scy_offset = 32 * (((_get(LY) + _get(SCY)) % 256) / 8);
+
+                uint16_t scx_offset = (tile_index + _get(SCX) / 8) % 32;
+
+                address = bgmap_start + ((scy_offset + scx_offset) & 0x3ff);
+
+                tile_id = _get(address);
+
+            }
+
+            else {
+                // window fetch
+                if (_get(LCDC) & 0x40) { // 6th bit
+                    bgmap_start = 0x9c00;
+                } // bgmap_start is either 0x9c00 or 0x9800
+
+                uint16_t wy_offset = 32 * (window_ly / 8);
+                uint16_t wx_offset = tile_index;
+
+                address = bgmap_start + ((wy_offset + wx_offset) & 0x3ff);
+            }
+
+            this->tile_id = _get(address);
 
             current_fetcher_mode = fetcher_mode::FetchTileDataLow;
             break;
@@ -656,32 +668,29 @@ void ppu::tick() {
                 break;
             }
 
-            /*
-            if (fetch_sprite_ip) {
-                sprite_fetch_tile_data_low();
-            }*/
-
-            else { // bg/window
-                uint16_t offset = fetch_window_ip
-                                      ? 2 * (this->window_ly % 8)
-                                      : 2 * ((_get(LY) + _get(SCY)) % 8);
-
-                uint16_t address{};
-
-                // 8000 method or 8800 method to read
-                if (((_get(LCDC) >> 4) & 1) == 0) {
-                    // 8800 method
-                    address =
-                        0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
-
-                } else {
-                    // 8000 method
-                    address = 0x8000 + (tile_id * 16) + offset;
-                }
-
-                low_byte = _get(address);
-                high_byte_address = address + 1;
+            if (dummy_fetch) {
+                current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
+                break;
             }
+
+            uint16_t offset = fetch_window_ip
+                                  ? 2 * (this->window_ly % 8)
+                                  : 2 * ((_get(LY) + _get(SCY)) % 8);
+
+            uint16_t address{};
+
+            // 8000 method or 8800 method to read
+            if (((_get(LCDC) >> 4) & 1) == 0) {
+                // 8800 method
+                address = 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
+
+            } else {
+                // 8000 method
+                address = 0x8000 + (tile_id * 16) + offset;
+            }
+
+            low_byte = _get(address);
+            high_byte_address = address + 1;
 
             current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
             break;
@@ -689,6 +698,11 @@ void ppu::tick() {
 
         case fetcher_mode::FetchTileDataHigh: {
             if (fetcher_ticks < 6 || fetch_sprite_ip) {
+                break;
+            }
+
+            if (dummy_fetch) {
+                current_fetcher_mode = fetcher_mode::PushToFIFO;
                 break;
             }
 
@@ -700,7 +714,9 @@ void ppu::tick() {
         }
 
         case fetcher_mode::PushToFIFO: {
-            // PushToFIFO still happens on fetch_sprite_ip because background fifo won't be empty anyway and if it was it needs to be filled in on fetcher tick 7
+            // PushToFIFO still happens on fetch_sprite_ip because background
+            // fifo won't be empty anyway and if it was it needs to be filled in
+            // on fetcher tick 7
 
             if (dummy_fetch) {
                 for (unsigned int i = 0; i < 8; ++i) {
@@ -713,6 +729,7 @@ void ppu::tick() {
             }
 
             if (background_fifo.empty()) {
+                assert(!dummy_fetch && "dummy fetch should be false here!");
                 // push to background fifo
                 for (unsigned int i = 0; i < 8; ++i) {
                     uint8_t final_bit = ((low_byte >> i) & 1) |
@@ -786,7 +803,9 @@ void ppu::tick() {
             fetch_sprite_ip = false;
             sprite_ticks = 0;
 
-            fetcher_ticks = 0;
+            // 1 or 0
+            fetcher_ticks = current_fetcher_mode == fetcher_mode::PushToFIFO;
+
             current_fetcher_mode = fetcher_mode::FetchTileNo;
         }
 
@@ -878,6 +897,9 @@ void ppu::tick() {
     case ppu_mode::HBlank: {
         mode0_ticks++;
 
+        // extend oam write block by 1 M (on lcd reset only? or not?)
+        // this->gb_mmu.oam_write_block = mode0_ticks <= 4;
+
         // this->gb_mmu.oam_write_block = false;
         // this->gb_mmu.vram_write_block = false;
 
@@ -909,7 +931,7 @@ void ppu::tick() {
                 window_ly++;
             } // add window ly before resetting fetch window
 
-            reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
+            reset_ticks(); // resets ticks, fetcher_ticks, ,
                            // mode3_ticks, mode0_ticks
 
             // resets lcd_x to 0, and stat irq
@@ -966,6 +988,8 @@ void ppu::tick() {
             _set(IF, _get(IF) | 1);
             vblank_start = false;
 
+            assert(this->gb_mmu.oam_write_block == false &&
+                   "oam write block should be false here!");
             // this->gb_mmu.oam_write_block = false;
         }
 
@@ -995,7 +1019,7 @@ void ppu::tick() {
 
         if (ticks == 456) {
             // ticks = 0; // wait 456 T-cycles for the whole scanline, reset
-            reset_ticks(); // resets ticks, fetcher_ticks, dummy_ticks,
+            reset_ticks(); // resets ticks, fetcher_ticks,
                            // mode3_ticks, mode0_ticks
 
             // resets lcd_x to 0, and stat irq
