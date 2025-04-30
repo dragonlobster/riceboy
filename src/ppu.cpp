@@ -325,114 +325,46 @@ void ppu::fetch_sprites() {
     // initialize first sprite cycles, assign it differently depending on mod8
     uint8_t first_sprite_cycles{0};
 
+    // default cycle per mod 8
+    uint8_t default_cycle{0};
+
     // first sprite x can only be 0-7 (because we used %8)
-    /*
     switch (mod8) {
-    case 0: first_sprite_cycles = 8; break; // 7 - 8
-    case 1: first_sprite_cycles = 8; break; // 7 - 8
-    case 2: first_sprite_cycles = 4; break; // 2 - 5
-    case 3: first_sprite_cycles = 4; break;
-    case 4: first_sprite_cycles = 0; break;
-    case 5: first_sprite_cycles = 0; break;
-    case 6: first_sprite_cycles = 0; break;
-    case 7: first_sprite_cycles = 0; break;
-    }*/
-
-    switch (mod8) {
-    case 0: first_sprite_cycles = 11-0; break; // default stall: 0  8
-    case 1: first_sprite_cycles = 10-0; break; // default stall: 0  8
-    case 2: first_sprite_cycles = 9-1; break; // default stall: 1-2?  5
-    case 3: first_sprite_cycles = 8-2; break; // default stall: 2  4
-    case 4: first_sprite_cycles = 7-3; break; // default stall: 3  1
-    case 5: first_sprite_cycles = 6-3; break; // default stall: 3  1
-    case 6: first_sprite_cycles = 6-4; break; // default stall: 4  0
-    case 7: first_sprite_cycles = 6-5; break; // default stall: 5  0
+    case 0: default_cycle = 5; break;
+    case 1: default_cycle = 4; break;
+    case 2: default_cycle = 3; break;
+    case 3: default_cycle = 2; break;
+    case 4: default_cycle = 1; break;
+    case 5: default_cycle = 0; break;
+    case 6: default_cycle = 0; break;
+    case 7: default_cycle = 0; break;
     }
 
+    sprite_fetch_stall_cycles =
+        (6 * (sprites_to_fetch.size() - sprites_ge_168));
 
-    // assert(first_sprite_cycles && "first sprite cycles must have been set!");
-
-    // assign penalties based on largest sprite x?
-    // uint8_t penalty = largest_sprite_x > 160 ? (largest_sprite_x - 160) - 3 :
-    // 0;
-
-    if (first_sprite_x == 2) {
-        first_sprite_cycles += 0;
-    }
-
-    /*
-    // 0, 0, 1, 2, 3, 3, 4, 5
-    if (first_sprite_x == 160) {
-        first_sprite_cycles += 0;
-    }
-    if (first_sprite_x == 161) {
-        first_sprite_cycles += 0;
-    }
-    if (first_sprite_x == 162) {
-        first_sprite_cycles += 1;
-    }
-    if (first_sprite_x == 163) {
-        first_sprite_cycles += 2;
-    }
-    if (first_sprite_x == 164) {
-        first_sprite_cycles += 3;
-    }
-    if (first_sprite_x == 165) {
-        first_sprite_cycles += 3;
-    }
-    if (first_sprite_x == 166) {
-        first_sprite_cycles += 4;
-    }
-    if (first_sprite_x == 167) {
-        first_sprite_cycles += 5;
-    }*/
-
-    // sprite_fetch_stall_cycles += penalty;
-    sprite_fetch_stall_cycles = first_sprite_cycles + default_cycles;
-
-    // subtract until divisible by 4
-    while (sprite_fetch_stall_cycles % 4 != 0) {
+    // try to move sprite fetch stall cycles down 1 M-cycle
+    while ((sprite_fetch_stall_cycles + 174 + default_cycle) % 4 != 2) {
         sprite_fetch_stall_cycles--;
     }
 
+    // off screen penalties (> 160)
+    switch (first_sprite_x) {
+    case 160: sprite_fetch_stall_cycles += 0; break;
+    case 161: sprite_fetch_stall_cycles += 0; break;
+    case 162: sprite_fetch_stall_cycles += 0; break;
+    case 163: sprite_fetch_stall_cycles += 0; break;
+    case 164: sprite_fetch_stall_cycles += 0; break;
+    case 165: sprite_fetch_stall_cycles += 0; break;
+    case 166: sprite_fetch_stall_cycles += 0; break;
+    case 167: sprite_fetch_stall_cycles += 0; break;
+    }
+
     /*
-    if (first_sprite_x == 167) {
-        sprite_fetch_stall_cycles += 5;
-    }
-
-    if (first_sprite_x == 160) {
-        sprite_fetch_stall_cycles += 2;
-    }
-
-    if (first_sprite_x == 161) {
-        sprite_fetch_stall_cycles += 2;
-    }
-
-    if (first_sprite_x == 162 && sprites_to_fetch.size() < 10) {
-        sprite_fetch_stall_cycles += 4; // 4- 7
-        // at < 10, it takes 33-36 cycles
-    }
-
-    if (first_sprite_x == 163) {
-        sprite_fetch_stall_cycles += 3;
-    }
-
-    if (first_sprite_x == 164) {
-        sprite_fetch_stall_cycles += 6; // 6 - 9
-    }
-
-    if (first_sprite_x == 165) {
-        sprite_fetch_stall_cycles += 5; // 5 - 8
-    }
-
-    if (first_sprite_x == 166) {
-        sprite_fetch_stall_cycles += 4; // 4 - 7
-    }
-
-    if (first_sprite_x == 167) {
-        sprite_fetch_stall_cycles += 4;
+    // background fifo stall cycles don't count towards waiting for BG fetch to finish for some reason?
+    if (background_fifo.size() < 6) {
+        sprite_fetch_stall_cycles -= (6 - background_fifo.size());
     }*/
-
 
     sprites_to_fetch.clear();
 
@@ -607,7 +539,7 @@ void ppu::tick() {
 
         case fetcher_mode::FetchTileNo: {
 
-            if (fetcher_ticks < 2 || fetch_sprite_ip) {
+            if (fetcher_ticks < 2) {
                 break;
             }
 
@@ -654,7 +586,7 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataLow: {
-            if (fetcher_ticks < 4 || fetch_sprite_ip) {
+            if (fetcher_ticks < 4) {
                 break;
             }
 
@@ -687,7 +619,7 @@ void ppu::tick() {
         }
 
         case fetcher_mode::FetchTileDataHigh: {
-            if (fetcher_ticks < 6 || fetch_sprite_ip) {
+            if (fetcher_ticks < 6) {
                 break;
             }
 
@@ -755,15 +687,16 @@ void ppu::tick() {
             fetch_sprite_ip = true;
         }
 
-        if (fetch_sprite_ip) {
+        // wait for bg fetcher to finish?
+        if (fetch_sprite_ip &&
+            current_fetcher_mode == fetcher_mode::PushToFIFO) {
+
             if (!sprites_to_fetch.empty()) {
-                assert(!sprite_fetch_stall_cycles &&
-                       "sprite fetch stall cycles was set before?");
                 fetch_sprites();
+                fetcher_ticks = 1;
             }
 
-            while ((sprite_ticks) < sprite_fetch_stall_cycles) {
-                sprite_ticks++;
+            while ((fetcher_ticks) < sprite_fetch_stall_cycles) {
                 return;
             }
 
@@ -771,10 +704,9 @@ void ppu::tick() {
             fetch_sprite_ip = false;
             sprite_ticks = 0;
 
-            // 1 or 0
-            fetcher_ticks = current_fetcher_mode == fetcher_mode::PushToFIFO;
-
-            current_fetcher_mode = fetcher_mode::FetchTileNo;
+            // fetcher_ticks = 0;
+            // current_fetcher_mode = fetcher_mode::FetchTileNo;
+            return;
         }
 
         // push pixels to LCD, 1 pixel per dot
