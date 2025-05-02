@@ -35,12 +35,12 @@ void ppu::initialize_skip_bootrom_values() {
     window_ly = 0;
     wy_condition = true;
     tile_index = 0x14;
-    tile_id = 0;
+    bg_tile_id = 0;
     fetch_window_ip = false;
     fetch_sprite_ip = false;
-    low_byte = 0;
-    high_byte = 0;
-    high_byte_address = 0x800f;
+    bg_low_byte = 0;
+    bg_high_byte = 0;
+    bg_high_byte_address = 0x800f;
     dummy_fetch = true;
     scx_discard_count = 0;
     scx_discard = true;
@@ -98,11 +98,9 @@ void ppu::interrupt_line_check() {
 
     ppu_mode stat_mode = static_cast<ppu_mode>(_get(STAT) & 3);
 
-    bool oam_scan =
-        (stat_mode == ppu_mode::OAM_Scan) &&
-        (_get(STAT) &
-         0x20); // only trigger the delay the tick after the mode starts
-    // 0010 0000
+    bool oam_scan = (stat_mode == ppu_mode::OAM_Scan) &&
+                    (_get(STAT) & 0x20); // only trigger the delay the tick
+                                         // after the mode starts 0010 0000
 
     bool hblank = (stat_mode == ppu_mode::HBlank) && (_get(STAT) & 0x08);
     // 0000 1000
@@ -190,10 +188,10 @@ void ppu::sprite_fetch_tile_data_low(oam_entry sprite) {
         if (_get(LY) <= ((sprite).y - 16) + 7) {
             // top half
             if (!y_flip) {
-                tile_id &= 0xfe; // set lsb to 0
+                sprite_tile_id &= 0xfe; // set lsb to 0
                 line_offset = (_get(LY) - ((sprite).y - 16)) * 2;
             } else {
-                tile_id |= 0x01; // set lsb to 1
+                sprite_tile_id |= 0x01; // set lsb to 1
                 line_offset = (8 - 1 - (_get(LY) - ((sprite).y - 16))) * 2;
             }
         }
@@ -201,10 +199,10 @@ void ppu::sprite_fetch_tile_data_low(oam_entry sprite) {
         else {
             // bottom half
             if (!y_flip) {
-                tile_id |= 0x01;
+                sprite_tile_id |= 0x01;
                 line_offset = (_get(LY) - ((sprite).y - 16)) * 2;
             } else {
-                tile_id &= 0xfe;
+                sprite_tile_id &= 0xfe;
                 line_offset =
                     (8 - 1 - (_get(LY) - (((sprite).y - 16) + 7))) * 2;
             }
@@ -223,10 +221,10 @@ void ppu::sprite_fetch_tile_data_low(oam_entry sprite) {
         }
     }
 
-    sprite_address = 0x8000 + (16 * tile_id) + line_offset;
+    sprite_address = 0x8000 + (16 * sprite_tile_id) + line_offset;
 
-    low_byte = _get(sprite_address);
-    high_byte_address = sprite_address + 1;
+    sprite_low_byte = _get(sprite_address);
+    sprite_high_byte_address = sprite_address + 1;
 }
 
 void ppu::sprite_push_to_fifo(oam_entry sprite) {
@@ -253,8 +251,8 @@ void ppu::sprite_push_to_fifo(oam_entry sprite) {
 
         unsigned int j = x_flip ? 7 - i : i;
 
-        uint8_t final_bit =
-            ((low_byte >> j) & 1) | (((high_byte >> j) << 1) & 0x02);
+        uint8_t final_bit = ((sprite_low_byte >> j) & 1) |
+                            (((sprite_high_byte >> j) << 1) & 0x02);
 
         sprite_fifo_pixel pixel = {(sprite).x, final_bit, (sprite).flags};
 
@@ -265,13 +263,13 @@ void ppu::sprite_push_to_fifo(oam_entry sprite) {
 
     // handle sprites to fetch array
     /*
-    sprite_to_fetch = nullptr;
-    sprites_to_fetch.erase(sprites_to_fetch.begin());
-    if (sprites_to_fetch.empty()) {
-        fetch_sprite_ip = false;
-    } else {
-        sprite_to_fetch = &sprites_to_fetch[0];
-    }*/
+       sprite_to_fetch = nullptr;
+       sprites_to_fetch.erase(sprites_to_fetch.begin());
+       if (sprites_to_fetch.empty()) {
+       fetch_sprite_ip = false;
+       } else {
+       sprite_to_fetch = &sprites_to_fetch[0];
+       }*/
 }
 
 void ppu::fetch_sprites() {
@@ -300,13 +298,13 @@ void ppu::fetch_sprites() {
         }
 
         // step 1: get tile id
-        this->tile_id = (sprite).tile_id;
+        this->sprite_tile_id = (sprite).tile_id;
 
         // step 2: fetch tile data low
         sprite_fetch_tile_data_low(sprite);
 
         // step 3: fetch tile data high:
-        high_byte = _get(high_byte_address);
+        sprite_high_byte = _get(sprite_high_byte_address);
 
         // step 4: push to sprite fifo
         sprite_push_to_fifo(sprite);
@@ -360,11 +358,9 @@ void ppu::fetch_sprites() {
     case 167: sprite_fetch_stall_cycles += 0; break;
     }
 
-    /*
-    // background fifo stall cycles don't count towards waiting for BG fetch to finish for some reason?
-    if (background_fifo.size() < 6) {
-        sprite_fetch_stall_cycles -= (6 - background_fifo.size());
-    }*/
+    if (first_sprite_x == 0 && sprites_to_fetch.size() == 5) {
+        sprite_fetch_stall_cycles += 0;
+    }
 
     sprites_to_fetch.clear();
 
@@ -397,10 +393,12 @@ void ppu::tick() {
 
     // if lcd got toggled on
     if (this->gb_mmu.lcd_toggle && ((_get(LCDC) >> 7) & 1)) {
-        this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        //  lcd enabled again, LCD reset should be true
-        //_set(LY, 0); // reset LY incase there was any write to it (handled by
-        // mmu already)
+        this->gb_mmu.lcd_toggle =
+            false; // reset the lcd toggle
+                   //  lcd enabled again, LCD reset should be true
+                   //_set(LY, 0); // reset LY incase there was any write to it
+                   //(handled by
+                   // mmu already)
         this->lcd_reset = true;
         // update_ppu_mode(ppu_mode::OAM_Scan);
 
@@ -563,7 +561,7 @@ void ppu::tick() {
 
                 address = bgmap_start + ((scy_offset + scx_offset) & 0x3ff);
 
-                tile_id = _get(address);
+                bg_tile_id = _get(address);
 
             }
 
@@ -579,7 +577,7 @@ void ppu::tick() {
                 address = bgmap_start + ((wy_offset + wx_offset) & 0x3ff);
             }
 
-            this->tile_id = _get(address);
+            this->bg_tile_id = _get(address);
 
             current_fetcher_mode = fetcher_mode::FetchTileDataLow;
             break;
@@ -604,15 +602,16 @@ void ppu::tick() {
             // 8000 method or 8800 method to read
             if (((_get(LCDC) >> 4) & 1) == 0) {
                 // 8800 method
-                address = 0x9000 + (static_cast<int8_t>(tile_id) * 16) + offset;
+                address =
+                    0x9000 + (static_cast<int8_t>(bg_tile_id) * 16) + offset;
 
             } else {
                 // 8000 method
-                address = 0x8000 + (tile_id * 16) + offset;
+                address = 0x8000 + (bg_tile_id * 16) + offset;
             }
 
-            low_byte = _get(address);
-            high_byte_address = address + 1;
+            bg_low_byte = _get(address);
+            bg_high_byte_address = address + 1;
 
             current_fetcher_mode = fetcher_mode::FetchTileDataHigh;
             break;
@@ -628,7 +627,7 @@ void ppu::tick() {
                 break;
             }
 
-            high_byte = _get(high_byte_address);
+            bg_high_byte = _get(bg_high_byte_address);
 
             current_fetcher_mode = fetcher_mode::PushToFIFO;
             break;
@@ -654,8 +653,8 @@ void ppu::tick() {
                 assert(!dummy_fetch && "dummy fetch should be false here!");
                 // push to background fifo
                 for (unsigned int i = 0; i < 8; ++i) {
-                    uint8_t final_bit = ((low_byte >> i) & 1) |
-                                        (((high_byte >> i) << 1) & 0x02);
+                    uint8_t final_bit = ((bg_low_byte >> i) & 1) |
+                                        (((bg_high_byte >> i) << 1) & 0x02);
                     background_fifo.push_back(final_bit);
                 }
                 tile_index++;
@@ -690,9 +689,10 @@ void ppu::tick() {
         // wait for bg fetcher to finish?
         if (fetch_sprite_ip &&
             current_fetcher_mode == fetcher_mode::PushToFIFO) {
-
             if (!sprites_to_fetch.empty()) {
                 fetch_sprites();
+                // first cycle of sprite fetch shares the last cycle of bg fetch
+                // after waiting
                 fetcher_ticks = 1;
             }
 
@@ -704,8 +704,9 @@ void ppu::tick() {
             fetch_sprite_ip = false;
             sprite_ticks = 0;
 
-            // fetcher_ticks = 0;
-            // current_fetcher_mode = fetcher_mode::FetchTileNo;
+            // do not reset fetcher, we are stuck in PushToFIFO mode since we
+            // already fetched the tile needed
+
             return;
         }
 
@@ -779,9 +780,9 @@ void ppu::tick() {
 
         if (lcd_x == 168) {
             /*
-            assert(ticks >= 172+80 && ticks <= 293+80 &&
-                   "ticks in drawing mode should be between 172 and 289!!");
-                   */
+               assert(ticks >= 172+80 && ticks <= 293+80 &&
+               "ticks in drawing mode should be between 172 and 289!!");
+               */
 
             if (ticks > 400) {
                 std::cout << ticks << '\n';
@@ -812,10 +813,10 @@ void ppu::tick() {
             this->gb_mmu.oam_read_block = true;
         }
         /*
-        if (ticks == 456 && _get(LY) == 0) {
-            // reading LY at this exact dot returns a bitwise AND between prev
-            // LY and current LY
-            _set(LY, _get(LY) + 1); // new scanline reached
+           if (ticks == 456 && _get(LY) == 0) {
+        // reading LY at this exact dot returns a bitwise AND between prev
+        // LY and current LY
+        _set(LY, _get(LY) + 1); // new scanline reached
         }*/
 
         // wait 456 T-cycles (scanline ends there)
@@ -901,10 +902,10 @@ void ppu::tick() {
 
         // test increment LY 6 T-cycles earlier (past line 0)
         /*
-        if (ticks == 452 && _get(LY) > 0 && !end_frame) {
-            // reading LY at this exact dot returns a bitwise AND between prev
-            // LY and current LY
-            _set(LY, _get(LY) + 1); // new scanline reached
+           if (ticks == 452 && _get(LY) > 0 && !end_frame) {
+        // reading LY at this exact dot returns a bitwise AND between prev
+        // LY and current LY
+        _set(LY, _get(LY) + 1); // new scanline reached
         }*/
 
         if (ticks == 452 && !end_frame) {
