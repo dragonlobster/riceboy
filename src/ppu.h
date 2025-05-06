@@ -40,14 +40,14 @@ class ppu {
     bool fetch_window_ip{false}; // fetch window in progress
     bool fetch_sprite_ip{false}; // fetch sprite in progress
 
-    uint8_t bg_tile_id{0};          // saved tile_id for grabbing
+    uint8_t bg_tile_id{0}; // saved tile_id for grabbing
     // saved low byte and high byte for processing
     uint8_t bg_low_byte{};
     uint8_t bg_high_byte{};
     // save the high byte address from fetch low byte step
     uint16_t bg_high_byte_address{};
 
-    uint8_t sprite_tile_id{0};          // saved tile_id for grabbing
+    uint8_t sprite_tile_id{0}; // saved tile_id for grabbing
     // saved low byte and high byte for processing
     uint8_t sprite_low_byte{};
     uint8_t sprite_high_byte{};
@@ -141,6 +141,8 @@ class ppu {
     void fetch_sprites();
     // uint8_t sprite_fetch_stall_cycles{0};
     uint8_t sprite_fetch_stall_cycles{0};
+    // sprite_accumulated_offset;
+    uint8_t sprite_accumulated_offset{0};
 
     // update ppu mode
     void update_ppu_mode(ppu_mode mode);

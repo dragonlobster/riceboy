@@ -341,10 +341,16 @@ void ppu::fetch_sprites() {
     sprite_fetch_stall_cycles =
         (6 * (sprites_to_fetch.size() - sprites_ge_168));
 
-    // try to move sprite fetch stall cycles down 1 M-cycle
-    while ((sprite_fetch_stall_cycles + 174 + default_cycle) % 4 != 2) {
+    sprite_fetch_stall_cycles-=3;
+
+    // try to move sprite fetch stall cycles down 1 M-cycle ?
+    /*
+    while ((sprite_fetch_stall_cycles + 174 + default_cycle +
+            sprite_accumulated_offset) %
+               4 !=
+           2) {
         sprite_fetch_stall_cycles--;
-    }
+    }*/
 
     // off screen penalties (> 160)
     switch (first_sprite_x) {
@@ -358,7 +364,9 @@ void ppu::fetch_sprites() {
     case 167: sprite_fetch_stall_cycles += 0; break;
     }
 
-    if (first_sprite_x == 0 && sprites_to_fetch.size() == 5) {
+    //sprite_accumulated_offset += (sprite_fetch_stall_cycles + default_cycle);
+
+    if (first_sprite_x == 160 && sprites_to_fetch.size() == 5) {
         sprite_fetch_stall_cycles += 0;
     }
 
@@ -840,6 +848,9 @@ void ppu::tick() {
             // dummy fetch too?
             dummy_fetch = true;
             fetch_window_ip = false;
+
+            // reset sprite_accumualted_offset
+            sprite_accumulated_offset = 0;
 
             // clear sprite buffer
             sprite_buffer.clear();
