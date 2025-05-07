@@ -12,7 +12,8 @@
      _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
 void mmu::initialize_skip_bootrom_values() {
-    div_ff04 = 0xd1e4;
+    //div_ff04 = 0xd1e4; // this is just wrong, but organically it's what i get
+    div_ff04 = 0xabc8;
     tac_ff07 = 0xf8;
     lcdc_ff40 = 0x91;
     lcd_toggle = false;
@@ -211,7 +212,6 @@ void mmu::set_load_rom_complete() {
                "Cartridge is NULL! Can't complete load_rom_complete");
         this->cartridge->set_load_rom_complete();
     }
-
     this->load_rom_complete = true;
 }
 

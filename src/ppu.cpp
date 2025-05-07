@@ -260,22 +260,11 @@ void ppu::sprite_push_to_fifo(oam_entry sprite) {
             sprite_fifo[fifo_index] = pixel;
         }
     }
-
-    // handle sprites to fetch array
-    /*
-       sprite_to_fetch = nullptr;
-       sprites_to_fetch.erase(sprites_to_fetch.begin());
-       if (sprites_to_fetch.empty()) {
-       fetch_sprite_ip = false;
-       } else {
-       sprite_to_fetch = &sprites_to_fetch[0];
-       }*/
 }
 
 void ppu::fetch_sprites() {
     // fetch a sprite, remember to stall the appropriate amount of cycles based
     // on sprite x mod 8
-
     uint8_t first_sprite_x{0};
 
     // sprites greater than or equal to 168
@@ -310,23 +299,14 @@ void ppu::fetch_sprites() {
         sprite_push_to_fifo(sprite);
     }
 
-    // do not set to false yet, we need to stall for stall cycles
-    // fetch_sprite_ip = true;
-
-    // default cycles for sprites that are not the first sprite and not >= 168
-    uint8_t default_cycles =
-        (6 * (sprites_to_fetch.size() - 1 - sprites_ge_168));
-
     // mod 8 of first sprie x
     uint8_t mod8 = first_sprite_x % 8;
 
-    // initialize first sprite cycles, assign it differently depending on mod8
-    uint8_t first_sprite_cycles{0};
-
     // default cycle per mod 8
-    uint8_t default_cycle{0};
+    //uint8_t default_cycle{0};
 
     // first sprite x can only be 0-7 (because we used %8)
+    /*
     switch (mod8) {
     case 0: default_cycle = 5; break;
     case 1: default_cycle = 4; break;
@@ -336,39 +316,24 @@ void ppu::fetch_sprites() {
     case 5: default_cycle = 0; break;
     case 6: default_cycle = 0; break;
     case 7: default_cycle = 0; break;
-    }
+    }*/
+    uint8_t default_cycle = (mod8 <= 4) ? (5 - mod8) : 0;
 
     sprite_fetch_stall_cycles =
         (6 * (sprites_to_fetch.size() - sprites_ge_168));
 
-    sprite_fetch_stall_cycles-=3;
 
-    // try to move sprite fetch stall cycles down 1 M-cycle ?
-    /*
+    // try to move sprite fetch stall cycles down 1 M-cycle
     while ((sprite_fetch_stall_cycles + 174 + default_cycle +
             sprite_accumulated_offset) %
                4 !=
            2) {
         sprite_fetch_stall_cycles--;
-    }*/
-
-    // off screen penalties (> 160)
-    switch (first_sprite_x) {
-    case 160: sprite_fetch_stall_cycles += 0; break;
-    case 161: sprite_fetch_stall_cycles += 0; break;
-    case 162: sprite_fetch_stall_cycles += 0; break;
-    case 163: sprite_fetch_stall_cycles += 0; break;
-    case 164: sprite_fetch_stall_cycles += 0; break;
-    case 165: sprite_fetch_stall_cycles += 0; break;
-    case 166: sprite_fetch_stall_cycles += 0; break;
-    case 167: sprite_fetch_stall_cycles += 0; break;
+        sprite_compensation_offset++;
     }
 
-    //sprite_accumulated_offset += (sprite_fetch_stall_cycles + default_cycle);
-
-    if (first_sprite_x == 160 && sprites_to_fetch.size() == 5) {
-        sprite_fetch_stall_cycles += 0;
-    }
+    // adding back previous offset, moving down 1 M-cycle afterwards
+    sprite_accumulated_offset += (sprite_fetch_stall_cycles + default_cycle + sprite_compensation_offset);
 
     sprites_to_fetch.clear();
 
@@ -379,7 +344,7 @@ void ppu::tick() {
     // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
         this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        reset_ticks();
+        //reset_ticks();
         //_set(LY, 0);                     // reset LY (handled by mmu already)
         assert(oam_search_counter == 0 &&
                this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
@@ -387,7 +352,7 @@ void ppu::tick() {
 
         // keep current interrupt line as the value before lcd turned off
 
-        update_ppu_mode(ppu_mode::LCDToggledOn);
+        //update_ppu_mode(ppu_mode::LCDToggledOn);
 
         return;
     }
@@ -409,6 +374,10 @@ void ppu::tick() {
                    // mmu already)
         this->lcd_reset = true;
         // update_ppu_mode(ppu_mode::OAM_Scan);
+
+        reset_ticks();
+
+        update_ppu_mode(ppu_mode::LCDToggledOn);
 
         // TODO: check if i need to run all the functions and just align ticks
         // instead of returning here (does LCD turn on the same cycle as LCDC
@@ -851,6 +820,8 @@ void ppu::tick() {
 
             // reset sprite_accumualted_offset
             sprite_accumulated_offset = 0;
+            // reset sprite compensation offset
+            sprite_compensation_offset = 0;
 
             // clear sprite buffer
             sprite_buffer.clear();

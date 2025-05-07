@@ -85,7 +85,7 @@ class mmu {
 
     // div, timer related
     // div counter stored in mmu
-    uint16_t div_ff04{0};
+    uint16_t div_ff04{0}; // startup value for div is ab
     uint8_t tima_ff05{0}; // tima_ff05
     uint8_t tac_ff07{0xf8};
     uint8_t last_div_state{0}; // for falling edge detection

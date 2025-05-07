@@ -69,11 +69,14 @@ int main() {
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/vblank_stat_intr-GS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing_sprites.gb", // fail
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing_sprites.gb", // pass
     };
 
     std::array<std::string, 1> mooneye_cpu{
         "BOOT/mooneye-gb_hwtests/acceptance/instr/daa.gb"};
+
+    std::array<std::string, 1> mooneye_root{
+        "BOOT/mooneye-gb_hwtests/acceptance/boot_div-dmgABCmgb.gb"};
 
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
@@ -81,11 +84,12 @@ int main() {
     //riceboy->gb_cpu.prepare_rom(mooneye_ppu[5]);
 
 
-    // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
-    // riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
-    // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    //riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
+    riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
+    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[2]);
+    //riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
+    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    //riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);

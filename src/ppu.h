@@ -143,6 +143,8 @@ class ppu {
     uint8_t sprite_fetch_stall_cycles{0};
     // sprite_accumulated_offset;
     uint8_t sprite_accumulated_offset{0};
+    // how many cycles i subtracted from sprite fetching to reach the % 4 == 2 part
+    uint8_t sprite_compensation_offset{0};
 
     // update ppu mode
     void update_ppu_mode(ppu_mode mode);
