@@ -303,7 +303,7 @@ void ppu::fetch_sprites() {
     uint8_t mod8 = first_sprite_x % 8;
 
     // default cycle per mod 8
-    //uint8_t default_cycle{0};
+    // uint8_t default_cycle{0};
 
     // first sprite x can only be 0-7 (because we used %8)
     /*
@@ -322,7 +322,6 @@ void ppu::fetch_sprites() {
     sprite_fetch_stall_cycles =
         (6 * (sprites_to_fetch.size() - sprites_ge_168));
 
-
     // try to move sprite fetch stall cycles down 1 M-cycle
     while ((sprite_fetch_stall_cycles + 174 + default_cycle +
             sprite_accumulated_offset) %
@@ -333,7 +332,8 @@ void ppu::fetch_sprites() {
     }
 
     // adding back previous offset, moving down 1 M-cycle afterwards
-    sprite_accumulated_offset += (sprite_fetch_stall_cycles + default_cycle + sprite_compensation_offset);
+    sprite_accumulated_offset += (sprite_fetch_stall_cycles + default_cycle +
+                                  sprite_compensation_offset);
 
     sprites_to_fetch.clear();
 
@@ -341,10 +341,11 @@ void ppu::fetch_sprites() {
 }
 
 void ppu::tick() {
+    ppu_total_ticks++;
     // if lcd got toggled off
     if (this->gb_mmu.lcd_toggle && !((_get(LCDC) >> 7) & 1)) {
         this->gb_mmu.lcd_toggle = false; // reset the lcd toggle
-        //reset_ticks();
+        // reset_ticks();
         //_set(LY, 0);                     // reset LY (handled by mmu already)
         assert(oam_search_counter == 0 &&
                this->gb_mmu.ppu_current_oam_row == 0 && dummy_fetch &&
@@ -352,7 +353,7 @@ void ppu::tick() {
 
         // keep current interrupt line as the value before lcd turned off
 
-        //update_ppu_mode(ppu_mode::LCDToggledOn);
+        // update_ppu_mode(ppu_mode::LCDToggledOn);
 
         return;
     }

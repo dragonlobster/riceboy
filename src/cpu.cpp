@@ -1980,7 +1980,8 @@ void cpu::tick() {
 
     this->ticks = 0; // reset ticks
 
-    this->gb_mmu->increment_div(4); // increment internal div before cpu writes
+    // increments internal div by M-cycle
+    this->gb_mmu->increment_div(); // increment internal div before cpu writes
 
     // check if boot rom is completed
     if (!boot_rom_complete && _get(0xff50)) {

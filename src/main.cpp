@@ -20,7 +20,6 @@ int main() {
     // initialize gameboy on heap
     std::unique_ptr<gameboy> riceboy = std::make_unique<gameboy>(window);
 
-
     // TODO: load chosen cartridge
     // std::string rom =
     // "BOOT/mooneye-gb_hwtests/acceptance/timer/rapid_toggle.gb";
@@ -57,18 +56,18 @@ int main() {
 
     std::array<std::string, 14> mooneye_ppu{
         "BOOT/mooneye-gb_hwtests/manual-only/sprite_priority.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/basic.gb",    // pass
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/reg_read.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/oam_dma/sources-dmgABCmgbS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/hblank_ly_scx_timing-GS.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_1_2_timing-GS.gb",  // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_0_timing.gb",     // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode3_timing.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_write_timing-GS.gb", // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/lcdon_timing-dmgABCmgbS.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_irq_blocking.gb",   // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/vblank_stat_intr-GS.gb", // pass
-        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb", // pass
+        "BOOT/mooneye-gb_hwtests/acceptance/ppu/stat_lyc_onoff.gb",      // pass
         "BOOT/mooneye-gb_hwtests/acceptance/ppu/intr_2_mode0_timing_sprites.gb", // pass
     };
 
@@ -81,15 +80,14 @@ int main() {
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
 
-    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[5]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[5]);
 
-
-    //riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
-    riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    //riceboy->gb_cpu.prepare_rom(mooneye_ppu[2]);
-    //riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
-    //riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
-    //riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
+    // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
+    // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
+    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[0]);
+    // riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
+    riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
+    // riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
@@ -101,7 +99,8 @@ int main() {
     // double accumulator{0};
     // double last_frame_time{0};
 
-    // skips the bootrom (i captured the initial values by setting a breakpoint at load rom complete
+    // skips the bootrom (i captured the initial values by setting a breakpoint
+    // at load rom complete
     riceboy->skip_bootrom();
 
     // frame clock (avoiding setFrameRateLimit imprecision)
@@ -118,7 +117,7 @@ int main() {
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
 
         double target_frame_time = 1.f / (((1 << 22) / 70224) * 1000);
-        //double target_frame_time = 1000;
+        // double target_frame_time = 1000;
 
         // 70224 ipf - clock speed 4194304Hz
         while (frame_time >= target_frame_time) {

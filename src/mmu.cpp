@@ -12,7 +12,7 @@
      _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
 void mmu::initialize_skip_bootrom_values() {
-    //div_ff04 = 0xd1e4; // this is just wrong, but organically it's what i get
+    // div_ff04 = 0xd1e4; // this is just wrong, but organically it's what i get
     div_ff04 = 0xabc8;
     tac_ff07 = 0xf8;
     lcdc_ff40 = 0x91;
@@ -135,23 +135,23 @@ void mmu::handle_lcdc_write(uint8_t value) {
 
     this->lcdc_ff40 = value;
 
-    if (load_rom_complete) {
-        uint8_t new_lcd_bit = (this->lcdc_ff40 >> 7) & 1;
-        // true if lcd was toggled on or off
-        this->lcd_toggle = lcd_bit != new_lcd_bit;
+    // if (load_rom_complete) {
+    uint8_t new_lcd_bit = (this->lcdc_ff40 >> 7) & 1;
+    // true if lcd was toggled on or off
+    this->lcd_toggle = lcd_bit != new_lcd_bit;
 
-        lcd_on = new_lcd_bit;
+    lcd_on = new_lcd_bit;
 
-        // lcd toggled off
-        if (lcd_toggle && !new_lcd_bit) {
-            // reset LY to 0
-            write_memory(0xff44, 0);
+    // lcd toggled off
+    if (lcd_toggle && !new_lcd_bit) {
+        // reset LY to 0
+        write_memory(0xff44, 0);
 
-            // reset STAT mode bit to 0
-            uint8_t stat_mode = read_memory(0xff41);
-            write_memory(0xff41, (stat_mode & 0xfc));
-        }
+        // reset STAT mode bit to 0
+        uint8_t stat_mode = read_memory(0xff41);
+        write_memory(0xff41, (stat_mode & 0xfc));
     }
+    //}
 }
 
 void mmu::handle_stat_write(uint8_t value) {
@@ -225,17 +225,9 @@ void mmu::set_cartridge_type(uint8_t type) {
 }
 
 // direct increment div ff04 to here, read ff04 also to read div
-void mmu::increment_div(uint16_t value, bool check_falling_edge) {
-    // if (!this->div_write_ran && !this->tac_write_ran) {
-    //}
-    if (check_falling_edge) {
-        for (uint8_t i = 0; i < value; i++) {
-            this->div_ff04++;
-            falling_edge();
-        }
-    } else {
-        this->div_ff04 += value;
-    }
+void mmu::increment_div() {
+    this->div_ff04 += 4;
+    falling_edge();
 }
 
 mmu::section mmu::locate_section(const uint16_t address) {

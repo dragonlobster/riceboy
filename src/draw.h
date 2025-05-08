@@ -9,5 +9,5 @@ class draw {
                                         std::uint8_t green, std::uint8_t blue);
 
     static sf::Vertex add_vertex(sf::Vector2f position, std::uint8_t red,
-                                        std::uint8_t green, std::uint8_t blue);
+                                 std::uint8_t green, std::uint8_t blue);
 };

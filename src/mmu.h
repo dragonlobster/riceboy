@@ -85,14 +85,15 @@ class mmu {
 
     // div, timer related
     // div counter stored in mmu
-    uint16_t div_ff04{0}; // startup value for div is ab
+    uint16_t div_ff04{4}; // TODO: we need to tick the timer before fetching the first instruction?
     uint8_t tima_ff05{0}; // tima_ff05
     uint8_t tac_ff07{0xf8};
     uint8_t last_div_state{0}; // for falling edge detection
     bool tima_overflow{false};
     bool tima_overflow_standby{false};
     bool lock_tima_write{false};
-    void increment_div(uint16_t value = 1, bool check_falling_edge = true);
+    // increment div by M-cycle
+    void increment_div();
     void falling_edge();
     void handle_tima_overflow();
     void handle_div_write();
@@ -126,7 +127,7 @@ class mmu {
     uint8_t lcdc_ff40{};
     void handle_lcdc_write(uint8_t value);
     bool lcd_toggle{false};
-    bool lcd_on{true}; // indicates whether lcd is on or off
+    bool lcd_on{false}; // indicates whether lcd is on or off
     // TODO: fix timer and interrupt as individual classes later on
 
     // ppu mode
@@ -147,7 +148,6 @@ class mmu {
   private:
     // Interrupt enable flag - 0xFFFF
     uint8_t interrupt_enable_flag{};
-
 
     // zero page - ff80 - fffe, High RAM (127 bytes)
     uint8_t zero_page[(0xfffe - 0xff80) + 1]{};
