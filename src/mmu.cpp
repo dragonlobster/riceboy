@@ -19,11 +19,10 @@ void mmu::initialize_skip_bootrom_values() {
     lcd_toggle = false;
     lcd_on = true;
     ppu_mode = 0x02;
-    hardware_registers[0x50] = 0x01;
+    hardware_registers[0x50] = 0xff;
     hardware_registers[0x0f] = 0xe1;
     hardware_registers[0x41] = 0x85;
     hardware_registers[0x47] = 0xfc;
-    hardware_registers[0x50] = 0x01;
 
     hardware_registers[0x12] = 0xf3;
     hardware_registers[0x13] = 0xc1;
@@ -509,7 +508,14 @@ uint8_t mmu::read_memory(uint16_t address) const {
             // mask top 3 bits with 1s for IF (they are unused)
         } else if (address == 0xff40) {
             return this->lcdc_ff40; // lcdc ff40
-        } else {
+        }
+
+        // unused
+        else if (address == 0xff03 || address == 0xff05 || (address > 0xff07 && address < 0xff0f) || address == 0xff15  || address == 0xff1f || address == 0xff4e || address == 0xff4d || address == 0xff4f || (address > 0xff26 && address < 0xff30) || (address >= 0xff51)) {
+            return 0xff;
+        }
+
+        else {
             return this->hardware_registers[address - base_address];
         }
 
@@ -692,6 +698,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
             return;
         }
 
+        if (address == 0xff50) {
+            hardware_registers[0x50] = 0xff;
+            return;
+        }
+
         // stat based on lcd off
         /*
         if (!lcd_on && address == 0xff41) {
@@ -800,6 +811,10 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         // stat (mask top bit)
         else if (address == 0xff41) {
             handle_stat_write(value);
+        }
+
+        else if (address == 0xff50) {
+            hardware_registers[0x50] = 0xff;
         }
 
         // stat based on lcd off

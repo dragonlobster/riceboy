@@ -1,11 +1,11 @@
 # Gameboy DMG Emulator
-Cycle accurate DMG-01 Emulator written with C++ and SFML.
+Cycle accurate DMG-01 Emulator written with C++ and SFML. Emulates Sprite and Background FIFOs.
 
 ## Progress
 Features | Complete | Remarks
 :------------ | :-------------|:-------------|
-CPU | :white_check_mark: | M-cycle accurate
-PPU | :white_check_mark: | T-cycle accurate
+CPU | :white_check_mark: | M-cycle
+PPU | :white_check_mark: | T-cycle
 MMU | :white_check_mark: |
 Interrupts | :white_check_mark: |
 Timer | :white_check_mark: |
@@ -52,7 +52,7 @@ acceptance/ppu/lcdon_timing-dmgABCmgbS | :white_check_mark: | First time LCD is 
 acceptance/ppu/stat_irq_blocking | :white_check_mark: |
 acceptance/ppu/vblank_stat_intr-GS | :white_check_mark: | STAT bit 5 enables LCD interrupt (sets IF LCD bit) during VBlank on LY=144.
 acceptance/ppu/stat_lyc_onoff | :white_check_mark: | The interrupt line should remain unchanged when LCD is turned off to prevent an incorrect rising edge when LCD is turned on again.
-acceptance/ppu/intr_2_mode0_timing_sprites | :white_large_square: |
+acceptance/ppu/intr_2_mode0_timing_sprites | :white_check_mark: | When a sprite is detected, we need to wait for the BG fetch to finish (PushToFIFO mode reached). Organically this stalls mode 3 0-5 cycles (the final cycle of BG fetch overlaps with the first cycle of sprite fetching). Each sprite takes 6 cycles to fetch. In my case however, since I incremented LY at 452, I moved my entire sprite fetching 1 M-cycle lower in order to pass the test.
 acceptance/manual-only/sprite_priority | :white_check_mark: | Sprite FIFO is always filled in with transparent pixels to maintain a fixed size of 8. This affects the rules of sprite (or obj) priority on overlapping pixels between different objects, where transparent pixels should always be replaced with non transparent ones regardless of priority.
 acceptance/interrupts/ie_push | :white_check_mark: | There are 2 checks for IE, the first is corresponding bits with IE and IF, but when actually servicing the interrupt, if IE was written to it, it actually changes the interrupt vector from the original to the new interrupt vector based on the new IE. If 0 was written to IE, then it jumps to reset vector 0. But if IE was written to on T3 then the interrupt vector fails to do the switcharoo.
 acceptance/oam_dma/basic | :white_check_mark: | 
