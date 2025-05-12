@@ -1983,6 +1983,16 @@ void cpu::tick() {
     // increments internal div by M-cycle
     this->gb_mmu->increment_div(); // increment internal div before cpu writes
 
+    // the cpu instructions for setting TIMA to TMA has been completed, we can
+    // unlock writing to TIMA now
+    if (this->gb_mmu->lock_tima_write) {
+        this->gb_mmu->lock_tima_write = false;
+    }
+
+    if (this->gb_mmu->tima_overflow_standby) {
+        this->gb_mmu->handle_tima_overflow();
+    }
+
     // check if boot rom is completed
     if (!boot_rom_complete && _get(0xff50)) {
         // boot rom has completed
@@ -1993,16 +2003,6 @@ void cpu::tick() {
         // complete boot rom in mmu so that writes to certain addresses are
         // blocked
         this->gb_mmu->set_load_rom_complete();
-    }
-
-    // the cpu instructions for setting TIMA to TMA has been completed, we can
-    // unlock writing to TIMA now
-    if (this->gb_mmu->lock_tima_write) {
-        this->gb_mmu->lock_tima_write = false;
-    }
-
-    if (this->gb_mmu->tima_overflow_standby) {
-        this->gb_mmu->handle_tima_overflow();
     }
 
     // TODO: DMA happen before or after interrupt checking (does it matter)? and

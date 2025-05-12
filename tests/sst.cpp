@@ -1,5 +1,6 @@
 #include "../src/cpu.h"
 #include "../src/mmu.h"
+#include "../src/timer.h"
 #include "opcodes.h" // import all opcodes
 #include <array>
 #include <fstream>
@@ -9,6 +10,8 @@ using json = nlohmann::json;
 
 class sst_mmu : public mmu {
   public:
+    sst_mmu(timer &gb_timer) : mmu(gb_timer) {};
+
     uint8_t memory[0xffff]{};
 
     uint8_t bus_read_memory(uint16_t address) override {
@@ -20,7 +23,9 @@ class sst_mmu : public mmu {
     };
 };
 
-sst_mmu test_mmu{};
+
+timer test_timer{};
+sst_mmu test_mmu{test_timer};
 
 cpu test_cpu = cpu(test_mmu);
 

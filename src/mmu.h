@@ -5,11 +5,15 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include "timer.h"
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
 class mmu {
   public:
+    mmu(timer &timer);
+    timer *gb_timer{};
+
     virtual uint8_t read_memory(uint16_t address) const;
     virtual uint8_t bus_read_memory(
         uint16_t address); // corruption bug could modify memory (not const)

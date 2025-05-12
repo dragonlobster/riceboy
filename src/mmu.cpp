@@ -11,10 +11,15 @@
      _cartridge_type == mmu::cartridge_type::mbc1_ram ||                       \
      _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
+mmu::mmu(timer &timer) { this->gb_timer = &timer; }
+
 void mmu::initialize_skip_bootrom_values() {
-    // div_ff04 = 0xd1e4; // this is just wrong, but organically it's what i get
     div_ff04 = 0xabc8;
     tac_ff07 = 0xf8;
+
+    // initialize gb timer values
+    this->gb_timer->intialize_values();
+
     lcdc_ff40 = 0x91;
     lcd_toggle = false;
     lcd_on = true;
