@@ -4,6 +4,7 @@
 void timer::intialize_values() {
     this->sysclock = 0xabc8;
     this->tac_ff07 = 0xf8;
+    this->ticks = 3;
 }
 
 void timer::falling_edge() {
@@ -38,7 +39,22 @@ void timer::falling_edge() {
     this->last_div_state = div_state;
 }
 
-void timer::increment_sysclock() {
+void timer::tick() {
+    this->ticks++;
+
+    if (ticks < 4) {
+        return;
+    }
+
+    ticks = 0;
+
     this->sysclock += 4;
     falling_edge();
+
+    // the cpu instructions for setting TIMA to TMA has been completed, we can
+    // unlock writing to TIMA now
+
+    if (this->lock_tima_write) {
+        this->lock_tima_write = false;
+    }
 }

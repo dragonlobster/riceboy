@@ -967,7 +967,7 @@ void cpu::ret(conditions condition, bool ime_condition) {
 
     auto m3 = [=]() {
         if (ime_condition) {
-            this->ime = true;
+            this->gb_interrupt->ime = true;
         }
         this->PC = this->_combine_2_8bits(W, Z);
     };
@@ -1810,10 +1810,10 @@ void cpu::daa() {
 void cpu::ei_or_di(const bool ei) {
     if (ei) {
         // this->ime = true;
-        this->ei_delay = true;
+        this->gb_interrupt->ei_delay = true;
 
     } else {
-        this->ime = false;
+        this->gb_interrupt->ime = false;
     }
 }
 
@@ -1939,9 +1939,12 @@ void cpu::load_rom() {
 }
 
 // cpu constructor
-cpu::cpu(mmu &mmu) {
+cpu::cpu(mmu &mmu, timer &timer, interrupt &interrupt) {
     // pass by reference
     this->gb_mmu = &mmu; // & refers to actual address to assign to the pointer
+    this->gb_timer = &timer;
+
+    this->gb_interrupt = &interrupt;
 }
 
 void cpu::initialize_skip_bootrom_values() {
@@ -1961,12 +1964,9 @@ void cpu::initialize_skip_bootrom_values() {
     PC = 0x0100;
     W = 0x00;
     Z = 0x50;
-    ei_delay = false;
-    ime = false;
     halt = false;
     halt_bug = false;
     interrupt_ticks = 3;
-    timer_ticks = 3;
     ticks = 3;
     fetch_opcode = true;
 }
@@ -1980,16 +1980,10 @@ void cpu::tick() {
 
     this->ticks = 0; // reset ticks
 
-    // increments internal div by M-cycle
-    this->gb_mmu->increment_div(); // increment internal div before cpu writes
+    // tick the timer
+    // this->gb_timer->tick(); // increment internal div before cpu writes
 
-    // the cpu instructions for setting TIMA to TMA has been completed, we can
-    // unlock writing to TIMA now
-    if (this->gb_mmu->lock_tima_write) {
-        this->gb_mmu->lock_tima_write = false;
-    }
-
-    if (this->gb_mmu->tima_overflow_standby) {
+    if (this->gb_timer->tima_overflow_standby) {
         this->gb_mmu->handle_tima_overflow();
     }
 
@@ -2008,11 +2002,11 @@ void cpu::tick() {
     // TODO: DMA happen before or after interrupt checking (does it matter)? and
     // does it happen during halt handle DMA transfers on dma mode before
     // exeucting instructions
-    if (this->gb_mmu->dma_delay) {
+    if (this->gb_mmu->gb_ppu->dma_delay) {
         this->gb_mmu->set_oam_dma();
     }
 
-    else if (this->gb_mmu->dma_mode) {
+    else if (this->gb_mmu->gb_ppu->dma_mode) {
         this->gb_mmu->dma_transfer();
     }
 
@@ -2024,9 +2018,9 @@ void cpu::tick() {
     const uint8_t opcode = this->_get(this->PC); // get current opcode
 
     // ime should be set before execution of next opcode
-    if (ei_delay && opcode != 0xfb) {
-        this->ime = true;
-        this->ei_delay = false;
+    if (this->gb_interrupt->ei_delay && opcode != 0xfb) {
+        this->gb_interrupt->ime = true;
+        this->gb_interrupt->ei_delay = false;
     }
 
     if (!this->halt) {
@@ -2050,78 +2044,10 @@ void cpu::tick() {
 
         // TODO: are interrupts affected by HALT?
     }
-}
 
-void cpu::interrupt_tick() {
-    this->interrupt_ticks++;
-
-    if (interrupt_ticks < 4) {
-        return;
+    if (this->gb_timer->tima_overflow) {
+        this->gb_timer->tima_overflow_standby = true;
     }
-    this->interrupt_ticks = 0;
-    // operates in M-cycles
-
-    // if (M_operations.empty() && I_operations.empty()) {
-    //     this->handle_interrupts();
-    // }
-}
-
-void cpu::timer_tick() {
-    timer_ticks++;
-
-    if (timer_ticks < 4) {
-        return;
-    }
-    timer_ticks = 0;
-
-    // handles the tima overflow case one cycle later (tima overflows at 255+1)
-    if (this->gb_mmu->tima_overflow) {
-        this->gb_mmu->tima_overflow_standby = true;
-    }
-}
-
-std::tuple<cpu::interrupts, cpu::if_mask> cpu::check_current_interrupt() {
-    uint8_t _ie = this->_get(0xffff);
-    uint8_t _if = this->_get(0xff0f);
-
-    uint8_t ie_joypad = (_ie >> 4) & 1;
-    uint8_t ie_serial = (_ie >> 3) & 1;
-    uint8_t ie_timer = (_ie >> 2) & 1;
-    uint8_t ie_lcd = (_ie >> 1) & 1;
-    uint8_t ie_vblank = _ie & 1;
-
-    uint8_t if_joypad = (_if >> 4) & 1;
-    uint8_t if_serial = (_if >> 3) & 1;
-    uint8_t if_timer = (_if >> 2) & 1;
-    uint8_t if_lcd = (_if >> 1) & 1;
-    uint8_t if_vblank = _if & 1;
-
-    interrupts interrupt{interrupts::none};
-    if_mask mask{if_mask::none};
-
-    if (ie_vblank && if_vblank) {
-        // vblank interrupt
-        interrupt = interrupts::vblank;
-        mask = if_mask::vblank;
-    } else if (ie_lcd && if_lcd) {
-        // lcd interrupt
-        interrupt = interrupts::lcd;
-        mask = if_mask::lcd;
-    } else if (ie_timer && if_timer) {
-        // timer interrupt
-        interrupt = interrupts::timer;
-        mask = if_mask::timer;
-    } else if (ie_serial && if_serial) {
-        // serial interrupt
-        interrupt = interrupts::serial;
-        mask = if_mask::serial;
-    } else if (ie_joypad && if_joypad) {
-        // joypad interrupt
-        interrupt = interrupts::joypad;
-        mask = if_mask::joypad;
-    }
-
-    return {interrupt, mask};
 }
 
 void cpu::push_interrupts() {
@@ -2144,15 +2070,16 @@ void cpu::push_interrupts() {
 
         this->_set(this->SP, this->PC & 0xff);
 
-        this->PC = static_cast<uint16_t>(current_interrupt);
-        this->_set(0xff0f,
-                   _get(0xff0f) & static_cast<uint8_t>(current_if_mask));
+        this->PC = static_cast<uint16_t>(this->gb_interrupt->current_interrupt);
+
+        this->gb_interrupt->interrupt_flags &=
+            static_cast<uint8_t>(this->gb_interrupt->current_if_mask);
     };
 
     auto m5 = [=]() {
-        this->ime = false;
-        this->current_interrupt = interrupts::none;
-        this->current_if_mask = if_mask::none;
+        this->gb_interrupt->ime = false;
+        this->gb_interrupt->current_interrupt = interrupt::interrupts::none;
+        this->gb_interrupt->current_if_mask = interrupt::if_mask::none;
     };
 
     this->I_operations.push_back(m5);
@@ -2168,8 +2095,8 @@ void cpu::handle_interrupts() {
     // takes 5 M-Cycles
 
     // exit halt if _ie & _if
-    uint8_t _ie = this->_get(0xffff);
-    uint8_t _if = this->_get(0xff0f);
+    uint8_t _ie = this->gb_interrupt->interrupt_enable_flag;
+    uint8_t _if = this->gb_interrupt->interrupt_flags;
 
     if ((_ie & _if & 0x1f) && this->halt) {
         this->halt = false;
@@ -2178,23 +2105,24 @@ void cpu::handle_interrupts() {
 
     // NOTE: This runs before cpu write to the interrupt (so it is based on
     // previous M cycle write)
-    auto [i, m] = check_current_interrupt(); // interrupt, mask
-    this->current_interrupt = i;
-    this->current_if_mask = m;
+    this->gb_interrupt->check_current_interrupt(); // interrupt, mask
 
     if (!this->I_operations.empty()) {
         return;
     }
 
-    if (!this->ime || !_ie || !_if) { // no interrupts and I operations is empty
+    if (!this->gb_interrupt->ime || !_ie ||
+        !_if) { // no interrupts and I operations is empty
         return;
     }
 
-    if (this->current_interrupt == interrupts::none) {
+    if (this->gb_interrupt->current_interrupt == interrupt::interrupts::none) {
         // no interrupts, and I operations was empty
         // if I operations was not empty, then we would have returned early to
         // continue servicing our interrupt with new vectors
-        assert(m == if_mask::none && "if mask is not set properly!!");
+        assert(this->gb_interrupt->current_if_mask ==
+                   interrupt::if_mask::none &&
+               "if mask is not set properly!!");
         return;
     }
 

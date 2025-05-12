@@ -6,13 +6,18 @@
 #include <memory>
 #include <vector>
 #include "timer.h"
+#include "ppu.h"
+#include "interrupt.h"
 
 // TODO: restrict access to ROM, VRAM, and OAM
 
 class mmu {
   public:
-    mmu(timer &timer);
+    mmu(timer &timer, interrupt &interrupt, ppu &ppu);
+
     timer *gb_timer{};
+    interrupt *gb_interrupt{};
+    ppu *gb_ppu{};
 
     virtual uint8_t read_memory(uint16_t address) const;
     virtual uint8_t bus_read_memory(
@@ -87,18 +92,6 @@ class mmu {
     void set_load_rom_complete();
     void set_cartridge_type(uint8_t type);
 
-    // div, timer related
-    // div counter stored in mmu
-    uint16_t div_ff04{4}; // TODO: we need to tick the timer before fetching the first instruction?
-    uint8_t tima_ff05{0}; // tima_ff05
-    uint8_t tac_ff07{0xf8};
-    uint8_t last_div_state{0}; // for falling edge detection
-    bool tima_overflow{false};
-    bool tima_overflow_standby{false};
-    bool lock_tima_write{false};
-    // increment div by M-cycle
-    void increment_div();
-    void falling_edge();
     void handle_tima_overflow();
     void handle_div_write();
     void handle_tac_write(uint8_t value);
@@ -106,10 +99,6 @@ class mmu {
     void handle_tma_write(uint8_t value);
     void handle_stat_write(uint8_t value);
 
-    // dma
-    uint8_t dma_ff46{0}; // dma starts out as 0xff
-    bool dma_mode{false};
-    bool dma_delay{false}; // delay dma start by one cycle
 
     uint16_t dma_source_transfer_address{0}; // address for DMA transfer
     bus dma_bus_source{};
@@ -124,15 +113,8 @@ class mmu {
     void oam_bug_read_inc(
         uint16_t address); // when read and increase occur in the same cycle
 
-    // used for oam corruption bug (ppu current oam row accessed in mode 2)
-    uint8_t ppu_current_oam_row{0};
-
     // lcdc register, lcd was reset
-    uint8_t lcdc_ff40{};
     void handle_lcdc_write(uint8_t value);
-    bool lcd_toggle{false};
-    bool lcd_on{false}; // indicates whether lcd is on or off
-    // TODO: fix timer and interrupt as individual classes later on
 
     // ppu mode
     uint8_t ppu_mode{2};
@@ -150,9 +132,6 @@ class mmu {
     void initialize_skip_bootrom_values();
 
   private:
-    // Interrupt enable flag - 0xFFFF
-    uint8_t interrupt_enable_flag{};
-
     // zero page - ff80 - fffe, High RAM (127 bytes)
     uint8_t zero_page[(0xfffe - 0xff80) + 1]{};
 
@@ -163,9 +142,6 @@ class mmu {
 
     // ununsable memory - 0xfea0 - 0xfeff
     uint8_t unusable_memory[(0xfeff - 0xfea0) + 1]{};
-
-    // oam ram - 0xfe00 - 0xfe9f
-    uint8_t oam_ram[(0xfe9f - 0xfe00) + 1]{};
 
     // echo ram - reserved, do not use 0xe000 - 0xfdff
     uint8_t echo_ram[(0xfdff - 0xe000) + 1]{};
@@ -178,15 +154,6 @@ class mmu {
 
     // cartridge ram - 0xa000 - 0xbfff
     uint8_t cartridge_ram[(0xbfff - 0xa000) + 1]{}; // e-ram
-
-    // bg_map_data_2 - 0x9C00 - 0x9FFF
-    uint8_t bg_map_data_2[(0x9fff - 0x9c00) + 1]{};
-
-    // bg_map_data_1 - 0x9800 - 0x9bff
-    uint8_t bg_map_data_1[(0x9bff - 0x9800) + 1]{};
-
-    // character ram - 0x8000 - 0x97ff
-    uint8_t character_ram[(0x97ff - 0x8000) + 1]{};
 
     // cartridge rom - switchable banks 1-xx - 0x4000 - 0x7FFF
     uint8_t cartridge_rom_switchable_banks[(0x7fff - 0x4000) + 1]{};

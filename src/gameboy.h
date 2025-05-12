@@ -4,6 +4,7 @@
 #include "mmu.h"
 #include "ppu.h"
 #include "timer.h"
+#include "interrupt.h"
 #include <SFML/Graphics.hpp>
 
 class gameboy {
@@ -22,9 +23,10 @@ class gameboy {
 
     // TODO: mmu, cpu, ppu
     timer gb_timer{};
-    mmu gb_mmu{gb_timer};
-    cpu gb_cpu = cpu(gb_mmu);
-    ppu gb_ppu = ppu(gb_mmu, window);
+    interrupt gb_interrupt{};
+    ppu gb_ppu = ppu(gb_interrupt, window);
+    mmu gb_mmu{gb_timer, gb_interrupt, gb_ppu};
+    cpu gb_cpu = cpu(gb_mmu, gb_timer, gb_interrupt);
 
     void tick();
 

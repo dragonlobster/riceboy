@@ -3,10 +3,11 @@
 
 class timer {
   public:
+    uint16_t ticks{0};
     // initialize sysclock to be 4
     uint16_t sysclock{4};
     // increment the sysclock
-    void increment_sysclock();
+    void tick();
     // div, timer related
     // div counter stored in mmu
     uint8_t tima_ff05{0}; // tima_ff05

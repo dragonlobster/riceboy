@@ -2,17 +2,19 @@
 
 #include "draw.h"
 #include "mmu.h"
+#include "interrupt.h"
 #include <SFML/Graphics.hpp>
 
 class ppu {
   public:
-    mmu &gb_mmu; // the central mmu
-
+    interrupt &gb_interrupt;
     sf::RenderWindow &window;
 
-    ppu(mmu &gb_mmu_, sf::RenderWindow &window_);
+    ppu(interrupt &gb_interrupt, sf::RenderWindow &window_);
 
     void initialize_skip_bootrom_values();
+
+    uint8_t _get(uint16_t address); // get vram or oam ram;
 
     // dot = tick = T-cycle
     void tick();
@@ -81,13 +83,6 @@ class ppu {
 
     // interrupts, stat handling
     bool current_interrupt_line{false}; // 0x48 interrupt (LCD)
-
-    uint8_t interrupt_t_cycle{0};
-    // the exact T cycle (T1, T2, T3, T4) that the rising edge occured
-    uint8_t interrupt_m_cycle{0};
-    // the exact M-cycle (1-114) that the rising edge occured
-    // uint8_t interrupt_delay{0}; // set the interrupt IF later on
-    // 255 means off
 
     void increment_ly();
 
@@ -161,23 +156,47 @@ class ppu {
     // lcd was reset
     bool lcd_reset{false};
 
-    // registers
-    uint16_t LCDC{0xff40};
-    uint16_t STAT{0xff41};
-    uint16_t SCY{0xff42};
-    uint16_t SCX{0xff43};
-    uint16_t LY{0xff44};
-    uint16_t LYC{0xff45};
-    uint16_t DMA{0xff46};
-    uint16_t BGP{0xff47};
-    uint16_t OBP0{0xff48};
-    uint16_t OBP1{0xff49};
-    uint16_t WX{0xff4b};
-    uint16_t WY{0xff4a};
-    uint16_t IF{0xff0f};
+    // ppu registers
+    uint8_t lcdc_ff40{0};
+    uint8_t stat_ff41{0};
+    uint8_t scy_ff42{0};
+    uint8_t scx_ff43{0};
+    uint8_t ly_ff44{0};
+    uint8_t lyc_ff45{0};
+    uint8_t dma_ff46{0};
+    uint8_t bgp_ff47{0};
+    uint8_t obp0_ff48{0};
+    uint8_t obp1_ff49{0};
+    uint8_t wx_ff4b{0};
+    uint8_t wy_ff4a{0};
 
-    // internal LY, (real LY) different from LY register value
-    uint8_t internal_ly{0};
+    // vram
+    // bg_map_data_2 - 0x9C00 - 0x9FFF
+    uint8_t bg_map_data_2[(0x9fff - 0x9c00) + 1]{};
+    // bg_map_data_1 - 0x9800 - 0x9bff
+    uint8_t bg_map_data_1[(0x9bff - 0x9800) + 1]{};
+    // character ram - 0x8000 - 0x97ff
+    uint8_t character_ram[(0x97ff - 0x8000) + 1]{};
+    // oam ram - 0xfe00 - 0xfe9f
+    uint8_t oam_ram[(0xfe9f - 0xfe00) + 1]{};
+
+    // oam and vram blocking
+    bool oam_read_block{false};
+    bool vram_read_block{false};
+    bool oam_write_block{false};
+    bool vram_write_block{false};
+
+    // lcd on, lcd toggle
+    bool lcd_on{false};
+    bool lcd_toggle{false};
+
+    // used for oam corruption bug (ppu current oam row accessed in mode 2)
+    uint8_t current_oam_row{0};
+
+    // dma related stuff
+    // dma
+    bool dma_mode{false};
+    bool dma_delay{false}; // delay dma start by one cycle
 
     // pixel drawing
     sf::Image lcd_frame_image{};
@@ -188,10 +207,6 @@ class ppu {
         uint8_t palette = 2); // 2 means get BGP (non sprite palette)
 
   private:
-    // functions
-    uint8_t _get(uint16_t address);
-    void _set(uint16_t address, uint8_t value);
-
     // palette
     const std::array<uint8_t, 3> color_palette_white{181, 175, 66};
     const std::array<uint8_t, 3> color_palette_light_gray{145, 155, 58};

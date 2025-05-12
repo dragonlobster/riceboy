@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mmu.h"
+#include "ppu.h"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -8,14 +9,18 @@
 #include <iostream>
 #include <tuple>
 #include <vector>
+#include "timer.h"
+#include "interrupt.h"
 
 class cpu {
     // TODO: make private
 
   public:
     // pointer to mmu
-    cpu(mmu &mmu); // pass by reference
+    cpu(mmu &mmu, timer &timer, interrupt &interrupt); // pass by reference
     mmu *gb_mmu{}; // the central mmu
+    timer *gb_timer{};
+    interrupt *gb_interrupt{};
 
     // main 8-bit registers
     uint8_t A{1};
@@ -44,8 +49,8 @@ class cpu {
     uint8_t Z{0};
 
     // interrupts, ime is either 0 or 1
-    bool ei_delay{false};
-    bool ime{false};
+    //bool ei_delay{false};
+    //bool ime{false};
 
     // HALT flag
     bool halt{false};
@@ -54,9 +59,7 @@ class cpu {
                           // (or you can just decrement it directly)
 
     std::vector<std::function<void()>> M_operations{};
-
-    // for interrupt operations
-    std::vector<std::function<void()>> I_operations{}; // interrupt operations
+    std::vector<std::function<void()>> I_operations{};
 
     // execute instructions
     // int is status (0 = success, 1 = error)
@@ -72,8 +75,6 @@ class cpu {
         const uint8_t opcode); // get the next opcode and increment the PC
 
     void tick();           // single cpu background_tick
-    void interrupt_tick(); // interrupt background_tick
-    void timer_tick();     // timer background_tick
 
     void handle_interrupts(); // handle interrupts
     void push_interrupts();
@@ -107,39 +108,15 @@ class cpu {
 
     enum class bitops { AND, XOR, OR };
 
-    enum class interrupts {
-        none = 0,
-        vblank = 0x40,
-        lcd = 0x48,
-        timer = 0x50,
-        serial = 0x58,
-        joypad = 0x60
-    };
-
-    enum class if_mask {
-        none = 0xff,   // should be 0xff so IF stays unmodified
-        vblank = 0xfe, // 1111 1110
-        lcd = 0xfd,    // 1111 1101
-        timer = 0xfb,  // 1111 1011
-        serial = 0xf7, // 1111 0111
-        joypad = 0xef  // 1110 1111
-    };
-
-    std::tuple<interrupts, if_mask>
-    check_current_interrupt(); // set current interrupt based on the new IE / IF
 
     // skip bootrom
     void initialize_skip_bootrom_values();
 
   private:
-    // interrupts
-    interrupts current_interrupt{interrupts::none};
-    if_mask current_if_mask{if_mask::none};
 
     // background_tick counter
     uint16_t ticks{0};
     uint16_t interrupt_ticks{0};
-    uint16_t timer_ticks{0};
 
     // state of action, fetch opcode = true or execute further instructions
     bool fetch_opcode{true};

@@ -1,6 +1,8 @@
 #include "../src/cpu.h"
 #include "../src/mmu.h"
 #include "../src/timer.h"
+#include "../src/interrupt.h"
+#include "../src/ppu.h"
 #include "opcodes.h" // import all opcodes
 #include <array>
 #include <fstream>
@@ -10,7 +12,7 @@ using json = nlohmann::json;
 
 class sst_mmu : public mmu {
   public:
-    sst_mmu(timer &gb_timer) : mmu(gb_timer) {};
+    sst_mmu(timer &gb_timer, interrupt &gb_interrupt, ppu &gb_ppu) : mmu(gb_timer, gb_interrupt, gb_ppu) {};
 
     uint8_t memory[0xffff]{};
 
@@ -25,9 +27,14 @@ class sst_mmu : public mmu {
 
 
 timer test_timer{};
-sst_mmu test_mmu{test_timer};
+interrupt test_interrupt{};
 
-cpu test_cpu = cpu(test_mmu);
+sf::RenderWindow &window;
+ppu test_ppu{test_interrupt, window};
+
+sst_mmu test_mmu{test_timer, test_interrupt, test_ppu};
+
+cpu test_cpu = cpu(test_mmu, test_timer, test_interrupt);
 
 namespace sst {
 struct cpu_state {
@@ -98,7 +105,7 @@ void test_setup(cpu &test_cpu, sst::cpu_state &initial) {
     test_cpu.C = initial.c;
     test_cpu.D = initial.d;
     test_cpu.E = initial.e;
-    test_cpu.ime = initial.ime;
+    test_interrupt.ime = initial.ime;
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {
@@ -126,7 +133,7 @@ void compare_final(cpu &test_cpu, sst::cpu_state &final) {
     EXPECT_EQ(test_cpu.C, final.c);
     EXPECT_EQ(test_cpu.D, final.d);
     EXPECT_EQ(test_cpu.E, final.e);
-    EXPECT_EQ(test_cpu.ime, final.ime);
+    EXPECT_EQ(test_interrupt.ime, final.ime);
 
     std::array<bool, 4> znhc{}; // flags array
     for (unsigned int i = 0; i < znhc.size(); ++i) {

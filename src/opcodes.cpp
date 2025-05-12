@@ -128,7 +128,7 @@ int cpu::handle_opcode(const uint8_t opcode) {
     case 1:
         if (z == 6 && y == 6) {
             // HALT
-            if (this->ime) {
+            if (this->gb_interrupt->ime) {
                 this->halt = true;
                 this->gb_mmu->cpu_halted = true;
             } else {
