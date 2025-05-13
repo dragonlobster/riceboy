@@ -2,14 +2,14 @@
 
 #include "cartridge.h"
 #include "mbc1.h"
+#include "timer.h"
+#include "interrupt.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include "timer.h"
-#include "ppu.h"
-#include "interrupt.h"
-
 // TODO: restrict access to ROM, VRAM, and OAM
+
+class ppu; // forward delcaration for ppu class
 
 class mmu {
   public:
@@ -118,12 +118,6 @@ class mmu {
 
     // ppu mode
     uint8_t ppu_mode{2};
-
-    // oam write and read block
-    bool oam_write_block{false};
-    bool oam_read_block{false};
-    bool vram_write_block{false};
-    bool vram_read_block{false};
 
     // cpu needs to tell us if it halted so the ppu can know
     bool cpu_halted{false};

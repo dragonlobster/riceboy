@@ -29,7 +29,7 @@ class sst_mmu : public mmu {
 timer test_timer{};
 interrupt test_interrupt{};
 
-sf::RenderWindow &window;
+sf::RenderWindow &window{};
 ppu test_ppu{test_interrupt, window};
 
 sst_mmu test_mmu{test_timer, test_interrupt, test_ppu};

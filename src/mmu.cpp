@@ -1,4 +1,5 @@
 #include "mmu.h"
+#include "ppu.h"
 #include <array>
 #include <cassert>
 #include <iostream>
@@ -340,7 +341,7 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
         (locate_section(address) == section::character_ram ||
          locate_section(address) == section::bg_map_data_1 ||
          locate_section(address) == section::bg_map_data_2) &&
-        vram_read_block) {
+        this->gb_ppu->vram_read_block) {
         return 0xff;
     }
 
@@ -348,7 +349,7 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
     // seems tricky
     // uint8_t stat_mode = hardware_registers[0x41] & 2;
 
-    if (locate_section(address) == section::oam_ram && (oam_read_block)) {
+    if (locate_section(address) == section::oam_ram && (this->gb_ppu->oam_read_block)) {
 
         return 0xff; // bug returns 0xff i think?
     }
@@ -674,7 +675,7 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
         (locate_section(address) == section::character_ram ||
          locate_section(address) == section::bg_map_data_1 ||
          locate_section(address) == section::bg_map_data_2) &&
-        vram_write_block) {
+        this->gb_ppu->vram_write_block) {
         return;
     }
 
@@ -692,7 +693,7 @@ void mmu::bus_write_memory(uint16_t address, uint8_t value) {
     }*/
 
     else if (locate_section(address) == section::oam_ram && load_rom_complete &&
-             oam_write_block) {
+             this->gb_ppu->oam_write_block) {
         return;
         // return; // block oam access during mode 2 and 3
     }

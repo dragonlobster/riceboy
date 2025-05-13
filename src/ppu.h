@@ -10,7 +10,7 @@ class ppu {
     interrupt &gb_interrupt;
     sf::RenderWindow &window;
 
-    ppu(interrupt &gb_interrupt, sf::RenderWindow &window_);
+    ppu(interrupt &gb_interrupt, sf::RenderWindow &window);
 
     void initialize_skip_bootrom_values();
 

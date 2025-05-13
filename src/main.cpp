@@ -84,7 +84,7 @@ int main() {
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
 
-    riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
+    riceboy->gb_cpu.prepare_rom(mooneye_ppu[11]);
     // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
@@ -93,14 +93,6 @@ int main() {
     // riceboy->gb_cpu.prepare_rom(blargg[6]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
-
-
-    // sf::RenderWindow window(sf::VideoMode({ Chip8::DISPLAY_WIDTH *
-    // draw::SCALE, Chip8::DISPLAY_HEIGHT * draw::SCALE }),
-    // "RiceBoy");
-
-    // double accumulator{0};
-    // double last_frame_time{0};
 
     // skips the bootrom (i captured the initial values by setting a breakpoint
     // at load rom complete
