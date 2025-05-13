@@ -128,8 +128,8 @@ void ppu::interrupt_line_check() {
     // 0000 1000
 
     // bit 5 (& 0x20) applies to both VBlank and OAM_Scan
-    bool vblank = (stat_mode == ppu_mode::VBlank) && (this->stat_ff41 & 0x10) ||
-                  ((this->stat_ff41 & 0x20) && (this->ly_ff44 == 144));
+    bool vblank = (stat_mode == ppu_mode::VBlank) && ((this->stat_ff41 & 0x10) ||
+                  ((this->stat_ff41 & 0x20) && (this->ly_ff44 == 144)));
     // 0001 0000, 0010 0000
 
     // get the old LY to compare
