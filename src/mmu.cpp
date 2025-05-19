@@ -12,10 +12,11 @@
      _cartridge_type == mmu::cartridge_type::mbc1_ram ||                       \
      _cartridge_type == mmu::cartridge_type::mbc1_ram_battery)
 
-mmu::mmu(timer &timer, interrupt &interrupt, ppu &ppu) {
+mmu::mmu(timer &timer, interrupt &interrupt, ppu &ppu, joypad &joypad) {
     this->gb_timer = &timer;
     this->gb_interrupt = &interrupt;
     this->gb_ppu = &ppu;
+    this->gb_joypad = &joypad;
 }
 
 void mmu::initialize_skip_bootrom_values() {
@@ -128,7 +129,7 @@ void mmu::handle_lcdc_write(uint8_t value) {
 
 void mmu::handle_stat_write(uint8_t value) {
     // mask top bit as 1 always, 0 and 1 bit not writable through mmu
-    this->gb_ppu->stat_ff41 = (value | 0x80) & 0xfc; 
+    this->gb_ppu->stat_ff41 = (value | 0x80) & 0xfc;
 }
 
 void mmu::handle_dma_write(uint8_t value) {
@@ -250,8 +251,10 @@ void mmu::oam_bug_read(uint16_t address) {
     // Apply OAM corruption formula to first word (first 2 bytes)
     for (int i = 0; i < 2; i++) {
         uint8_t a = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row + i];
-        uint8_t b = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 8 + i];
-        uint8_t c = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 4 + i];
+        uint8_t b =
+            this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 8 + i];
+        uint8_t c =
+            this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 4 + i];
         this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row + i] = b | (a & c);
     }
 
@@ -349,7 +352,8 @@ uint8_t mmu::bus_read_memory(uint16_t address) {
     // seems tricky
     // uint8_t stat_mode = hardware_registers[0x41] & 2;
 
-    if (locate_section(address) == section::oam_ram && (this->gb_ppu->oam_read_block)) {
+    if (locate_section(address) == section::oam_ram &&
+        (this->gb_ppu->oam_read_block)) {
 
         return 0xff; // bug returns 0xff i think?
     }
@@ -382,92 +386,47 @@ uint8_t mmu::read_memory(uint16_t address) const {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't read!");
 
-        if (address == 0xff04) {
-            return (this->gb_timer->sysclock & 0x0ff00) >> 8;
+        switch (address) {
+        // joypad
+        case 0xff00: return this->gb_joypad->handle_read();
+
+        // timer registers
+        case 0xff04: return (this->gb_timer->sysclock & 0x0ff00) >> 8;
+        case 0xff05: return this->gb_timer->tima_ff05;
+        case 0xff06: return this->gb_timer->tma_ff06;
+        case 0xff07: return this->gb_timer->tac_ff07;
+
+        // interrupt
+        case 0xff0f:
+            return this->gb_interrupt->interrupt_flags |
+                   0xe0; // mask top 3 bits for IF to 1 (unused)
+        case 0xffff:
+            return this->gb_interrupt->interrupt_enable_flag &
+                   0x1f; // mask top 3 bits for IE to 0 (unused)
+
+        // ppu
+        case 0xff40: return this->gb_ppu->lcdc_ff40;
+        case 0xff41: return this->gb_ppu->stat_ff41;
+        case 0xff42: return this->gb_ppu->scy_ff42;
+        case 0xff43: return this->gb_ppu->scx_ff43;
+        case 0xff44: return this->gb_ppu->ly_ff44;
+        case 0xff45: return this->gb_ppu->lyc_ff45;
+        case 0xff46: return this->gb_ppu->dma_ff46;
+        case 0xff47: return this->gb_ppu->bgp_ff47;
+        case 0xff48: return this->gb_ppu->obp0_ff48;
+        case 0xff49: return this->gb_ppu->obp1_ff49;
+        case 0xff4a: return this->gb_ppu->wy_ff4a;
+        case 0xff4b: return this->gb_ppu->wx_ff4b;
+
+        default    : {
+            // Attempt to read from cartridge
+            uint16_t result = this->cartridge->read_memory(address);
+
+            // Make sure result fits in 8 bits
+            if (result <= 0xff) {
+                return result;
+            }
         }
-
-        if (address == 0xff05) {
-            return this->gb_timer->tima_ff05;
-        }
-
-        if (address == 0xff06) {
-            return this->gb_timer->tma_ff06;
-        }
-
-        if (address == 0xff07) {
-            return this->gb_timer->tac_ff07;
-        }
-
-        if (address == 0xff46) {
-            return this->gb_ppu->dma_ff46;
-        }
-
-        if (address == 0xff00) {
-            return 0xff; // joypad
-        }
-
-        if (address == 0xff0f) {
-            return this->gb_interrupt->interrupt_flags | 0xe0;
-            // mask top 3 bits for IF to 1 (they are unused)
-        }
-
-        if (address == 0xffff) {
-            return this->gb_interrupt->interrupt_enable_flag & 0x1f;
-            // mask top 3 bits for IE to 0 (they are unused)
-        }
-
-        if (address == 0xff40) {
-            return this->gb_ppu->lcdc_ff40;
-        }
-
-        if (address == 0xff41) {
-            return this->gb_ppu->stat_ff41;
-        }
-
-        if (address == 0xff42) {
-            return this->gb_ppu->scy_ff42;
-        }
-
-        if (address == 0xff43) {
-            return this->gb_ppu->scx_ff43;
-        }
-
-        if (address == 0xff44) {
-            return this->gb_ppu->ly_ff44;
-        }
-
-        if (address == 0xff45) {
-            return this->gb_ppu->lyc_ff45;
-        }
-
-        if (address == 0xff46) {
-            return this->gb_ppu->dma_ff46;
-        }
-
-        if (address == 0xff47) {
-            return this->gb_ppu->bgp_ff47;
-        }
-
-        if (address == 0xff48) {
-            return this->gb_ppu->obp0_ff48;
-        }
-
-        if (address == 0xff49) {
-            return this->gb_ppu->obp1_ff49;
-        }
-
-        if (address == 0xff4a) {
-            return this->gb_ppu->wy_ff4a;
-        }
-
-        if (address == 0xff4b) {
-            return this->gb_ppu->wx_ff4b;
-        }
-
-        uint16_t result = this->cartridge->read_memory(address);
-
-        if (result <= 0xff) { // make sure result fits in 8 bits
-            return result;
         }
     }
 
@@ -505,87 +464,55 @@ uint8_t mmu::read_memory(uint16_t address) const {
     case mmu::section::internal_ram_bank_1_to_7:
         return this->internal_ram_bank_1_to_7[address - base_address];
 
-    case mmu::section::echo_ram        : return this->echo_ram[address - base_address];
+    case mmu::section::echo_ram: return this->echo_ram[address - base_address];
 
-    case mmu::section::oam_ram         : return this->gb_ppu->oam_ram[address - base_address];
+    case mmu::section::oam_ram:
+        return this->gb_ppu->oam_ram[address - base_address];
 
     case mmu::section::unusuable_memory: return 0; // DMG returns 0x00;
 
     case mmu::section::hardware_registers:
-        if (address == 0xff04) {
-            return (this->gb_timer->sysclock & 0xff00) >> 8;
-        } else if (address == 0xff05) {
-            return this->gb_timer->tima_ff05;
-        } else if (address == 0xff06) {
-            return this->gb_timer->tma_ff06;
-        } else if (address == 0xff07) {
-            return this->gb_timer->tac_ff07;
-        } else if (address == 0xff00) {
-            return 0xff; // joypad
-        } else if (address == 0xff46) {
-            return this->gb_ppu->dma_ff46;
-        } else if (address == 0xff0f) {
-            return this->gb_interrupt->interrupt_flags | 0xe0;
-            // return this->hardware_registers[0x0f] | 0xe0;
-            //  mask top 3 bits with 1s for IF (they are unused)
-        } else if (address == 0xff40) {
-            return this->gb_ppu->lcdc_ff40; // lcdc ff40
-        }
+        switch (address) {
+        // joypad
+        case 0xff00: return this->gb_joypad->handle_read();
 
-        else if (address == 0xff41) {
-            return this->gb_ppu->stat_ff41;
-        }
+        // timer
+        case 0xff04: return (this->gb_timer->sysclock & 0xff00) >> 8;
+        case 0xff05: return this->gb_timer->tima_ff05;
+        case 0xff06: return this->gb_timer->tma_ff06;
+        case 0xff07: return this->gb_timer->tac_ff07;
 
-        else if (address == 0xff42) {
-            return this->gb_ppu->scy_ff42;
-        }
+        // interrupt
+        case 0xff0f: return this->gb_interrupt->interrupt_flags | 0xe0;
 
-        else if (address == 0xff43) {
-            return this->gb_ppu->scx_ff43;
-        }
-
-        else if (address == 0xff44) {
-            return this->gb_ppu->ly_ff44;
-        }
-
-        else if (address == 0xff45) {
-            return this->gb_ppu->lyc_ff45;
-        }
-
-        else if (address == 0xff46) {
-            return this->gb_ppu->dma_ff46;
-        }
-
-        else if (address == 0xff47) {
-            return this->gb_ppu->bgp_ff47;
-        }
-
-        else if (address == 0xff48) {
-            return this->gb_ppu->obp0_ff48;
-        }
-
-        else if (address == 0xff49) {
-            return this->gb_ppu->obp1_ff49;
-        }
-
-        else if (address == 0xff4a) {
-            return this->gb_ppu->wy_ff4a;
-        }
-
-        else if (address == 0xff4b) {
-            return this->gb_ppu->wx_ff4b;
-        }
+        // ppu
+        case 0xff40: return this->gb_ppu->lcdc_ff40;
+        case 0xff41: return this->gb_ppu->stat_ff41;
+        case 0xff42: return this->gb_ppu->scy_ff42;
+        case 0xff43: return this->gb_ppu->scx_ff43;
+        case 0xff44: return this->gb_ppu->ly_ff44;
+        case 0xff45: return this->gb_ppu->lyc_ff45;
+        case 0xff46: return this->gb_ppu->dma_ff46;
+        case 0xff47: return this->gb_ppu->bgp_ff47;
+        case 0xff48: return this->gb_ppu->obp0_ff48;
+        case 0xff49: return this->gb_ppu->obp1_ff49;
+        case 0xff4a: return this->gb_ppu->wy_ff4a;
+        case 0xff4b: return this->gb_ppu->wx_ff4b;
 
         // unused
-        else if (address == 0xff03 || address == 0xff05 ||
-                 (address > 0xff07 && address < 0xff0f) || address == 0xff15 ||
-                 address == 0xff1f || address == 0xff4e || address == 0xff4d ||
-                 address == 0xff4f || (address > 0xff26 && address < 0xff30) ||
-                 (address >= 0xff51)) {
-            return 0xff;
-        }
+        case 0xff03:
+        case 0xff15:
+        case 0xff1f:
+        case 0xff4d:
+        case 0xff4e:
+        case 0xff4f: return 0xff;
 
-        else {
+        default:
+            // Check ranges for other unused registers
+            if ((address > 0xff07 && address < 0xff0f) ||
+                (address > 0xff26 && address < 0xff30) || (address >= 0xff51)) {
+                return 0xff;
+            }
             return this->hardware_registers[address - base_address];
         }
 
@@ -621,9 +548,12 @@ void mmu::oam_bug_write(uint16_t address) {
     // Apply OAM corruption formula to first word (first 2 bytes)
     for (int i = 0; i < 2; i++) {
         uint8_t a = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row + i];
-        uint8_t b = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 8 + i];
-        uint8_t c = this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 4 + i];
-        this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row + i] = ((a ^ c) & (b ^ c)) ^ c;
+        uint8_t b =
+            this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 8 + i];
+        uint8_t c =
+            this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row - 4 + i];
+        this->gb_ppu->oam_ram[this->gb_ppu->current_oam_row + i] =
+            ((a ^ c) & (b ^ c)) ^ c;
     }
 
     // Copy last 6 bytes from previous row (last 3 words)
@@ -718,6 +648,10 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         assert(this->cartridge.get() != nullptr &&
                "Cartridge is NULL! Can't write!");
 
+        if (address == 0xff00) {
+            this->gb_joypad->handle_write(value);
+        }
+
         if (address == 0xff04) {
             handle_div_write();
             return;
@@ -737,7 +671,6 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
             handle_tac_write(value);
             return;
         }
-
 
         // lcdc
         if (address == 0xff40) {
@@ -884,7 +817,11 @@ void mmu::write_memory(uint16_t address, uint8_t value) {
         break;
 
     case mmu::section::hardware_registers:
-        if (address == 0xff04) {
+        if (address == 0xff00) {
+            this->gb_joypad->handle_write(value);
+        }
+
+        else if (address == 0xff04) {
             handle_div_write();
         }
 

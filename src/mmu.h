@@ -4,6 +4,7 @@
 #include "mbc1.h"
 #include "timer.h"
 #include "interrupt.h"
+#include "joypad.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -13,11 +14,12 @@ class ppu; // forward delcaration for ppu class
 
 class mmu {
   public:
-    mmu(timer &timer, interrupt &interrupt, ppu &ppu);
+    mmu(timer &timer, interrupt &interrupt, ppu &ppu, joypad &joypad);
 
     timer *gb_timer{};
     interrupt *gb_interrupt{};
     ppu *gb_ppu{};
+    joypad *gb_joypad{};
 
     virtual uint8_t read_memory(uint16_t address) const;
     virtual uint8_t bus_read_memory(

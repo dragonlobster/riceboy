@@ -80,35 +80,116 @@ int main() {
     // TODO: load the BOOT ROM
     riceboy->gb_cpu.load_boot_rom();
 
-    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[12]);
-    // riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
+    // riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
+    //  riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
+    riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
     // riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
-    riceboy->gb_cpu.prepare_rom(blargg[0]);
+    // riceboy->gb_cpu.prepare_rom(blargg[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_cpu[0]);
     // riceboy->gb_cpu.prepare_rom(mooneye_interrupts[0]);
 
     // skips the bootrom (i captured the initial values by setting a breakpoint
     // at load rom complete
-    riceboy->skip_bootrom();
+    // riceboy->skip_bootrom();
 
     // frame clock (avoiding setFrameRateLimit imprecision)
     sf::Clock frame_clock{};
 
     while (window.isOpen()) {
 
+        // window.handleEvents(onClose, onKeyPressed);
         while (const std::optional event = window.pollEvent()) {
+
             // Close window: exit
-            if (event->is<sf::Event::Closed>())
+            if (event->is<sf::Event::Closed>()) {
                 window.close();
+            }
+
+            else if (const auto *key_pressed =
+                         event->getIf<sf::Event::KeyPressed>()) {
+
+                switch (key_pressed->scancode) {
+                case sf::Keyboard::Scancode::W:
+                    riceboy->gb_joypad.up = true;
+                    break;
+
+                case sf::Keyboard::Scancode::A:
+                    riceboy->gb_joypad.left = true;
+                    break;
+
+                case sf::Keyboard::Scancode::S:
+                    riceboy->gb_joypad.down = true;
+                    break;
+
+                case sf::Keyboard::Scancode::D:
+                    riceboy->gb_joypad.right = true;
+                    break;
+
+                case sf::Keyboard::Scancode::J:
+                    riceboy->gb_joypad.a = true;
+                    break;
+
+                case sf::Keyboard::Scancode::K:
+                    riceboy->gb_joypad.b = true;
+                    break;
+
+                case sf::Keyboard::Scancode::Enter:
+                    riceboy->gb_joypad.start = true;
+                    break;
+
+                case sf::Keyboard::Scancode::RShift:
+                    riceboy->gb_joypad.select = true;
+                    break;
+
+                }
+            }
+
+            else if (const auto *key_released =
+                         event->getIf<sf::Event::KeyReleased>()) {
+
+                switch (key_released->scancode) {
+                case sf::Keyboard::Scancode::W:
+                    riceboy->gb_joypad.up = false;
+                    break;
+
+                case sf::Keyboard::Scancode::A:
+                    riceboy->gb_joypad.left = false;
+                    break;
+
+                case sf::Keyboard::Scancode::S:
+                    riceboy->gb_joypad.down = false;
+                    break;
+
+                case sf::Keyboard::Scancode::D:
+                    riceboy->gb_joypad.right = false;
+                    break;
+
+                case sf::Keyboard::Scancode::J:
+                    riceboy->gb_joypad.a = false;
+                    break;
+
+                case sf::Keyboard::Scancode::K:
+                    riceboy->gb_joypad.b = false;
+                    break;
+
+                case sf::Keyboard::Scancode::Enter:
+                    riceboy->gb_joypad.start = false;
+                    break;
+
+                case sf::Keyboard::Scancode::RShift:
+                    riceboy->gb_joypad.select = false;
+                    break;
+
+                }
+            }
         }
 
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
-
-        double target_frame_time = 1.f / (((1 << 22) / 70224) * 1000);
-        // double target_frame_time = 1000;
+        double target_frame_time = (1.f / ((1 << 22) / 70224)) * 1000;
+        //double target_frame_time = (1.f / 120) * 1000;
 
         // 70224 ipf - clock speed 4194304Hz
         while (frame_time >= target_frame_time) {
