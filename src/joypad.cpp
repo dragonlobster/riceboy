@@ -1,38 +1,69 @@
 #include "joypad.h"
 #include <assert.h>
 
-uint8_t joypad::handle_read() {
-    // Start with upper bits 7-6 always set to 1
-    uint8_t value = 0xc0;
+void joypad::handle_press(buttons button) {
 
-    // Add selection bits 5-4 (0=selected, 1=not selected)
-    value |= ((!dpad) << 4) | ((!buttons) << 5);
-
-    // Default all button states to "not pressed" (1)
-    uint8_t button_states = 0xf;
-
-    if (buttons) {
-        button_states &= ~(start << 3);
-        button_states &= ~(select << 2);
-        button_states &= ~(b << 1);
-        button_states &= ~(a);
+    switch (button) {
+    case buttons::Up    : up = true; break;
+    case buttons::Down  : down = true; break;
+    case buttons::Left  : left = true; break;
+    case buttons::Right : right = true; break;
+    case buttons::Start : start = true; break;
+    case buttons::Select: select = true; break;
+    case buttons::A     : a = true; break;
+    case buttons::B     : b = true; break;
     }
 
-    else if (dpad) {
-        button_states &= ~(down << 3);
-        button_states &= ~(up << 2);
-        button_states &= ~(left << 1);
-        button_states &= ~(right);
+    if (button_select) {
+        // start, select, b, a - 3, 2, 1, 0
+        this->ff00_joyp =
+            this->ff00_joyp ^ !start << 3 ^ !select << 2 ^ !b << 1 ^ !a;
     }
 
-    return value | button_states;
+    if (dpad_select) {
+        this->ff00_joyp =
+            this->ff00_joyp ^ !down << 3 ^ !up << 2 ^ !left << 1 ^ !right;
+    }
+}
+
+void joypad::handle_release(buttons button) {
+
+    switch (button) {
+    case buttons::Up    : up = false; break;
+    case buttons::Down  : down = false; break;
+    case buttons::Left  : left = false; break;
+    case buttons::Right : right = false; break;
+    case buttons::Start : start = false; break;
+    case buttons::Select: select = false; break;
+    case buttons::A     : a = false; break;
+    case buttons::B     : b = false; break;
+    }
+
+    if (button_select) {
+        // start, select, b, a - 3, 2, 1, 0
+        this->ff00_joyp =
+            this->ff00_joyp ^ !start << 3 ^ !select << 2 ^ !b << 1 ^ !a;
+    }
+
+    if (dpad_select) {
+        this->ff00_joyp =
+            this->ff00_joyp ^ !down << 3 ^ !up << 2 ^ !left << 1 ^ !right;
+    }
 }
 
 void joypad::handle_write(uint8_t value) {
 
-    uint8_t buttons_bit = value >> 5 & 1;
-    uint8_t dpad_bit = value >> 4 & 1;
+    button_select = !(value >> 5 & 1);
+    dpad_select = !(value >> 4 & 1);
 
-    this->buttons = !buttons_bit;
-    this->dpad = !dpad_bit;
+    if (button_select) {
+        // start, select, b, a - 3, 2, 1, 0
+        this->ff00_joyp =
+            this->ff00_joyp ^ !start << 3 ^ !select << 2 ^ !b << 1 ^ !a;
+    }
+
+    if (dpad_select) {
+        this->ff00_joyp =
+            this->ff00_joyp ^ !down << 3 ^ !up << 2 ^ !left << 1 ^ !right;
+    }
 }

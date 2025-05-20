@@ -388,7 +388,7 @@ uint8_t mmu::read_memory(uint16_t address) const {
 
         switch (address) {
         // joypad
-        case 0xff00: return this->gb_joypad->handle_read();
+        case 0xff00: return this->gb_joypad->ff00_joyp;
 
         // timer registers
         case 0xff04: return (this->gb_timer->sysclock & 0x0ff00) >> 8;
@@ -474,7 +474,7 @@ uint8_t mmu::read_memory(uint16_t address) const {
     case mmu::section::hardware_registers:
         switch (address) {
         // joypad
-        case 0xff00: return this->gb_joypad->handle_read();
+        case 0xff00: return this->gb_joypad->ff00_joyp;
 
         // timer
         case 0xff04: return (this->gb_timer->sysclock & 0xff00) >> 8;

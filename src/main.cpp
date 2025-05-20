@@ -101,95 +101,10 @@ int main() {
     while (window.isOpen()) {
 
         // window.handleEvents(onClose, onKeyPressed);
-        while (const std::optional event = window.pollEvent()) {
-
-            // Close window: exit
-            if (event->is<sf::Event::Closed>()) {
-                window.close();
-            }
-
-            else if (const auto *key_pressed =
-                         event->getIf<sf::Event::KeyPressed>()) {
-
-                switch (key_pressed->scancode) {
-                case sf::Keyboard::Scancode::W:
-                    riceboy->gb_joypad.up = true;
-                    break;
-
-                case sf::Keyboard::Scancode::A:
-                    riceboy->gb_joypad.left = true;
-                    break;
-
-                case sf::Keyboard::Scancode::S:
-                    riceboy->gb_joypad.down = true;
-                    break;
-
-                case sf::Keyboard::Scancode::D:
-                    riceboy->gb_joypad.right = true;
-                    break;
-
-                case sf::Keyboard::Scancode::J:
-                    riceboy->gb_joypad.a = true;
-                    break;
-
-                case sf::Keyboard::Scancode::K:
-                    riceboy->gb_joypad.b = true;
-                    break;
-
-                case sf::Keyboard::Scancode::Enter:
-                    riceboy->gb_joypad.start = true;
-                    break;
-
-                case sf::Keyboard::Scancode::RShift:
-                    riceboy->gb_joypad.select = true;
-                    break;
-
-                }
-            }
-
-            else if (const auto *key_released =
-                         event->getIf<sf::Event::KeyReleased>()) {
-
-                switch (key_released->scancode) {
-                case sf::Keyboard::Scancode::W:
-                    riceboy->gb_joypad.up = false;
-                    break;
-
-                case sf::Keyboard::Scancode::A:
-                    riceboy->gb_joypad.left = false;
-                    break;
-
-                case sf::Keyboard::Scancode::S:
-                    riceboy->gb_joypad.down = false;
-                    break;
-
-                case sf::Keyboard::Scancode::D:
-                    riceboy->gb_joypad.right = false;
-                    break;
-
-                case sf::Keyboard::Scancode::J:
-                    riceboy->gb_joypad.a = false;
-                    break;
-
-                case sf::Keyboard::Scancode::K:
-                    riceboy->gb_joypad.b = false;
-                    break;
-
-                case sf::Keyboard::Scancode::Enter:
-                    riceboy->gb_joypad.start = false;
-                    break;
-
-                case sf::Keyboard::Scancode::RShift:
-                    riceboy->gb_joypad.select = false;
-                    break;
-
-                }
-            }
-        }
 
         double frame_time = frame_clock.getElapsedTime().asMilliseconds();
         double target_frame_time = (1.f / ((1 << 22) / 70224)) * 1000;
-        //double target_frame_time = (1.f / 120) * 1000;
+        // double target_frame_time = (1.f / 120) * 1000;
 
         // 70224 ipf - clock speed 4194304Hz
         while (frame_time >= target_frame_time) {
@@ -197,6 +112,96 @@ int main() {
                 riceboy->tick();
             }
             frame_time -= target_frame_time;
+
+            while (const std::optional event = window.pollEvent()) {
+
+                // Close window: exit
+                if (event->is<sf::Event::Closed>()) {
+                    window.close();
+                }
+
+                else if (const auto *key_pressed =
+                             event->getIf<sf::Event::KeyPressed>()) {
+
+                    switch (key_pressed->scancode) {
+                    case sf::Keyboard::Scancode::W:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::Up);
+                        break;
+
+                    case sf::Keyboard::Scancode::A:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::Left);
+                        break;
+
+                    case sf::Keyboard::Scancode::S:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::Down);
+                        break;
+
+                    case sf::Keyboard::Scancode::D:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::Right);
+                        break;
+
+                    case sf::Keyboard::Scancode::J:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::A);
+                        break;
+
+                    case sf::Keyboard::Scancode::K:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::B);
+                        break;
+
+                    case sf::Keyboard::Scancode::Enter:
+                        riceboy->gb_joypad.handle_press(joypad::buttons::Start);
+                        break;
+
+                    case sf::Keyboard::Scancode::RShift:
+                        riceboy->gb_joypad.handle_press(
+                            joypad::buttons::Select);
+                        break;
+                    }
+                }
+
+                else if (const auto *key_released =
+                             event->getIf<sf::Event::KeyReleased>()) {
+
+                    switch (key_released->scancode) {
+                    case sf::Keyboard::Scancode::W:
+                        riceboy->gb_joypad.handle_release(joypad::buttons::Up);
+                        break;
+
+                    case sf::Keyboard::Scancode::A:
+                        riceboy->gb_joypad.handle_release(
+                            joypad::buttons::Left);
+                        break;
+
+                    case sf::Keyboard::Scancode::S:
+                        riceboy->gb_joypad.handle_release(
+                            joypad::buttons::Down);
+                        break;
+
+                    case sf::Keyboard::Scancode::D:
+                        riceboy->gb_joypad.handle_release(
+                            joypad::buttons::Right);
+                        break;
+
+                    case sf::Keyboard::Scancode::J:
+                        riceboy->gb_joypad.handle_release(joypad::buttons::A);
+                        break;
+
+                    case sf::Keyboard::Scancode::K:
+                        riceboy->gb_joypad.handle_release(joypad::buttons::B);
+                        break;
+
+                    case sf::Keyboard::Scancode::Enter:
+                        riceboy->gb_joypad.handle_release(
+                            joypad::buttons::Start);
+                        break;
+
+                    case sf::Keyboard::Scancode::RShift:
+                        riceboy->gb_joypad.handle_release(
+                            joypad::buttons::Select);
+                        break;
+                    }
+                }
+            }
         }
         // 70224
     }
