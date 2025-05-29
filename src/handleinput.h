@@ -1,57 +1,35 @@
 #pragma once
 
-//#include "Chip8.h"
+#include "joypad.h"
 
-template <typename T>
-void HandleInput(bool (&keypad)[16], const T &keys, const bool &pressed) {
-    switch (keys.scancode) {
-    case sf::Keyboard::Scancode::Num1:
-        keypad[1] = pressed;
-        break;
-    case sf::Keyboard::Scancode::Num2:
-        keypad[2] = pressed;
-        break;
-    case sf::Keyboard::Scancode::Num3:
-        keypad[3] = pressed;
-        break;
-    case sf::Keyboard::Scancode::Num4:
-        keypad[0xC] = pressed;
-        break;
-    case sf::Keyboard::Scancode::Q:
-        keypad[4] = pressed;
-        break;
+template <typename Key>
+void HandleInput(joypad &joypad, const Key *key, const bool pressed) {
+    if (!key)
+        return;
+    switch (key->scancode) {
     case sf::Keyboard::Scancode::W:
-        keypad[5] = pressed;
-        break;
-    case sf::Keyboard::Scancode::E:
-        keypad[6] = pressed;
-        break;
-    case sf::Keyboard::Scancode::R:
-        keypad[0xD] = pressed;
+       joypad.handle_button(joypad::buttons::Up, pressed);
         break;
     case sf::Keyboard::Scancode::A:
-        keypad[7] = pressed;
+        joypad.handle_button(joypad::buttons::Left, pressed);
         break;
     case sf::Keyboard::Scancode::S:
-        keypad[8] = pressed;
+        joypad.handle_button(joypad::buttons::Down, pressed);
         break;
     case sf::Keyboard::Scancode::D:
-        keypad[9] = pressed; // 0xA
+        joypad.handle_button(joypad::buttons::Right, pressed);
         break;
-    case sf::Keyboard::Scancode::F:
-        keypad[0xE] = pressed; // 0xB
+    case sf::Keyboard::Scancode::Enter:
+        joypad.handle_button(joypad::buttons::Start, pressed);
         break;
-    case sf::Keyboard::Scancode::Z:
-        keypad[0xA] = pressed; // 0xC
+    case sf::Keyboard::Scancode::RShift:
+        joypad.handle_button(joypad::buttons::Select, pressed);
         break;
-    case sf::Keyboard::Scancode::X:
-        keypad[0] = pressed; // 0xD
+    case sf::Keyboard::Scancode::J:
+        joypad.handle_button(joypad::buttons::A, pressed);
         break;
-    case sf::Keyboard::Scancode::C:
-        keypad[0xB] = pressed; // 0xE
-        break;
-    case sf::Keyboard::Scancode::V:
-        keypad[0xF] = pressed; // 0xF
+    case sf::Keyboard::Scancode::K:
+        joypad.handle_button(joypad::buttons::B, pressed);
         break;
     }
 }

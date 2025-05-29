@@ -12,7 +12,7 @@ using json = nlohmann::json;
 
 class sst_mmu : public mmu {
   public:
-    sst_mmu(timer &gb_timer, interrupt &gb_interrupt, ppu &gb_ppu) : mmu(gb_timer, gb_interrupt, gb_ppu) {};
+    sst_mmu(timer &gb_timer, interrupt &gb_interrupt, ppu &gb_ppu, joypad &gb_joypad) : mmu(gb_timer, gb_interrupt, gb_ppu, gb_joypad) {};
 
     uint8_t memory[0xffff]{};
 
@@ -32,7 +32,9 @@ interrupt test_interrupt{};
 sf::RenderWindow &window{};
 ppu test_ppu{test_interrupt, window};
 
-sst_mmu test_mmu{test_timer, test_interrupt, test_ppu};
+joypad test_joypad{};
+
+sst_mmu test_mmu{test_timer, test_interrupt, test_ppu, test_joypad};
 
 cpu test_cpu = cpu(test_mmu, test_timer, test_interrupt);
 

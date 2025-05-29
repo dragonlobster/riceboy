@@ -93,7 +93,7 @@ int main() {
 
     // skips the bootrom (i captured the initial values by setting a breakpoint
     // at load rom complete
-    // riceboy->skip_bootrom();
+    riceboy->skip_bootrom();
 
     // frame clock (avoiding setFrameRateLimit imprecision)
     sf::Clock frame_clock{};
@@ -122,84 +122,12 @@ int main() {
 
                 else if (const auto *key_pressed =
                              event->getIf<sf::Event::KeyPressed>()) {
-
-                    switch (key_pressed->scancode) {
-                    case sf::Keyboard::Scancode::W:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::Up);
-                        break;
-
-                    case sf::Keyboard::Scancode::A:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::Left);
-                        break;
-
-                    case sf::Keyboard::Scancode::S:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::Down);
-                        break;
-
-                    case sf::Keyboard::Scancode::D:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::Right);
-                        break;
-
-                    case sf::Keyboard::Scancode::J:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::A);
-                        break;
-
-                    case sf::Keyboard::Scancode::K:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::B);
-                        break;
-
-                    case sf::Keyboard::Scancode::Enter:
-                        riceboy->gb_joypad.handle_press(joypad::buttons::Start);
-                        break;
-
-                    case sf::Keyboard::Scancode::RShift:
-                        riceboy->gb_joypad.handle_press(
-                            joypad::buttons::Select);
-                        break;
-                    }
+                    HandleInput(riceboy->gb_joypad, key_pressed, true);
                 }
 
                 else if (const auto *key_released =
                              event->getIf<sf::Event::KeyReleased>()) {
-
-                    switch (key_released->scancode) {
-                    case sf::Keyboard::Scancode::W:
-                        riceboy->gb_joypad.handle_release(joypad::buttons::Up);
-                        break;
-
-                    case sf::Keyboard::Scancode::A:
-                        riceboy->gb_joypad.handle_release(
-                            joypad::buttons::Left);
-                        break;
-
-                    case sf::Keyboard::Scancode::S:
-                        riceboy->gb_joypad.handle_release(
-                            joypad::buttons::Down);
-                        break;
-
-                    case sf::Keyboard::Scancode::D:
-                        riceboy->gb_joypad.handle_release(
-                            joypad::buttons::Right);
-                        break;
-
-                    case sf::Keyboard::Scancode::J:
-                        riceboy->gb_joypad.handle_release(joypad::buttons::A);
-                        break;
-
-                    case sf::Keyboard::Scancode::K:
-                        riceboy->gb_joypad.handle_release(joypad::buttons::B);
-                        break;
-
-                    case sf::Keyboard::Scancode::Enter:
-                        riceboy->gb_joypad.handle_release(
-                            joypad::buttons::Start);
-                        break;
-
-                    case sf::Keyboard::Scancode::RShift:
-                        riceboy->gb_joypad.handle_release(
-                            joypad::buttons::Select);
-                        break;
-                    }
+                    HandleInput(riceboy->gb_joypad, key_released, false);
                 }
             }
         }

@@ -21,8 +21,9 @@ class joypad {
     bool a{false};
     bool b{false};
 
-    void handle_press(buttons button);
-    void handle_release(buttons button);
+    void handle_button(buttons button, bool pressed);
 
     void handle_write(uint8_t value);
+
+    void update_joyp_register();
 };
