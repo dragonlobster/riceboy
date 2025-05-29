@@ -84,7 +84,6 @@ int main() {
     //  riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
     riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
-    // riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
     // riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[0]);
@@ -97,40 +96,50 @@ int main() {
 
     // frame clock (avoiding setFrameRateLimit imprecision)
     sf::Clock frame_clock{};
+    double accumulator{0};
+    double target_frame_time = 1.f / ((1 << 22) / 70224);
+    // double target_frame_time = 1000;
 
     while (window.isOpen()) {
 
-        // window.handleEvents(onClose, onKeyPressed);
+        /*
+        while (const std::optional event = window.pollEvent()) {
+            // Close window: exit
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
+        }*/
 
-        double frame_time = frame_clock.getElapsedTime().asMilliseconds();
-        double target_frame_time = (1.f / ((1 << 22) / 70224)) * 1000;
-        // double target_frame_time = (1.f / 120) * 1000;
+        while (const std::optional event = window.pollEvent()) {
+            // Close window: exit
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
+
+            else if (const auto *key_pressed =
+                         event->getIf<sf::Event::KeyPressed>()) {
+                HandleInput(riceboy->gb_joypad, key_pressed, true);
+            }
+
+            else if (const auto *key_released =
+                         event->getIf<sf::Event::KeyReleased>()) {
+                HandleInput(riceboy->gb_joypad, key_released, false);
+            }
+        }
+
+        const double delta_time = frame_clock.restart().asSeconds();
+        accumulator += delta_time; // add the delta time to the accumulator, we
+                                   // need to wait until it reachs ~1.67
+                                   // milliseconds (60 fps, ~1.67ms / frame)
 
         // 70224 ipf - clock speed 4194304Hz
-        while (frame_time >= target_frame_time) {
+        while (accumulator >= target_frame_time) {
             for (unsigned int i = 0; i < 70224; ++i) {
                 riceboy->tick();
             }
-            frame_time -= target_frame_time;
-
-            while (const std::optional event = window.pollEvent()) {
-
-                // Close window: exit
-                if (event->is<sf::Event::Closed>()) {
-                    window.close();
-                }
-
-                else if (const auto *key_pressed =
-                             event->getIf<sf::Event::KeyPressed>()) {
-                    HandleInput(riceboy->gb_joypad, key_pressed, true);
-                }
-
-                else if (const auto *key_released =
-                             event->getIf<sf::Event::KeyReleased>()) {
-                    HandleInput(riceboy->gb_joypad, key_released, false);
-                }
-            }
+            accumulator -= target_frame_time;
         }
+
         // 70224
     }
 
