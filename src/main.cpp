@@ -1,16 +1,21 @@
 #include "draw.h"
 #include "gameboy.h"
 #include "handleinput.h"
-#include "vendor/tinyfiledialogs.h"
+#include "tinyfiledialogs.h"
 #include <SFML/Graphics.hpp>
 
 int main() {
     // TODO: gb
 
     // open file dialog to load ROM
-    // const char* lFilterPatterns[1] = { "*.gb" };
-    // const char* ROM = tinyfd_openFileDialog("Open a Gameboy ROM", NULL, 1,
-    // lFilterPatterns, "*.gb", 0); if (!ROM) { exit(0); }
+    const char *lFilterPatterns[1] = {"*.gb"};
+    const char *ROM = tinyfd_openFileDialog("Open a Gameboy ROM", NULL, 1,
+                                            lFilterPatterns, "*.gb", 0);
+
+    if (!ROM) {
+        exit(0);
+    }
+
     sf::RenderWindow window(
         sf::VideoMode({160 * draw::SCALE, 144 * draw::SCALE}), "RiceBoy");
 
@@ -83,7 +88,7 @@ int main() {
     // riceboy->gb_cpu.prepare_rom(mooneye_ppu[13]);
     //  riceboy->gb_cpu.prepare_rom("BOOT/double-halt-cancel.gb");
     // riceboy->gb_cpu.prepare_rom("BOOT/dmg-acid2.gb");
-    riceboy->gb_cpu.prepare_rom("BOOT/test.gb");
+    riceboy->gb_cpu.prepare_rom(ROM);
     // riceboy->gb_cpu.prepare_rom(mooneye_timing[12]);
     // riceboy->gb_cpu.prepare_rom(mooneye_root[0]);
     // riceboy->gb_cpu.prepare_rom(blargg[0]);

@@ -29,7 +29,9 @@ class sst_mmu : public mmu {
 timer test_timer{};
 interrupt test_interrupt{};
 
-sf::RenderWindow &window{};
+sf::RenderWindow window(sf::VideoMode({160 * draw::SCALE, 144 * draw::SCALE}),
+                        "RiceBoy");
+
 ppu test_ppu{test_interrupt, window};
 
 joypad test_joypad{};

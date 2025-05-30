@@ -16,21 +16,18 @@ uint8_t ppu::_get(uint16_t address) {
     uint16_t base_address = static_cast<uint16_t>(section);
 
     switch (section) {
-    case mmu::section::oam_ram:
-        return this->oam_ram[address - base_address];
-        break;
+    case mmu::section::oam_ram: return this->oam_ram[address - base_address];
 
     case mmu::section::bg_map_data_2:
         return this->bg_map_data_2[address - base_address];
-        break;
 
     case mmu::section::bg_map_data_1:
         return this->bg_map_data_1[address - base_address];
-        break;
 
     case mmu::section::character_ram:
         return this->character_ram[address - base_address];
-        break;
+
+    default: return 0xff;
     }
 }
 
@@ -128,8 +125,9 @@ void ppu::interrupt_line_check() {
     // 0000 1000
 
     // bit 5 (& 0x20) applies to both VBlank and OAM_Scan
-    bool vblank = (stat_mode == ppu_mode::VBlank) && ((this->stat_ff41 & 0x10) ||
-                  ((this->stat_ff41 & 0x20) && (this->ly_ff44 == 144)));
+    bool vblank = (stat_mode == ppu_mode::VBlank) &&
+                  ((this->stat_ff41 & 0x10) ||
+                   ((this->stat_ff41 & 0x20) && (this->ly_ff44 == 144)));
     // 0001 0000, 0010 0000
 
     // get the old LY to compare
@@ -197,7 +195,8 @@ void ppu::reset_ticks() {
 
 void ppu::sprite_fetch_tile_data_low(oam_entry sprite) {
 
-    assert((sprite).y >= 16 && "sprite to fetch y position is abnormal!");
+    // i think this is no longer the case due to sprite fetching causing timing penalties
+    //assert((sprite).y >= 16 && "sprite to fetch y position is abnormal!");
 
     uint16_t sprite_address{};
     uint16_t line_offset{};

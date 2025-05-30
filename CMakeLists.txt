@@ -3,11 +3,13 @@ project(RiceBoy LANGUAGES CXX)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+add_library(tinyfiledialogs STATIC "includes/vendor/tinyfiledialogs.cpp" "includes/vendor/tinyfiledialogs.h")
+
+target_include_directories(tinyfiledialogs PUBLIC "includes/vendor")
+
 # gb components 
 add_subdirectory(src) 
-add_library(vendor INTERFACE)
-target_include_directories(vendor INTERFACE includes)
-target_link_libraries(gb_components PUBLIC vendor)
+target_link_libraries(gb_components PUBLIC tinyfiledialogs)
 
 # rice boy executable
 add_executable(RiceBoy src/main.cpp)
