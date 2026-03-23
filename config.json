@@ -1,0 +1,11 @@
+{
+  "ppu": {
+    "coincidence_flag_tick": 452,
+    "mode0_ticks": 204,
+    "mode2_ticks": 80,
+    "mode3_ticks": 172,
+    "mode1_ticks": 456,
+    "dummy_fetch_cycles": 8,
+    "scx_discard_cycles": 8
+  }
+}

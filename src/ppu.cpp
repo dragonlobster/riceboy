@@ -1,8 +1,130 @@
 #include "ppu.h"
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 void ppu::increment_ly() { this->ly_ff44++; }
+
+void ppu::load_config(const std::string& config_file) {
+    std::ifstream file(config_file);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Could not open config file " << config_file << ". Using defaults." << std::endl;
+        return;
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Basic parsing of config values (simple approach, not robust json parser)
+    // We'll look for specific key-value pairs
+    
+    // Look for coincidence_flag_tick
+    size_t pos = content.find("\"coincidence_flag_tick\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                coincidence_flag_tick = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for mode0_ticks
+    pos = content.find("\"mode0_ticks\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                mode0_ticks_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for mode2_ticks
+    pos = content.find("\"mode2_ticks\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                mode2_ticks_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for mode3_ticks
+    pos = content.find("\"mode3_ticks\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                mode3_ticks_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for mode1_ticks
+    pos = content.find("\"mode1_ticks\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                mode1_ticks_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for dummy_fetch_cycles
+    pos = content.find("\"dummy_fetch_cycles\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                dummy_fetch_cycles_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+    
+    // Look for scx_discard_cycles
+    pos = content.find("\"scx_discard_cycles\"");
+    if (pos != std::string::npos) {
+        pos = content.find(':', pos);
+        if (pos != std::string::npos) {
+            pos++;
+            while (pos < content.length() && (content[pos] == ' ' || content[pos] == '\t')) pos++;
+            size_t end = pos;
+            while (end < content.length() && content[end] >= '0' && content[end] <= '9') end++;
+            if (end > pos) {
+                scx_discard_cycles_config = std::stoi(content.substr(pos, end - pos));
+            }
+        }
+    }
+}
 
 uint8_t ppu::_get(uint16_t address) {
     mmu::section section = mmu::locate_section(address);
@@ -137,7 +259,7 @@ void ppu::interrupt_line_check() {
     current_interrupt_line = oam_scan || hblank || vblank || ly_lyc;
 
     //    // ly == lyc comparison delayed for 1 cycle
-    if (ticks >= 452) {
+    if (ticks >= coincidence_flag_tick) {
         this->stat_ff41 &= ~4;
     }
 

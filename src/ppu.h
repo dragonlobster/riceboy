@@ -4,6 +4,11 @@
 #include "mmu.h"
 #include "interrupt.h"
 #include <SFML/Graphics.hpp>
+#include <map>
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 class ppu {
   public:
@@ -197,6 +202,17 @@ class ppu {
     // dma
     bool dma_mode{false};
     bool dma_delay{false}; // delay dma start by one cycle
+
+    // Configuration values
+    uint16_t coincidence_flag_tick{452};
+    uint16_t mode0_ticks_config{204};
+    uint16_t mode2_ticks_config{80};
+    uint16_t mode3_ticks_config{172};
+    uint16_t mode1_ticks_config{456};
+    uint16_t dummy_fetch_cycles_config{8};
+    uint16_t scx_discard_cycles_config{8};
+    
+    void load_config(const std::string& config_file = "config.json");
 
     // pixel drawing
     sf::Image lcd_frame_image{};
